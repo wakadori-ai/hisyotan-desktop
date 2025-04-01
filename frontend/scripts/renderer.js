@@ -3,12 +3,15 @@
 
 import { logDebug, logError, saveErrorLog } from './logger.js';
 import { loadConfig } from './configLoader.js';
-import { initUIElements, showError } from './uiHelper.js';
+import { initUIElements, showError, shouldShowError } from './uiHelper.js';
 import { initExpressionElements, setExpression } from './expressionManager.js';
 import { setConfig as setWebSocketConfig, initWebSocket } from './websocketHandler.js';
 import { setConfig as setSpeechConfig, checkVoicevoxConnection } from './speechManager.js';
 import { initRandomLines } from './emotionHandler.js';
 import zombieOverlayManager from './overlayManager.js';
+
+// 起動中フラグ
+let isStartupInProgress = true;
 
 // 初期化
 document.addEventListener('DOMContentLoaded', async () => {
@@ -41,7 +44,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     initWebSocket();
     
     // VOICEVOXの接続確認
-    checkVoicevoxConnection();
+    // 非同期で実行し、結果を待たない（リトライロジックはcheckVoicevoxConnection内で処理）
+    checkVoicevoxConnection().catch(error => {
+      logDebug(`VOICEVOX接続確認中のエラー: ${error.message}`);
+      // エラー表示は機能内のリトライロジックに委ねる
+    });
     
     // ランダムセリフの初期化
     try {
@@ -67,9 +74,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     optimizePerformance();
     
     logDebug('すべての機能の初期化が完了しました');
+    
+    // 起動完了フラグを設定（10秒後に通常動作へ移行）
+    setTimeout(() => {
+      isStartupInProgress = false;
+      logDebug('起動猶予期間が終了しました。通常動作モードに移行します。');
+    }, 10000);
   } catch (error) {
     console.error('初期化エラー:', error);
-    showError(`初期化中にエラーが発生しました: ${error.message}`);
+    // 起動猶予期間後のみエラー表示
+    if (shouldShowError()) {
+      showError(`初期化中にエラーが発生しました: ${error.message}`);
+    }
     saveErrorLog(error);
   }
 });

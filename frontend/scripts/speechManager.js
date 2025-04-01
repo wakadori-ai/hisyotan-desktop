@@ -2,7 +2,7 @@
 // 発話・音声合成用のモジュール
 
 import { logDebug, logError, logZombieWarning } from './logger.js';
-import { showError } from './uiHelper.js';
+import { showError, shouldShowError } from './uiHelper.js';
 import { setText, showBubble, hideBubble, initUIElements } from './uiHelper.js';
 import { 
   setExpression, 
@@ -43,6 +43,12 @@ let currentSpeakAbort = null;
 
 // 現在再生中のAudioオブジェクト
 let currentAudio = null;
+
+// VOICEVOX接続状態管理変数
+let voicevoxRetryCount = 0;
+const MAX_VOICEVOX_RETRIES = 5;
+const VOICEVOX_RETRY_INTERVAL = 3000; // 再確認間隔（ミリ秒）
+let voicevoxConnectionErrorShown = false;
 
 // 🌟 モジュール読み込み時にUI要素を初期化（これがキモ！）
 initUIElements();
@@ -462,13 +468,37 @@ export async function checkVoicevoxConnection() {
     if (response.ok) {
       const result = await response.json();
       logDebug(`VOICEVOX接続確認結果: ${result.connected ? '接続成功' : '接続失敗'}`);
-      return result.connected;
+      
+      if (result.connected) {
+        // 接続成功時はリトライカウントをリセット
+        voicevoxRetryCount = 0;
+        voicevoxConnectionErrorShown = false;
+        return true;
+      } else {
+        // 接続失敗だがリトライ可能
+        throw new Error('VOICEVOX接続失敗: エンジンが起動していません');
+      }
     } else {
       throw new Error(`接続確認エラー: ${response.status}`);
     }
   } catch (error) {
     logDebug(`VOICEVOX接続エラー: ${error.message}`);
-    showError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
+    
+    // リトライ処理
+    voicevoxRetryCount++;
+    if (voicevoxRetryCount <= MAX_VOICEVOX_RETRIES) {
+      logDebug(`VOICEVOX接続リトライ予定 (${voicevoxRetryCount}/${MAX_VOICEVOX_RETRIES}): ${VOICEVOX_RETRY_INTERVAL}ms後`);
+      
+      // 数秒後に再試行
+      setTimeout(() => {
+        checkVoicevoxConnection().catch(err => logDebug(`再試行時のエラー: ${err.message}`));
+      }, VOICEVOX_RETRY_INTERVAL);
+    } else if (shouldShowError() && !voicevoxConnectionErrorShown) {
+      // 最大再試行回数を超えた場合のみエラー表示（猶予期間後）
+      showError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
+      voicevoxConnectionErrorShown = true;
+    }
+    
     return false;
   }
 }

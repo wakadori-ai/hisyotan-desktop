@@ -2,7 +2,7 @@
 // WebSocket接続管理用のモジュール
 
 import { logDebug, logError, logZombieWarning } from './logger.js';
-import { showError } from './uiHelper.js';
+import { showError, shouldShowError } from './uiHelper.js';
 import { updateConnectionStatus } from './uiHelper.js';
 import { speak, speakWithPreset } from './speechManager.js';
 import { hideTimeoutMap } from './speechManager.js';
@@ -24,6 +24,7 @@ let reconnectAttempts = 0; // 再接続試行回数
 const MAX_RECONNECT_ATTEMPTS = 5; // 最大再接続試行回数
 const RECONNECT_INTERVAL = 3000; // 再接続間隔（ミリ秒）
 let config = null; // 設定データ
+let connectionErrorShown = false; // エラーメッセージが表示されたかどうか
 
 /**
  * 設定をセットする
@@ -48,6 +49,7 @@ export function initWebSocket() {
       logDebug('WebSocket接続が確立されました');
       isConnected = true;
       reconnectAttempts = 0;
+      connectionErrorShown = false;
       updateConnectionStatus('connected');
       
       // 接続確立時にハローメッセージを送信
@@ -85,7 +87,10 @@ export function initWebSocket() {
         handleWebSocketMessage(message);
       } catch (error) {
         logError(`WebSocketメッセージのパース失敗: ${error.message}`, error);
-        showError('メッセージ処理中にエラーが発生しました');
+        // エラー表示は起動猶予期間後のみ
+        if (shouldShowError()) {
+          showError('メッセージ処理中にエラーが発生しました');
+        }
       }
     };
     
@@ -103,19 +108,34 @@ export function initWebSocket() {
       } else {
         updateConnectionStatus('failed');
         logError('WebSocket再接続の最大試行回数に達しました', new Error('再接続失敗'));
-        showError('バックエンドサーバーに接続できません。サーバーが起動しているか確認してください。');
+        
+        // 起動猶予期間後かつ未表示の場合のみエラー表示
+        if (shouldShowError() && !connectionErrorShown) {
+          showError('バックエンドサーバーに接続できません。サーバーが起動しているか確認してください。');
+          connectionErrorShown = true;
+        }
       }
     };
     
     websocket.onerror = (error) => {
       logError(`WebSocketエラー発生`, error);
       updateConnectionStatus('error');
-      showError('バックエンド接続中にエラーが発生しました');
+      
+      // 起動猶予期間後かつ未表示の場合のみエラー表示
+      if (shouldShowError() && !connectionErrorShown) {
+        showError('バックエンド接続中にエラーが発生しました');
+        connectionErrorShown = true;
+      }
     };
   } catch (error) {
     logError(`WebSocket初期化エラー: ${error.message}`, error);
     updateConnectionStatus('error');
-    showError(`バックエンド接続エラー: ${error.message}`);
+    
+    // 起動猶予期間後かつ未表示の場合のみエラー表示
+    if (shouldShowError() && !connectionErrorShown) {
+      showError(`バックエンド接続エラー: ${error.message}`);
+      connectionErrorShown = true;
+    }
     
     // エラー発生時も再接続を試みる
     if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
