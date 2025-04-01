@@ -511,6 +511,13 @@ body.mouse-active .speech-bubble.show {
   padding-top: 14px;
 }
 
+/* 設定ボタンと閉じるボタンのポインターイベント修正 */
+.settings-icon,
+.close-button,
+.bubble-close-button {
+  pointer-events: auto !important;
+}
+
 .advanced-section-toggle {
   cursor: pointer;
   padding: 8px 10px;
