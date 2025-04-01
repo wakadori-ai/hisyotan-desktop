@@ -79,6 +79,20 @@ async def start_zombie_monitoring() -> None:
         # 開発中の機能のため、モジュールが存在しない場合はスキップ
         try:
             from ..zombie.service import get_zombie_service
+            from ..voice.voicevox_starter import is_voicevox_ready
+            import asyncio
+            
+            # VOICEVOXの準備ができるまで少し待機
+            wait_count = 0
+            max_wait = 15  # 最大15秒待機
+            while wait_count < max_wait:
+                if await is_voicevox_ready():
+                    logger.info("VOICEVOXの準備が完了しました。ゾンビ監視を開始します。")
+                    break
+                await asyncio.sleep(1)
+                wait_count += 1
+                if wait_count % 5 == 0:
+                    logger.info(f"VOICEVOXの準備を待機中... ({wait_count}秒)")
             
             # ゾンビサービスの取得
             zombie_service = get_zombie_service()

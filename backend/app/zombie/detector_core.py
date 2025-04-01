@@ -105,39 +105,29 @@ class ZombieDetector:
             # ResNet分類器も初期化
             if self.resnet_enabled:
                 try:
-                    # パスを通すためにsys.pathを調整
+                    # 絶対パスではなく相対パスを使ってインポート
                     import sys
-                    import os
-                    from pathlib import Path
+                    sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+                    from ml.train import ZombieClassifier
+                    logger.info("ZombieClassifierをインポートしました")
                     
-                    # プロジェクトルートパスを取得して追加
-                    root_path = str(Path(__file__).parent.parent.parent)
-                    if root_path not in sys.path:
-                        sys.path.insert(0, root_path)
-                        logger.info(f"sys.pathに追加しました: {root_path}")
+                    # 分類器のインスタンス化と実行
+                    self.resnet_classifier = await loop.run_in_executor(
+                        None, 
+                        lambda: ZombieClassifier(data_path=os.path.join(DATA_DIR, "datasets", "zombie_classifier"))
+                    )
+                    logger.info("ResNet分類器の初期化に成功しました")
+                except ImportError as e:
+                    logger.error(f"ZombieClassifierのインポートに失敗: {e}")
                     
-                    # ZombieClassifierをインポート試行
-                    try:
-                        from backend.ml.train import ZombieClassifier
-                        logger.info("ZombieClassifierをインポートしました")
-                        
-                        # 分類器のインスタンス化と実行
-                        self.resnet_classifier = await loop.run_in_executor(
-                            None, 
-                            lambda: ZombieClassifier(data_path=os.path.join(DATA_DIR, "datasets", "zombie_classifier"))
-                        )
-                        logger.info("ResNet分類器の初期化に成功しました")
-                    except ImportError as e:
-                        logger.error(f"ZombieClassifierのインポートに失敗: {e}")
-                        
-                        # 最小限のダミー実装を提供
-                        class DummyClassifier:
-                            def predict_image(self, img_path):
-                                logger.warning("ダミー分類器が使用されています！")
-                                return "not_zombie", 0.0
-                        
-                        self.resnet_classifier = DummyClassifier()
-                        logger.warning("ダミーのResNet分類器を使用します")
+                    # 最小限のダミー実装を提供
+                    class DummyClassifier:
+                        def predict_image(self, img_path):
+                            logger.warning("ダミー分類器が使用されています！")
+                            return "not_zombie", 0.0
+                    
+                    self.resnet_classifier = DummyClassifier()
+                    logger.warning("ダミーのResNet分類器を使用します")
                 except Exception as e:
                     logger.error(f"ResNet分類器の初期化に失敗: {e}")
                     logger.exception("詳細なスタックトレース:")

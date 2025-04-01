@@ -59,11 +59,14 @@ class Settings:
         
         # 音声プリセットの読み込み
         self.VOICE_PRESETS = {
+            "通常": {"pitch": 0.0, "intonation": 1.0, "speed": 1.0},       # 標準ボイス
             "にこにこ": {"pitch": 0.06, "intonation": 1.3, "speed": 1.05},   # 明るく元気な声
             "警戒・心配": {"pitch": -0.03, "intonation": 0.9, "speed": 0.95}, # 少し不安げな声
             "びっくり": {"pitch": 0.12, "intonation": 1.5, "speed": 1.2},     # テンパっている声
             "やさしい": {"pitch": -0.06, "intonation": 1.1, "speed": 0.9},    # 落ち着いた声
-            "眠そう": {"pitch": -0.09, "intonation": 0.8, "speed": 0.8}       # ふにゃふにゃ声
+            "眠そう": {"pitch": -0.09, "intonation": 0.8, "speed": 0.8},      # ふにゃふにゃ声
+            "不安・怯え": {"pitch": -0.05, "intonation": 0.85, "speed": 0.9},  # 不安で怯えた声
+            "疑問・思案": {"pitch": -0.01, "intonation": 1.1, "speed": 0.9}    # 考え中の声
         }
         
         # 音声再生のクールダウン設定（秒）

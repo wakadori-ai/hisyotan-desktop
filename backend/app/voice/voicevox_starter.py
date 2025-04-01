@@ -21,6 +21,9 @@ voicevox_process: Optional[subprocess.Popen] = None
 # VOICEVOXが起動しているかどうか
 voicevox_running = False
 
+# VOICEVOXの準備状態を確認する変数
+_voicevox_ready = False
+
 def is_voicevox_running() -> bool:
     """VOICEVOXエンジンが起動しているかどうかを確認"""
     global voicevox_running
@@ -158,11 +161,55 @@ def stop_voicevox_engine() -> bool:
         logger.error(f"VOICEVOXエンジンの停止中にエラーが発生: {e}")
         return False
 
-# スレッドで非同期に起動する
-def start_voicevox_in_thread() -> None:
+# VOICEVOXが準備完了したかを確認する関数
+async def is_voicevox_ready() -> bool:
     """
-    バックグラウンドスレッドでVOICEVOXエンジンを起動
+    VOICEVOXエンジンが起動して準備完了しているかを確認する
+    
+    Returns:
+        bool: 準備完了ならTrue
     """
+    global _voicevox_ready
+    
+    # すでに準備完了フラグが立っている場合はそのまま返す
+    if _voicevox_ready:
+        return True
+    
+    # 準備完了していない場合はAPIに接続確認
+    try:
+        from ..config import get_settings
+        import aiohttp
+        import asyncio
+        
+        settings = get_settings()
+        
+        # 非同期HTTPリクエストでVOICEVOXのバージョンエンドポイントに接続確認
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(f"{settings.VOICEVOX_HOST}/version", timeout=1) as response:
+                    if response.status == 200:
+                        _voicevox_ready = True
+                        return True
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                return False
+        
+        return False
+    except Exception:
+        return False
+
+def start_voicevox_in_thread() -> bool:
+    """
+    別スレッドでVOICEVOXエンジンを起動する
+    
+    Returns:
+        bool: 起動プロセス開始成功の場合True
+    """
+    global _voicevox_ready
+    
+    # VOICEVOXエンジン起動時に準備完了フラグをリセット
+    _voicevox_ready = False
+    
+    # 残りのコードは既存のままとする
     def run_starter():
         success = start_voicevox_engine()
         logger.info(f"VOICEVOX起動スレッド完了: {'成功' if success else '失敗'}")
@@ -172,6 +219,8 @@ def start_voicevox_in_thread() -> None:
     starter_thread.start()
     logger.info("VOICEVOX起動スレッドを開始しました")
     
+    return True
+
 # アプリケーション終了時にVOICEVOXも停止
 def cleanup_on_exit() -> None:
     """
