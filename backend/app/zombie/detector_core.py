@@ -10,10 +10,21 @@ import glob
 import shutil
 import traceback  # スタックトレース取得用
 import json  # デバッグ情報のJSON出力用
+import torch
 from typing import List, Dict, Any, Tuple, Optional, Callable, Coroutine
 from ultralytics import YOLO
+from ultralytics.nn.tasks import DetectionModel
+from ultralytics.nn.modules import Conv
+from torch.nn import Sequential
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# PyTorch 2.6以降対応: DetectionModelとSequentialを安全なグローバルとして追加
+torch.serialization.add_safe_globals([
+    DetectionModel,
+    Sequential,
+    Conv
+])
 
 # 内部モジュールのインポート
 from .performance import PERFORMANCE_SETTINGS
@@ -97,6 +108,13 @@ class ZombieDetector:
     async def load_model(self):
         """YOLOモデルの非同期ロード"""
         try:
+            # YOLOロード直前に safe_globals を再追加（タイミング確保のため）
+            torch.serialization.add_safe_globals([
+                DetectionModel,
+                Sequential,
+                Conv
+            ])
+            
             # モデルのロードは重い処理なので非同期で行う
             loop = asyncio.get_event_loop()
             self.model = await loop.run_in_executor(None, lambda: YOLO(self.model_path))

@@ -312,7 +312,8 @@ class ZombieClassifier:
             try:
                 # モデルの読み込み
                 model_path = self.model_path/'zombie_classifier.pth'
-                checkpoint = torch.load(model_path)
+                # PyTorch 2.6以降対応: weights_only=Falseを明示的に指定
+                checkpoint = torch.load(model_path, weights_only=False)
                 
                 # ResNet18モデルの作成
                 self.model = models.resnet18(weights=None)
