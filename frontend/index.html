@@ -171,6 +171,23 @@
           container.style.paddingLeft = '0';
           break;
       }
+      
+      // ボタンの見た目を更新
+      const positionButtons = document.querySelectorAll('.position-buttons button');
+      if (positionButtons.length === 4) {
+        // すべてのボタンからアクティブクラスを削除
+        positionButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // 選択されたポジションに合わせてアクティブクラスを追加
+        let activeIndex = 0;
+        switch (position) {
+          case 'topLeft': activeIndex = 0; break;
+          case 'topRight': activeIndex = 1; break;
+          case 'bottomLeft': activeIndex = 2; break;
+          case 'bottomRight': activeIndex = 3; break;
+        }
+        positionButtons[activeIndex].classList.add('active');
+      }
     }
     
     // 自動透明化の設定
@@ -291,47 +308,58 @@
         <span class="close-btn" onclick="toggleOverlayMenu()">×</span>
       </div>
       <div class="overlay-content">
-        <div class="slider-control">
-          <label>透明度: <span id="opacityValue">100</span>%</label>
-          <input type="range" id="opacitySlider" min="0" max="100" value="100" oninput="updateOpacity(this.value)">
-        </div>
-        <div class="slider-control">
-          <label>サイズ: <span id="sizeValue">100</span>%</label>
-          <input type="range" id="sizeSlider" min="50" max="150" value="100" oninput="updateSize(this.value)">
-        </div>
-        <div class="position-control">
-          <label>位置:</label>
-          <div class="position-buttons">
-            <button onclick="updatePosition('topLeft')">左上</button>
-            <button onclick="updatePosition('topRight')">右上</button>
-            <button onclick="updatePosition('bottomLeft')">左下</button>
-            <button onclick="updatePosition('bottomRight')">右下</button>
+        <!-- ユーザー向け基本設定 -->
+        <div class="settings-section">
+          <div class="slider-control">
+            <label>透明度: <span id="opacityValue">100</span>%</label>
+            <input type="range" id="opacitySlider" min="0" max="100" value="100" oninput="updateOpacity(this.value)">
+          </div>
+          <div class="slider-control">
+            <label>サイズ: <span id="sizeValue">100</span>%</label>
+            <input type="range" id="sizeSlider" min="50" max="150" value="100" oninput="updateSize(this.value)">
+          </div>
+          <div class="position-control">
+            <label>位置:</label>
+            <div class="position-buttons">
+              <button onclick="updatePosition('topLeft')">左上</button>
+              <button onclick="updatePosition('topRight')">右上</button>
+              <button onclick="updatePosition('bottomLeft')">左下</button>
+              <button onclick="updatePosition('bottomRight')">右下</button>
+            </div>
+          </div>
+          <div class="toggle-control">
+            <label>
+              <input type="checkbox" id="autoHideToggle" onchange="toggleAutoHide(this.checked)">
+              マウス操作時に自動で透明化
+            </label>
+          </div>
+          <div class="toggle-control">
+            <label>
+              <input type="checkbox" id="alwaysTopToggle" onchange="toggleAlwaysOnTop(this.checked)">
+              常に最前面に表示
+            </label>
           </div>
         </div>
-        <div class="toggle-control">
-          <label>
-            <input type="checkbox" id="autoHideToggle" onchange="toggleAutoHide(this.checked)">
-            マウス操作時に自動で透明化
-          </label>
-        </div>
-        <div class="toggle-control">
-          <label>
-            <input type="checkbox" id="alwaysTopToggle" onchange="toggleAlwaysOnTop(this.checked)">
-            常に最前面に表示
-          </label>
-        </div>
-        <div class="advanced-control">
-          <label>高度な設定:</label>
-          <div class="advanced-buttons">
-            <button onclick="toggleDebugMenu()">開発メニュー表示</button>
-            <button onclick="toggleDebugPanel()">デバッグパネル</button>
-            <button onclick="openDevTools()">開発者ツール</button>
+        
+        <!-- 開発者向け詳細設定（折りたたみ式） -->
+        <div class="advanced-section-wrapper">
+          <div class="advanced-section-toggle" onclick="toggleAdvancedSection()">
+            <span class="toggle-icon">▷</span> 詳細設定（開発者向け）
+          </div>
+          <div class="advanced-section" id="advancedSection" style="display: none;">
+            <div class="advanced-buttons">
+              <button onclick="toggleDebugMenu()">開発メニュー</button>
+              <button onclick="toggleDebugPanel()">デバッグパネル</button>
+              <button onclick="openDevTools()">開発者ツール</button>
+              <button onclick="testZombieOverlay()">ゾンビ警告テスト</button>
+              <button onclick="testNormalBubble()">吹き出し状態確認</button>
+            </div>
           </div>
         </div>
+        
         <div class="overlay-footer">
-          <span class="shortcut-hint">ショートカット: Ctrl+F11</span>
-          <button onclick="saveSettings()">保存</button>
-          <button onclick="closeApp()" class="exit-button">アプリを終了</button>
+          <button onclick="saveSettings()" class="save-button">保存</button>
+          <button onclick="closeApp()" class="exit-button">終了</button>
         </div>
       </div>
     </div>
@@ -662,6 +690,22 @@
       } else {
         console.error('ゾンビオーバーレイマネージャーが見つかりません');
         alert('ゾンビオーバーレイマネージャーが初期化されていません');
+      }
+    }
+  </script>
+
+  <script>
+    // 詳細設定セクションの表示/非表示を切り替える
+    function toggleAdvancedSection() {
+      const section = document.getElementById('advancedSection');
+      const toggle = document.querySelector('.advanced-section-toggle');
+      
+      if (section.style.display === 'none') {
+        section.style.display = 'block';
+        toggle.querySelector('.toggle-icon').textContent = '▼';
+      } else {
+        section.style.display = 'none';
+        toggle.querySelector('.toggle-icon').textContent = '▷';
       }
     }
   </script>

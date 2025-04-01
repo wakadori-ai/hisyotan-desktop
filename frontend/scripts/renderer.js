@@ -136,6 +136,14 @@ async function loadAndApplySettings() {
           if (assistantImage) {
             assistantImage.style.opacity = config.assistant.opacity / 100;
           }
+          
+          // UI要素にも値を反映
+          const opacitySlider = document.getElementById('opacitySlider');
+          const opacityValue = document.getElementById('opacityValue');
+          if (opacitySlider && opacityValue) {
+            opacitySlider.value = config.assistant.opacity;
+            opacityValue.textContent = config.assistant.opacity;
+          }
         }
         
         // サイズの適用
@@ -143,6 +151,14 @@ async function loadAndApplySettings() {
           const assistantImage = document.getElementById('assistantImage');
           if (assistantImage) {
             assistantImage.style.transform = `scale(${config.assistant.size / 100})`;
+          }
+          
+          // UI要素にも値を反映
+          const sizeSlider = document.getElementById('sizeSlider');
+          const sizeValue = document.getElementById('sizeValue');
+          if (sizeSlider && sizeValue) {
+            sizeSlider.value = config.assistant.size;
+            sizeValue.textContent = config.assistant.size;
           }
         }
         
@@ -179,11 +195,43 @@ async function loadAndApplySettings() {
                 break;
             }
           }
+          
+          // UI要素にも視覚的に反映（ボタンにアクティブクラスを追加する場合）
+          const positionButtons = document.querySelectorAll('.position-buttons button');
+          if (positionButtons && positionButtons.length === 4) {
+            // 一度すべてのアクティブクラスを削除
+            positionButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // 現在の位置に応じてアクティブクラスを追加
+            let activeIndex = 0;
+            switch (config.assistant.position) {
+              case 'topLeft': activeIndex = 0; break;
+              case 'topRight': activeIndex = 1; break;
+              case 'bottomLeft': activeIndex = 2; break;
+              case 'bottomRight': activeIndex = 3; break;
+            }
+            positionButtons[activeIndex].classList.add('active');
+          }
         }
         
         // 自動透明化の設定
-        if (typeof config.assistant.autoHide === 'boolean' && !config.assistant.autoHide) {
-          document.body.classList.remove('mouse-active');
+        if (typeof config.assistant.autoHide === 'boolean') {
+          const autoHideToggle = document.getElementById('autoHideToggle');
+          if (autoHideToggle) {
+            autoHideToggle.checked = config.assistant.autoHide;
+          }
+          
+          if (!config.assistant.autoHide) {
+            document.body.classList.remove('mouse-active');
+          }
+        }
+        
+        // 最前面表示の設定
+        if (typeof config.assistant.alwaysOnTop === 'boolean') {
+          const alwaysTopToggle = document.getElementById('alwaysTopToggle');
+          if (alwaysTopToggle) {
+            alwaysTopToggle.checked = config.assistant.alwaysOnTop;
+          }
         }
         
         console.log('秘書たんの設定を適用しました', config.assistant);
