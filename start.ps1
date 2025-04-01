@@ -76,16 +76,18 @@ function Show-Logo {
 # VOICEVOXが起動しているか確認する関数
 function Test-VOICEVOXAvailable {
     try {
-        $response = Invoke-WebRequest -Uri "http://127.0.0.1:50021/speakers" -Method GET -TimeoutSec 3 -ErrorAction SilentlyContinue
-        if ($response.StatusCode -eq 200) {
-            Write-Host "✅ VOICEVOXは正常に動作しています ✨" -ForegroundColor Green
+        $json = Invoke-RestMethod -Uri "http://127.0.0.1:50021/speakers" -Method GET -TimeoutSec 5 -ErrorAction Stop
+        if ($json -and $json.Count -gt 0) {
+            Write-Host "✅ VOICEVOXは正常に動作しています（スピーカー数: $($json.Count)）✨" -ForegroundColor Green
             return $true
+        } else {
+            Write-Host "⚠️ VOICEVOXはレスポンスを返しましたが、スピーカー情報がありません" -ForegroundColor Yellow
+            return $false
         }
     } catch {
         Write-Host "⚠️ VOICEVOXに接続できません: $($_.Exception.Message)" -ForegroundColor Yellow
         return $false
     }
-    return $false
 }
 
 # VOICEVOXを自動起動する関数
@@ -111,13 +113,14 @@ function Start-VOICEVOXEngine {
             Start-Process -FilePath $voicevoxPath -WindowStyle Minimized
             Write-Host "🚀 VOICEVOXエンジンを起動しました。初期化を待機中..." -ForegroundColor Cyan
             
-            # 起動を待つ（最大30秒）
+            # 起動を待つ（最適化）
             $retryCount = 0
-            $maxRetry = 10
+            $maxRetry = 5  # 回数を減らす
+            $waitSec = 2   # 待機時間も短縮
             $success = $false
             
             while ($retryCount -lt $maxRetry -and -not $success) {
-                Start-Sleep -Seconds 3
+                Start-Sleep -Seconds $waitSec
                 $success = Test-VOICEVOXAvailable
                 if (-not $success) {
                     Write-Host "⌛ VOICEVOXエンジン起動待機中... ($($retryCount+1)/$maxRetry)" -ForegroundColor Yellow
@@ -129,8 +132,9 @@ function Start-VOICEVOXEngine {
                 Write-Host "✅ VOICEVOXエンジンが正常に起動しました 🎤" -ForegroundColor Green
                 return $true
             } else {
-                Write-Host "⚠️ VOICEVOXエンジンの応答を確認できませんでした。対応が必要かもしれません" -ForegroundColor Yellow
-                Write-Host "   URL: http://127.0.0.1:50021/speakers でVOICEVOXの状態を確認してください" -ForegroundColor Yellow
+                Write-Host "⚠️ VOICEVOXエンジンの応答を確認できませんでした。" -ForegroundColor Yellow
+                Write-Host "   💡 実は起動している可能性もあります！このまま続けてみてください" -ForegroundColor Cyan
+                Write-Host "   URL: http://127.0.0.1:50021/speakers でVOICEVOXの状態を確認できます" -ForegroundColor Yellow
                 return $false
             }
         } else {
@@ -144,19 +148,50 @@ function Start-VOICEVOXEngine {
     }
 }
 
+# VOICEVOXプロセスが既に実行中かをチェックする関数（高速）
+function Test-VOICEVOXProcessRunning {
+    $vvProcess = Get-Process -Name "run" -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*VOICEVOX*" }
+    if ($vvProcess) {
+        Write-Host "✨ VOICEVOXプロセスが既に実行中です（PID: $($vvProcess.Id)）" -ForegroundColor Green
+        return $true
+    }
+    return $false
+}
+
 # メイン処理
 try {
     Show-Logo
     Write-Host "🚀 秘書たんを起動しています..." -ForegroundColor Cyan
     
-    # VOICEVOXの起動確認と自動起動
-    $voicevoxRunning = Test-VOICEVOXAvailable
-    if (-not $voicevoxRunning) {
-        Write-Host "🔄 VOICEVOXエンジンが実行されていません。自動起動を試みます..." -ForegroundColor Yellow
-        $voicevoxStartResult = Start-VOICEVOXEngine
-        if (-not $voicevoxStartResult) {
-            Write-Host "⚠️ 音声機能は利用できません。VOICEVOXエンジンを手動で起動してください" -ForegroundColor Yellow
-            Write-Host "   👉 引き続き他の機能の起動を続行します" -ForegroundColor Cyan
+    # VOICEVOXの起動確認と自動起動（最適化）
+    $voicevoxProcessRunning = Test-VOICEVOXProcessRunning
+    
+    if ($voicevoxProcessRunning) {
+        # プロセスが実行中の場合はHTTPチェックもしておく（バックグラウンドで）
+        Write-Host "🎀 VOICEVOXは既に準備できているみたいですね！" -ForegroundColor Magenta
+        Write-Host "   💭 (バックグラウンドで応答確認をしていますので、お待たせしません💫)" -ForegroundColor Cyan
+        $voicevoxRunning = $true
+        
+        # バックグラウンドでHTTP応答を確認（秘書たんの起動を待たせない）
+        Start-Job -ScriptBlock {
+            $jsonTest = $null
+            try {
+                $jsonTest = Invoke-RestMethod -Uri "http://127.0.0.1:50021/speakers" -Method GET -TimeoutSec 2 -ErrorAction Stop
+            } catch {
+                # エラーは無視（ログのみ）
+                Write-Host "ℹ️ VOICEVOXは実行中ですが、まだHTTP応答の準備ができていないようです" -ForegroundColor Yellow
+            }
+        } | Out-Null
+    } else {
+        # プロセスが見つからない場合は通常の確認を実行
+        $voicevoxRunning = Test-VOICEVOXAvailable
+        if (-not $voicevoxRunning) {
+            Write-Host "🔄 VOICEVOXエンジンが実行されていません。自動起動を試みます..." -ForegroundColor Yellow
+            $voicevoxStartResult = Start-VOICEVOXEngine
+            if (-not $voicevoxStartResult) {
+                Write-Host "⚠️ 音声機能は利用できません。VOICEVOXエンジンを手動で起動してください" -ForegroundColor Yellow
+                Write-Host "   👉 引き続き他の機能の起動を続行します" -ForegroundColor Cyan
+            }
         }
     }
     
@@ -201,7 +236,7 @@ try {
         Write-Host "   👉 VOICEVOXを手動で起動すると、音声機能が使えるようになります" -ForegroundColor Yellow
     }
     
-    Write-Host "`n😊 ご利用ありがとうございます！`n" -ForegroundColor Magenta
+    Write-Host "`n🎀 秘書たんが待機しています！今日も一日頑張りましょう〜♪`n" -ForegroundColor Magenta
     
 } catch {
     Write-Host "❌ エラーが発生しました: $_" -ForegroundColor Red
