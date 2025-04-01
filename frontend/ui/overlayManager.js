@@ -1,7 +1,7 @@
 // overlayManager.js
 // ゾンビの存在感を画面上に可視化するためのモジュール
 
-import { logDebug } from './logger.js';
+import { logDebug } from '../core/logger.js';
 
 class ZombieOverlayManager {
   constructor() {

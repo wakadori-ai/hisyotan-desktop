@@ -1,9 +1,9 @@
 // emotionHandler.js
 // 感情反応・ランダムメッセージ生成用のモジュール
 
-import { logDebug } from './logger.js';
-import { speak } from './speechManager.js';
-import { reactWithVoice } from './audioReactor.js';
+import { logDebug } from '../core/logger.js';
+import { speak } from '../emotion/speechManager.js';
+import { reactWithVoice } from '../voice/audioReactor.js';
 
 let randomLinesController = null; // ランダムセリフ表示の制御オブジェクト
 

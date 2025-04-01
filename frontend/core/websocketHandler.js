@@ -1,11 +1,11 @@
 // websocketHandler.js
 // WebSocket接続管理用のモジュール
 
-import { logDebug, logError, logZombieWarning } from './logger.js';
-import { showError, shouldShowError } from './uiHelper.js';
-import { updateConnectionStatus } from './uiHelper.js';
-import { speak, speakWithPreset } from './speechManager.js';
-import { hideTimeoutMap } from './speechManager.js';
+import { logDebug, logError, logZombieWarning } from '../core/logger.js';
+import { showError, shouldShowError } from '../ui/uiHelper.js';
+import { updateConnectionStatus } from '../ui/uiHelper.js';
+import { speak, speakWithPreset } from '../emotion/speechManager.js';
+import { hideTimeoutMap } from '../emotion/speechManager.js';
 import { 
   startLightBounce, 
   stopLightBounce, 
@@ -14,9 +14,9 @@ import {
   startNervousShake,
   stopNervousShake,
   setExpression
-} from './expressionManager.js';
-import { playPresetSound } from './audioReactor.js';
-import zombieOverlayManager from './overlayManager.js';
+} from '../emotion/expressionManager.js';
+import { playPresetSound } from '../voice/audioReactor.js';
+import zombieOverlayManager from '../ui/overlayManager.js';
 
 let websocket = null; // WebSocketオブジェクト
 let isConnected = false; // 接続状態

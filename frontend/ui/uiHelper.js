@@ -1,7 +1,7 @@
 // uiHelper.js
 // UI表示制御用のモジュール
 
-import { logDebug, logError, logZombieWarning } from './logger.js';
+import { logDebug, logError, logZombieWarning } from '../core/logger.js';
 
 // DOM要素
 let speechBubble;

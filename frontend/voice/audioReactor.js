@@ -2,7 +2,7 @@
 // ゲームイベントに対する音声リアクション機能を提供するモジュール
 // Author: hisyotan-desktop team
 
-import { logDebug } from './logger.js';
+import { logDebug } from '../core/logger.js';
 
 // 効果音（SE）と音声ファイルのマッピング定義
 const presetMap = {

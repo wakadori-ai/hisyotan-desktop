@@ -42,7 +42,7 @@ try {
 // 設定読み込み
 let config = {};
 try {
-  config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'config.json'), 'utf8'));
 } catch (error) {
   console.error('設定ファイルの読み込みに失敗しました:', error);
   config = {
@@ -168,7 +168,7 @@ function createWindow() {
 
   mainWindow.focus();
   // メインページ読み込み - 正しいパスを指定
-  const indexPath = path.join(__dirname, '..', 'index.html');
+  const indexPath = path.join(__dirname, '..', 'ui', 'index.html');
   console.log('index.htmlのパス:', indexPath);
   console.log('アプリケーションのパス:', app.getAppPath());
   mainWindow.loadFile(indexPath);
@@ -203,9 +203,11 @@ ipcMain.handle('speak-text', async (event, text, emotion = 'normal') => {
 });
 
 // 開発者ツールを開くためのIPCハンドラー
-ipcMain.on('open-dev-tools', () => {
+ipcMain.on('open-dev-tools', (event, options) => {
   if (mainWindow) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // 常に別ウィンドウで開くよう強制
+    const devToolsOptions = { mode: 'detach' };
+    mainWindow.webContents.openDevTools(devToolsOptions);
     console.log('開発者ツールを別ウィンドウで開きました');
   }
 });
@@ -246,14 +248,12 @@ ipcMain.handle('update-settings', (event, newSettings) => {
 
 // 設定保存関数
 function saveConfig() {
+  const configPath = path.join(__dirname, '..', 'config', 'config.json');
   try {
-    fs.writeFileSync(
-      path.join(__dirname, 'config.json'),
-      JSON.stringify(config, null, 2),
-      'utf8'
-    );
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    console.log('設定ファイルを保存しました:', configPath);
   } catch (error) {
-    console.error('設定の保存に失敗しました:', error);
+    console.error('設定ファイルの保存に失敗しました:', error);
   }
 }
 

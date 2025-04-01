@@ -1,7 +1,7 @@
 // expressionManager.js
 // 表情変更・アニメーション制御用のモジュール
 
-import { logDebug } from './logger.js';
+import { logDebug } from '../core/logger.js';
 
 // DOM要素
 let assistantImage;
@@ -33,29 +33,75 @@ export function setExpression(expression) {
     
     currentExpression = expression;
     
-    // 画像パスを設定（パスを修正）
-    // タイムスタンプを追加してキャッシュを回避
-    const timestamp = new Date().getTime();
-    let imagePath = `http://127.0.0.1:8000/assets/secretary_${expression}.png?t=${timestamp}`;
-    
-    // 絶対パスを取得（Electron APIが利用可能な場合）
-    if (window.electronAPI && window.electronAPI.getAssetPath) {
-      window.electronAPI.getAssetPath(`images/secretary_${expression}.png`)
-        .then(absolutePath => {
-          logDebug(`絶対パスを取得: ${absolutePath}`);
-          assistantImage.src = absolutePath;
-        })
-        .catch(err => {
-          logDebug(`絶対パス取得エラー: ${err.message}、相対パスを使用します`);
-          assistantImage.src = imagePath;
-        });
-    } else {
-      // Electron APIが使用できない場合は相対パスを試す
-      logDebug(`画像パスを設定: ${imagePath}`);
-      assistantImage.src = imagePath;
+    try {
+      // 画像パスを設定（デバッグ向けに複数のパスを用意）
+      const timestamp = new Date().getTime();
+      
+      // Electronの場合は直接アプリの絶対パスを使う
+      if (window.electronAPI) {
+        logDebug('Electron APIを使用して画像を読み込みます');
+        
+        // assistantImageが見つかるか確認
+        if (!assistantImage) {
+          assistantImage = document.getElementById('assistantImage');
+          logDebug('assistantImageを再取得しました');
+        }
+        
+        // Electronの場合は絶対パスを使う
+        if (window.electronAPI.getAssetPath) {
+          try {
+            const assetPath = `images/secretary_${expression}.png`;
+            window.electronAPI.getAssetPath(assetPath)
+              .then(path => {
+                logDebug(`画像の絶対パスを取得: ${path}`);
+                assistantImage.src = path;
+              })
+              .catch(err => {
+                // 絶対パスが取得できない場合はエラーハンドリング
+                logDebug(`絶対パス取得エラー: ${err.message}`);
+                
+                // フォールバックとして直接パスを指定
+                const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png?t=${timestamp}`;
+                logDebug(`直接絶対パスを使用: ${directPath}`);
+                assistantImage.src = directPath;
+              });
+          } catch (err) {
+            logDebug(`getAssetPath実行エラー: ${err.message}`);
+            
+            // エラー時は直接絶対パスを設定
+            const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png?t=${timestamp}`;
+            logDebug(`直接絶対パスを使用: ${directPath}`);
+            assistantImage.src = directPath;
+          }
+        } else {
+          // getAssetPathがない場合は直接絶対パスを設定
+          const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png?t=${timestamp}`;
+          logDebug(`直接絶対パスを使用: ${directPath}`);
+          assistantImage.src = directPath;
+        }
+      } else {
+        // 非Electron環境（ブラウザなど）
+        const imagePath = `http://127.0.0.1:8000/static/images/secretary_${expression}.png?t=${timestamp}`;
+        logDebug(`非Electron環境用画像パス: ${imagePath}`);
+        assistantImage.src = imagePath;
+      }
+      
+      // 代替テキストを設定
+      assistantImage.alt = `秘書たん（${expression}）`;
+      
+    } catch (error) {
+      console.error(`画像設定エラー: ${error.message}`);
+      logDebug(`画像設定処理でエラー: ${error.message}`);
+      
+      // エラー発生時の最終手段として直接絶対パスを設定
+      try {
+        const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png`;
+        assistantImage.src = directPath;
+        logDebug(`エラー発生後の直接パス設定: ${directPath}`);
+      } catch (e) {
+        console.error(`最終的な画像設定も失敗: ${e.message}`);
+      }
     }
-    
-    assistantImage.alt = `秘書たん（${expression}）`;
     
     logDebug(`表情変更完了: ${expression}`);
     return true;

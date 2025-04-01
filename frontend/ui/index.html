@@ -280,7 +280,7 @@
         <span class="bubble-text" id="speechText"></span>
         <div class="bubble-close-button" id="bubbleCloseButton" onclick="hideBubble()">×</div>
       </div>
-      <img id="assistantImage" class="assistant-image" src="../assets/images/secretary_normal.png" alt="秘書たん" />
+      <img id="assistantImage" class="assistant-image" src="../../assets/images/secretary_normal.png" alt="秘書たん" />
       <div class="close-button" id="closeButton" onclick="closeApp()">×</div>
     </div>
     <div class="error-bubble" id="errorBubble">
@@ -365,251 +365,14 @@
     </div>
   </div>
 
-  <!-- スクリプト -->
-  <script type="module" src="ui/renderer.js"></script>
-  <script>
-    // AudioContextを最初のページ読み込み時に初期化
-    document.addEventListener('DOMContentLoaded', () => {
-      // ユーザー操作を待たずに音声を再生できるようにするための初期化
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      // サイレント音声を再生して初期化
-      const silentAudio = new Audio();
-      silentAudio.volume = 0.01;
-      silentAudio.play().catch(err => console.log('初期サイレント再生：', err));
-    });
-    
-    // Electron環境かどうかをチェック
-    const isElectronApp = typeof window !== 'undefined' && 
-                          typeof window.electronAPI !== 'undefined';
-    
-    console.log('環境チェック: Electron =', isElectronApp ? 'Yes' : 'No');
-    
-    // speak関数をグローバルに定義（renderer.jsのものがない場合のフォールバック）
-    if (typeof window.speak !== 'function') {
-      window.speak = function(text, emotion = 'normal', displayTime = 5000) {
-        console.log(`[Fallback] 秘書たんの発言: ${text} (感情: ${emotion}, 表示時間: ${displayTime}ms)`);
-        // 吹き出しを取得
-        const speechBubble = document.getElementById('speechBubble');
-        const speechText = document.getElementById('speechText');
-        
-        if (speechBubble && speechText) {
-          // テキストを設定
-          speechText.textContent = text;
-          
-          // 吹き出しを表示
-          speechBubble.style.cssText = `
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-          `;
-          speechBubble.className = 'speech-bubble show';
-          
-          // 指定時間後に非表示
-          if (displayTime > 0) {
-            setTimeout(() => {
-              speechBubble.className = 'speech-bubble hide';
-              speechBubble.style.opacity = '0';
-              setTimeout(() => {
-                speechBubble.style.display = 'none';
-              }, 300);
-            }, displayTime);
-          }
-        }
-      };
-    }
-    
-    // デバッグメニューの表示/非表示を切り替える
-    function toggleDebugMenu() {
-      const menu = document.getElementById('debugMenu');
-      if (menu.style.display === 'none') {
-        menu.style.display = 'flex';
-      } else {
-        menu.style.display = 'none';
-      }
-    }
-    
-    // 開発者ツールを開く関数
-    function openDevTools() {
-      if (window.electronAPI && window.electronAPI.openDevTools) {
-        console.log('ElectronAPI経由で開発者ツールを開きます');
-        window.electronAPI.openDevTools();
-      } else {
-        console.log('Electron APIが利用できないため開発者ツールを開けません');
-        alert('開発者ツールを開くにはCtrl+Shift+I (Windows/Linux) または Cmd+Option+I (Mac) を押してください');
-      }
-    }
-    
-    // 通常吹き出しテスト
-    function testNormalBubble() {
-      console.log('通常吹き出しテスト実行');
-      // 直接renderer.jsの関数を呼び出す
-      window.speak('これは通常の吹き出しテストです', 'normal', 10000);
-    }
-    
-    // 赤い吹き出しテスト（デバッグ用）
-    function testBubble() {
-      console.log('赤吹き出しテスト実行');
-      const speechBubble = document.getElementById('speechBubble');
-      const speechText = document.getElementById('speechText');
-      
-      // テキスト設定
-      speechText.textContent = 'これはデバッグ用テストです！';
-      
-      // 強制的に表示（デバッグ用の赤い吹き出し）
-      speechBubble.className = 'speech-bubble debug-bubble';
-      speechBubble.style.cssText = `
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        background-color: #ffdddd !important;
-        border: 3px solid #d32f2f !important;
-        position: fixed !important;
-        top: 100px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        z-index: 999999 !important;
-      `;
-      
-      console.log('赤吹き出し設定完了');
-    }
-    
-    // ランダムセリフをテスト実行する関数
-    function testRandomLine() {
-      console.log('ランダムセリフをテスト実行します');
-      
-      // ランダムセリフ関数が存在するか確認
-      if (typeof window.initRandomLines === 'function') {
-        // 既存のコントローラーを使用
-        if (window.randomLinesController && typeof window.randomLinesController.showNow === 'function') {
-          console.log('既存のコントローラーを使用してランダムセリフを表示します');
-          window.randomLinesController.showNow();
-        } else {
-          // 新しいコントローラーを生成
-          console.log('新しいコントローラーを生成してランダムセリフを表示します');
-          const controller = window.initRandomLines(15000);
-          
-          // 即時実行
-          if (controller && typeof controller.showNow === 'function') {
-            controller.showNow();
-          }
-        }
-      } else if (typeof window.showRandomLine === 'function') {
-        // showRandomLine関数があればそれを使う
-        console.log('✅ showRandomLine関数を使用してランダムセリフを有効化します');
-        
-        // 簡易コントローラーを作成
-        window.randomLinesController = {
-          showNow: window.showRandomLine,
-          stop: function() { console.log('ランダムセリフを停止しました'); }
-        };
-      } else {
-        console.error('ランダムセリフ関数が見つかりません');
-        alert('ランダムセリフ機能が初期化されていません');
-      }
-    }
-    
-    // ページ読み込み完了後の処理を強化
-    document.addEventListener('DOMContentLoaded', async () => {
-      console.log('DOM 読み込み完了 - 初期化開始');
-      
-      // レンダラーの初期化を待つ
-      const waitForRandomLines = () => {
-        console.log('ランダムセリフ機能の初期化処理を開始');
-        
-        try {
-          // レンダラースクリプトの読み込みを確認
-          if (typeof window.initRandomLines === 'function') {
-            console.log('✅ ランダムセリフ関数が見つかりました - 初期化します');
-            try {
-              // グローバル変数に保存
-              window.randomLinesController = window.initRandomLines(15000);
-              
-              // テスト用に即時実行
-              setTimeout(() => {
-                console.log('🔍 ランダムセリフのテスト実行');
-                if (window.randomLinesController && typeof window.randomLinesController.showNow === 'function') {
-                  window.randomLinesController.showNow();
-                }
-              }, 3000);
-            } catch (error) {
-              console.error('ランダムセリフ初期化中にエラーが発生しました:', error);
-              
-              // エラー発生時に簡易コントローラーを作成
-              window.randomLinesController = createFallbackController();
-            }
-          } else if (typeof window.showRandomLine === 'function') {
-            // showRandomLine関数があればそれを使う
-            console.log('✅ showRandomLine関数を使用してランダムセリフを有効化します');
-            
-            // 簡易コントローラーを作成
-            window.randomLinesController = {
-              showNow: window.showRandomLine,
-              stop: function() { console.log('ランダムセリフを停止しました'); }
-            };
-          } else {
-            console.warn('⚠️ ランダムセリフ関数がまだ見つかりません（再試行します）');
-            // 再試行
-            setTimeout(waitForRandomLines, 1000);
-          }
-        } catch (e) {
-          console.error('ランダムセリフ検証中にエラーが発生しました:', e);
-        }
-      };
-      
-      // フォールバックコントローラー作成関数
-      function createFallbackController() {
-        console.log('フォールバックランダムセリフコントローラーを作成します');
-        return {
-          showNow: function() {
-            const phrases = [
-              "おつかれさま〜…ぎゅってしてあげたい気分なの",
-              "すごいよ…ちゃんと頑張ってるの、見てるからね",
-              "ふにゃ…今日はのんびりしよ？",
-              "ねぇ、ちょっとだけ甘えてもいい…？",
-              "ここにいるからね。ひとりじゃないよ",
-              "お水飲んだ？小休憩しよっか",
-              "えらいえらい…よしよしっ"
-            ];
-            const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-            if (typeof window.speak === 'function') {
-              window.speak(randomPhrase, 'normal', 5000);
-            } else {
-              console.log('フォールバック発言:', randomPhrase);
-            }
-          },
-          stop: function() {
-            console.log('フォールバックコントローラー: ランダムセリフを停止しました');
-          }
-        };
-      }
-      
-      // 5秒後に初期化を開始（レンダラー初期化の時間を確保）
-      setTimeout(waitForRandomLines, 5000);
-    });
-    
-    // キーボードショートカット
-    document.addEventListener('keydown', (event) => {
-      // Ctrl+Shift+I または Cmd+Option+I で開発者ツールを開く
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && (event.key === 'I' || event.key === 'i')) {
-        openDevTools();
-      }
-      // F2キーでデバッグメニューの表示/非表示を切り替え
-      if (event.key === 'F2') {
-        toggleDebugMenu();
-      }
-      
-      // F3キーで通常吹き出しテスト
-      if (event.key === 'F3') {
-        testNormalBubble();
-      }
-      
-      // Ctrl+F11 でオーバーレイメニューを表示
-      if ((event.ctrlKey || event.metaKey) && event.key === 'F11') {
-        toggleOverlayMenu();
-        event.preventDefault(); // デフォルトの動作を防止
-      }
-    });
-  </script>
+  <!-- メインスクリプトの読み込み (正しいパスで配置) -->
+  <script type="module" src="../core/logger.js"></script>
+  <script type="module" src="../emotion/speechManager.js"></script>
+  <script type="module" src="../emotion/expressionManager.js"></script>
+  <script type="module" src="../voice/audioReactor.js"></script>
+  <script type="module" src="./uiHelper.js"></script>
+  <script type="module" src="./overlayManager.js"></script>
+  <script type="module" src="./renderer.js"></script>
 
   <!-- デバッグパネル -->
   <div id="debug-panel" style="display: none; position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; z-index: 9999999; font-family: monospace; font-size: 12px;">
@@ -706,6 +469,19 @@
       } else {
         section.style.display = 'none';
         toggle.querySelector('.toggle-icon').textContent = '▷';
+      }
+    }
+  </script>
+
+  <script>
+    // デバッグコンソールを新しいウィンドウで開く
+    function openDevTools() {
+      if (window.electronAPI && window.electronAPI.openDevTools) {
+        console.log('ElectronAPI経由で開発者ツールを開きます');
+        window.electronAPI.openDevTools({ mode: 'detach' });
+      } else {
+        console.error('開発者ツールAPIが見つかりません');
+        alert('開発者ツールを開くためのAPIが利用できません。');
       }
     }
   </script>

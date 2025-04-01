@@ -1,7 +1,7 @@
 // configLoader.js
 // 設定読み込み用のモジュール
 
-import { logDebug, logError } from './logger.js';
+import { logDebug, logError } from '../core/logger.js';
 
 // デフォルト設定
 const defaultConfig = {
