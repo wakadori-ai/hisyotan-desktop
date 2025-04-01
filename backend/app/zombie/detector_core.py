@@ -19,13 +19,6 @@ from torch.nn import Sequential
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# PyTorch 2.6以降対応: DetectionModelとSequentialを安全なグローバルとして追加
-torch.serialization.add_safe_globals([
-    DetectionModel,
-    Sequential,
-    Conv
-])
-
 # 内部モジュールのインポート
 from .performance import PERFORMANCE_SETTINGS
 from .notification import notification_manager
@@ -107,14 +100,7 @@ class ZombieDetector:
     
     async def load_model(self):
         """YOLOモデルの非同期ロード"""
-        try:
-            # YOLOロード直前に safe_globals を再追加（タイミング確保のため）
-            torch.serialization.add_safe_globals([
-                DetectionModel,
-                Sequential,
-                Conv
-            ])
-            
+        try:            
             # モデルのロードは重い処理なので非同期で行う
             loop = asyncio.get_event_loop()
             self.model = await loop.run_in_executor(None, lambda: YOLO(self.model_path))

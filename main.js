@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const fetch = require('node-fetch');
+const iconv = require('iconv-lite');
 
 // 開発モードかどうかを判定
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -64,12 +65,16 @@ async function startBackendServer() {
     
     // 標準出力のリスニング
     backendProcess.stdout.on('data', (data) => {
-      console.log(`バックエンド出力: ${data.toString().trim()}`);
+      // iconv-liteを使ってShift-JISデコード
+      const output = iconv.decode(data, 'cp932').trim();
+      console.log(`バックエンド出力: ${output}`);
     });
     
     // エラー出力のリスニング
     backendProcess.stderr.on('data', (data) => {
-      console.error(`バックエンドエラー: ${data.toString().trim()}`);
+      // iconv-liteを使ってShift-JISデコード
+      const output = iconv.decode(data, 'cp932').trim();
+      console.error(`バックエンドエラー: ${output}`);
     });
     
     // プロセス終了時の処理

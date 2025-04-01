@@ -15,6 +15,12 @@ from pathlib import Path
 from fastapi import Body
 import argparse
 
+# 標準出力・標準エラー出力のエンコーディングを明示的に設定
+if sys.stdout.encoding != 'utf-8':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 # ベースディレクトリの設定
 BASE_DIR = Path(__file__).parent.absolute()
 if str(BASE_DIR) not in sys.path:
