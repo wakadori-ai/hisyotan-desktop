@@ -105,20 +105,42 @@ class ZombieDetector:
             # ResNet分類器も初期化
             if self.resnet_enabled:
                 try:
-                    # 非同期でResNet分類器を読み込む
-                    from backend.ml.train import ZombieClassifier
+                    # パスを通すためにsys.pathを調整
+                    import sys
+                    import os
+                    from pathlib import Path
                     
-                    # モデルディレクトリの設定
-                    resnet_model_dir = os.path.join(DATA_DIR, "models")
+                    # プロジェクトルートパスを取得して追加
+                    root_path = str(Path(__file__).parent.parent.parent)
+                    if root_path not in sys.path:
+                        sys.path.insert(0, root_path)
+                        logger.info(f"sys.pathに追加しました: {root_path}")
                     
-                    # 分類器のインスタンス化と実行
-                    self.resnet_classifier = await loop.run_in_executor(
-                        None, 
-                        lambda: ZombieClassifier(data_path=os.path.join(DATA_DIR, "datasets", "zombie_classifier"))
-                    )
-                    logger.info("ResNet分類器の初期化に成功しました")
+                    # ZombieClassifierをインポート試行
+                    try:
+                        from backend.ml.train import ZombieClassifier
+                        logger.info("ZombieClassifierをインポートしました")
+                        
+                        # 分類器のインスタンス化と実行
+                        self.resnet_classifier = await loop.run_in_executor(
+                            None, 
+                            lambda: ZombieClassifier(data_path=os.path.join(DATA_DIR, "datasets", "zombie_classifier"))
+                        )
+                        logger.info("ResNet分類器の初期化に成功しました")
+                    except ImportError as e:
+                        logger.error(f"ZombieClassifierのインポートに失敗: {e}")
+                        
+                        # 最小限のダミー実装を提供
+                        class DummyClassifier:
+                            def predict_image(self, img_path):
+                                logger.warning("ダミー分類器が使用されています！")
+                                return "not_zombie", 0.0
+                        
+                        self.resnet_classifier = DummyClassifier()
+                        logger.warning("ダミーのResNet分類器を使用します")
                 except Exception as e:
                     logger.error(f"ResNet分類器の初期化に失敗: {e}")
+                    logger.exception("詳細なスタックトレース:")
                     self.resnet_enabled = False
             
             return True
@@ -552,4 +574,48 @@ class ZombieDetector:
         except Exception as e:
             logger.error(f"コールバック呼び出し中にエラーが発生: {e}")
     
-    # 以下、実装の詳細については省略（ファイルサイズの制約のため）
+    def _save_detection_image(self, screenshot, boxes):
+        """
+        検出結果の画像を保存する
+        
+        Args:
+            screenshot: スクリーンショット画像
+            boxes: 検出されたバウンディングボックスの情報
+        """
+        try:
+            import cv2
+            from datetime import datetime
+            
+            # タイムスタンプの取得
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # 画像のコピーを作成
+            debug_img = screenshot.copy()
+            
+            # バウンディングボックスの描画
+            for box in boxes:
+                if "bbox" in box:
+                    x1, y1, x2, y2 = box["bbox"]
+                    conf = box.get("confidence", 0.0)
+                    class_id = box.get("class_id", 0)
+                    
+                    # 色の設定 (クラスIDによって変える)
+                    color = (0, 255, 0)  # 基本は緑色
+                    if class_id != 0:
+                        color = (0, 0, 255)  # 人物以外は赤色
+                    
+                    # バウンディングボックスと信頼度の描画
+                    cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(debug_img, f"{conf:.2f}", (x1, y1-10), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            
+            # 画像の保存
+            detection_count = len(boxes)
+            debug_path = os.path.join(DEBUG_DIR, f"detection_{timestamp}_{detection_count}.jpg")
+            cv2.imwrite(debug_path, debug_img)
+            
+            logger.debug(f"検出画像を保存しました: {debug_path}")
+            
+        except Exception as e:
+            logger.error(f"検出画像の保存中にエラーが発生: {e}")
+            # エラーが起きても処理を続行

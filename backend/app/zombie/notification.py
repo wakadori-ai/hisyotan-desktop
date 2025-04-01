@@ -57,7 +57,7 @@ class NotificationManager:
         self.min_audio_interval: float = 5.0
         
         # 同一ソースからの最小通知間隔（秒）
-        self.min_source_interval: float = 10.0
+        self.min_source_interval: float = 1.0
         self.last_source_time: Dict[str, float] = {}
     
     def try_acquire_notification(self, zombie_count: int, source: str = "detector", detection_type: Optional[str] = None) -> Tuple[bool, int]:
