@@ -1,0 +1,370 @@
+// renderer.js
+// 秘書たんのUI制御用エントリポイント
+
+import { logDebug, logError, saveErrorLog } from './logger.js';
+import { loadConfig } from './configLoader.js';
+import { initUIElements, showError } from './uiHelper.js';
+import { initExpressionElements, setExpression } from './expressionManager.js';
+import { setConfig as setWebSocketConfig, initWebSocket } from './websocketHandler.js';
+import { setConfig as setSpeechConfig, checkVoicevoxConnection } from './speechManager.js';
+import { initRandomLines } from './emotionHandler.js';
+
+// 初期化
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    logDebug('DOM読み込み完了、初期化を開始します');
+    
+    // UI要素の初期化
+    initUIElements();
+    initExpressionElements();
+    
+    // 初期表情設定
+    setExpression('normal');
+    
+    // 設定読み込み
+    const config = await loadConfig();
+    
+    // 各モジュールに設定を渡す
+    setWebSocketConfig(config);
+    setSpeechConfig(config);
+    
+    // バックエンドとの接続
+    initWebSocket();
+    
+    // VOICEVOXの接続確認
+    checkVoicevoxConnection();
+    
+    // ランダムセリフの初期化
+    try {
+      logDebug('ランダムセリフ機能を初期化しています...');
+      const randomController = initRandomLines(30000);
+      
+      // グローバルスコープにも保存（index.htmlから参照可能に）
+      if (typeof window !== 'undefined') {
+        window.randomLinesController = randomController;
+        // ランダムセリフ関数も明示的にwindowに設定
+        window.initRandomLines = initRandomLines;
+        logDebug('ランダムセリフ機能をグローバルに公開しました');
+      }
+    } catch (error) {
+      logDebug(`ランダムセリフ初期化エラー: ${error.message}`);
+      saveErrorLog(error);
+    }
+    
+    // マウスイベント処理の設定
+    setupMouseEventHandling();
+    
+    // パフォーマンス最適化
+    optimizePerformance();
+    
+    logDebug('すべての機能の初期化が完了しました');
+  } catch (error) {
+    console.error('初期化エラー:', error);
+    showError(`初期化中にエラーが発生しました: ${error.message}`);
+    saveErrorLog(error);
+  }
+});
+
+// デバッグ用: 初期化が完了したことをコンソールに表示
+console.log('renderer.js: すべての機能が初期化されました');
+
+// マウス操作検出のための変数
+let mouseTimer;
+let mouseActive = false;
+
+// マウスの動きを検出
+document.addEventListener('mousemove', function() {
+  // 自動透明化が有効な場合のみ適用
+  if (window.currentSettings && window.currentSettings.autoHide === false) {
+    return;
+  }
+  
+  // マウスが動いたらbodyにmouse-activeクラスを追加
+  document.body.classList.add('mouse-active');
+  mouseActive = true;
+  
+  // 既存のタイマーをクリア
+  clearTimeout(mouseTimer);
+  
+  // 3秒間動きがなければmouse-activeクラスを削除
+  mouseTimer = setTimeout(function() {
+    document.body.classList.remove('mouse-active');
+    mouseActive = false;
+  }, 3000);
+});
+
+// マウスクリック時も同様に処理
+document.addEventListener('mousedown', function() {
+  // 自動透明化が有効な場合のみ適用
+  if (window.currentSettings && window.currentSettings.autoHide === false) {
+    return;
+  }
+  
+  document.body.classList.add('mouse-active');
+  mouseActive = true;
+  
+  clearTimeout(mouseTimer);
+  
+  mouseTimer = setTimeout(function() {
+    document.body.classList.remove('mouse-active');
+    mouseActive = false;
+  }, 3000);
+});
+
+// 保存された設定の読み込みと適用
+async function loadAndApplySettings() {
+  try {
+    if (window.electronAPI && window.electronAPI.getSettings) {
+      const config = await window.electronAPI.getSettings();
+      
+      // 設定があれば適用
+      if (config && config.assistant) {
+        window.currentSettings = config.assistant;
+        
+        // 透明度の適用
+        if (typeof config.assistant.opacity === 'number') {
+          const assistantImage = document.getElementById('assistantImage');
+          if (assistantImage) {
+            assistantImage.style.opacity = config.assistant.opacity / 100;
+          }
+        }
+        
+        // サイズの適用
+        if (typeof config.assistant.size === 'number') {
+          const assistantImage = document.getElementById('assistantImage');
+          if (assistantImage) {
+            assistantImage.style.transform = `scale(${config.assistant.size / 100})`;
+          }
+        }
+        
+        // 位置の適用
+        if (config.assistant.position) {
+          const container = document.querySelector('.assistant-container');
+          if (container) {
+            // 位置に応じてスタイルを変更
+            switch (config.assistant.position) {
+              case 'topLeft':
+                container.style.alignItems = 'flex-start';
+                container.style.justifyContent = 'flex-start';
+                container.style.paddingRight = '0';
+                container.style.paddingLeft = '30px';
+                break;
+              case 'topRight':
+                container.style.alignItems = 'flex-end';
+                container.style.justifyContent = 'flex-start';
+                container.style.paddingRight = '30px';
+                container.style.paddingLeft = '0';
+                break;
+              case 'bottomLeft':
+                container.style.alignItems = 'flex-start';
+                container.style.justifyContent = 'flex-end';
+                container.style.paddingRight = '0';
+                container.style.paddingLeft = '30px';
+                break;
+              case 'bottomRight':
+              default:
+                container.style.alignItems = 'flex-end';
+                container.style.justifyContent = 'flex-end';
+                container.style.paddingRight = '30px';
+                container.style.paddingLeft = '0';
+                break;
+            }
+          }
+        }
+        
+        // 自動透明化の設定
+        if (typeof config.assistant.autoHide === 'boolean' && !config.assistant.autoHide) {
+          document.body.classList.remove('mouse-active');
+        }
+        
+        console.log('秘書たんの設定を適用しました', config.assistant);
+      }
+    }
+  } catch (error) {
+    console.error('設定の読み込みと適用に失敗しました:', error);
+  }
+}
+
+// マウスイベント処理の設定
+function setupMouseEventHandling() {
+  // マウスイベントを受け取る必要がある要素
+  const interactiveElements = [
+    document.getElementById('speechBubble'),
+    document.getElementById('errorBubble'),
+    document.getElementById('statusIndicator'),
+    document.getElementById('settingsIcon'),
+    document.getElementById('debugMenu'),
+    document.getElementById('overlayMenu')
+  ].filter(element => element !== null);
+  
+  // electronAPIが利用可能かチェック
+  if (window.electronAPI && window.electronAPI.enableMouseEvents && window.electronAPI.disableMouseEvents) {
+    // デバウンス処理用の変数
+    let mouseEventTimerId = null;
+    const debounceTime = 300; // ミリ秒
+    
+    // マウスイベントの有効化（デバウンス処理付き）
+    function enableMouseEventsWithDebounce() {
+      clearTimeout(mouseEventTimerId);
+      try {
+        window.electronAPI.enableMouseEvents();
+        logDebug('マウスイベントを有効化しました（デバウンス処理）');
+      } catch (error) {
+        logError('マウスイベント有効化エラー:', error);
+        saveErrorLog(error);
+      }
+    }
+    
+    // マウスイベントの無効化（デバウンス処理付き）
+    function disableMouseEventsWithDebounce() {
+      clearTimeout(mouseEventTimerId);
+      mouseEventTimerId = setTimeout(() => {
+        try {
+          // マウスがどのインタラクティブ要素の上にもない場合のみ無効化
+          const isOverInteractive = interactiveElements.some(element => 
+            element.matches(':hover')
+          );
+          
+          if (!isOverInteractive) {
+            window.electronAPI.disableMouseEvents();
+            logDebug('マウスイベントを無効化しました（デバウンス処理）');
+          }
+        } catch (error) {
+          logError('マウスイベント無効化エラー:', error);
+          saveErrorLog(error);
+        }
+      }, debounceTime);
+    }
+    
+    // interactiveな要素にマウスが入ったらイベントを有効化
+    interactiveElements.forEach(element => {
+      element.addEventListener('mouseenter', enableMouseEventsWithDebounce);
+      element.addEventListener('mouseleave', disableMouseEventsWithDebounce);
+    });
+    
+    // 初期状態では無効化しておく
+    window.electronAPI.disableMouseEvents();
+  } else {
+    logDebug('electronAPIが利用できないため、マウスイベント処理を設定できません');
+  }
+}
+
+// パフォーマンス最適化
+function optimizePerformance() {
+  try {
+    logDebug('パフォーマンス最適化を適用しています...');
+    
+    // リサイズイベントの最適化（デバウンス処理）
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        // リサイズ完了後の処理
+        logDebug('ウィンドウリサイズを検出しました');
+        // 必要なレイアウト調整があればここで実行
+      }, 250);
+    });
+    
+    // 低負荷モードの実装
+    const lowPowerMode = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (lowPowerMode) {
+      // アニメーション効果を減らす処理
+      document.body.classList.add('reduce-motion');
+      logDebug('低負荷モードを適用しました');
+    }
+    
+    // 不要なアニメーションを無効化（オプション）
+    if (window.currentSettings && window.currentSettings.reduceAnimations) {
+      document.body.classList.add('reduce-animations');
+      logDebug('アニメーション効果を削減しました');
+    }
+    
+    logDebug('パフォーマンス最適化が完了しました');
+  } catch (error) {
+    logError('パフォーマンス最適化エラー:', error);
+    saveErrorLog(error);
+  }
+}
+
+// クリックスルー制御用のコード
+document.addEventListener('keydown', (event) => {
+  // Alt+C でクリックスルーの切り替え
+  if (event.altKey && event.key === 'c') {
+    console.log('Alt+C が押されました - クリックスルー切り替え');
+    toggleClickThroughMode();
+  }
+});
+
+// クリックスルーモードの切り替え関数（外部からも呼び出せるようにグローバル関数として定義）
+window.toggleClickThroughMode = function() {
+  // electronAPIが利用可能かチェック
+  if (window.electronAPI && window.electronAPI.toggleClickThrough) {
+    window.electronAPI.toggleClickThrough().then(isDisabled => {
+      // クリックスルーが無効（つまりクリック可能）ならデバッグモード表示
+      if (isDisabled) {
+        document.body.classList.add('pointer-events-enabled');
+        console.log('デバッグモード有効: クリック可能');
+        
+        // デバッグパネルを表示
+        const debugPanel = document.getElementById('debug-panel');
+        if (debugPanel) {
+          debugPanel.style.display = 'block';
+        }
+        
+        // 操作可能状態を通知
+        speak('操作モードが有効になりました。Alt+Cで元に戻せます。', 'normal', 3000);
+      } else {
+        document.body.classList.remove('pointer-events-enabled');
+        console.log('デバッグモード無効: クリック透過');
+        
+        // デバッグパネルを非表示
+        const debugPanel = document.getElementById('debug-panel');
+        if (debugPanel) {
+          debugPanel.style.display = 'none';
+        }
+        
+        // クリックスルーモードに戻ったことを通知
+        speak('クリック透過モードに戻りました', 'normal', 2000);
+      }
+    });
+  } else {
+    console.error('electronAPI.toggleClickThrough が利用できません');
+  }
+};
+
+// レンダラープロセスのロード完了時にデバッグパネルのクリック透過を防止
+window.addEventListener('DOMContentLoaded', () => {
+  // デバッグパネルの要素を取得
+  const debugPanel = document.getElementById('debug-panel');
+  
+  if (debugPanel) {
+    // デバッグパネル内のボタンをクリックしたときの処理
+    debugPanel.addEventListener('mouseenter', () => {
+      if (window.electronAPI && window.electronAPI.enableClickThrough) {
+        // パネル上にマウスが乗ったら一時的にクリックスルーを無効化
+        window.electronAPI.enableClickThrough();
+      }
+    });
+    
+    debugPanel.addEventListener('mouseleave', () => {
+      // デバッグモードが有効でない場合のみ元に戻す
+      if (!document.body.classList.contains('pointer-events-enabled')) {
+        if (window.electronAPI && window.electronAPI.disableClickThrough) {
+          // パネルからマウスが離れたら元に戻す
+          window.electronAPI.disableClickThrough();
+        }
+      }
+    });
+  }
+});
+
+// Electron IPCからのクリックスルー状態変更通知を処理
+if (window.electronAPI) {
+  window.electronAPI.onClickThroughChanged((isEnabled) => {
+    if (isEnabled) {
+      document.body.classList.remove('pointer-events-enabled');
+    } else {
+      document.body.classList.add('pointer-events-enabled');
+    }
+  });
+}

@@ -1,0 +1,491 @@
+// speechManager.js
+// 発話・音声合成用のモジュール
+
+import { logDebug, logError, logZombieWarning } from './logger.js';
+import { showError } from './uiHelper.js';
+import { setText, showBubble, hideBubble, initUIElements } from './uiHelper.js';
+import { 
+  setExpression, 
+  startTalking, 
+  stopTalking, 
+  startLightBounce, 
+  stopLightBounce,
+  startTrembling,
+  stopTrembling,
+  startNervousShake,
+  stopNervousShake
+} from './expressionManager.js';
+
+// 設定データ
+let config = null;
+
+// 非表示タイマーをMapで管理（イベントタイプごとに異なるタイマーを持つ）
+let hideTimeoutMap = new Map(); 
+const messageDisplayTime = 5000; // デフォルトのメッセージ表示時間（ミリ秒）
+
+// 表示制御用フラグと現在のイベント状態管理
+let currentSpeechEvent = null;
+let hasAlreadyForced = false;
+let lastForceTime = 0;
+
+// 多重実行防止用の変数
+let lastSpokenEvent = null;
+let lastSpokenMessage = null;
+let lastZombieWarningTime = 0;
+const zombieCooldownMs = 10000; // ゾンビ警告のクールダウン時間（10秒）
+
+// 音声再生中フラグ
+let isAudioPlaying = false;
+
+// リクエストキャンセル用のAbortController
+let currentSpeakAbort = null;
+
+// 現在再生中のAudioオブジェクト
+let currentAudio = null;
+
+// 🌟 モジュール読み込み時にUI要素を初期化（これがキモ！）
+initUIElements();
+logDebug('speechManagerモジュール初期化: UI要素を初期化しました');
+
+// hideTimeoutMapをエクスポート
+export { hideTimeoutMap };
+
+/**
+ * 設定をセットする
+ * @param {Object} configData - 設定データ
+ */
+export function setConfig(configData) {
+  config = configData;
+  logDebug('音声合成設定をセットしました');
+}
+
+/**
+ * メッセージの整形（語尾を統一）
+ * @param {string} message - 整形前のメッセージ
+ * @returns {string} 整形後のメッセージ
+ */
+function formatMessage(message) {
+  if (!message.startsWith('「')) {
+    message = '「' + message;
+  }
+  if (!message.endsWith('」') && !message.endsWith('」。')) {
+    message = message + '」';
+  }
+  return message;
+}
+
+/**
+ * 吹き出しの表示を強制する
+ * @param {string} formattedText - 表示するテキスト
+ * @param {string} eventType - イベントタイプ（デフォルトは'default'）
+ */
+function forceShowBubble(formattedText, eventType = 'default') {
+  logDebug('吹き出しの表示を強制します');
+  const speechBubble = document.getElementById('speechBubble');
+  const speechText = document.getElementById('speechText');
+
+  // ゾンビ警告用の特別なデバッグログ
+  const isZombieEvent = (eventType === 'zombie_warning' || eventType === 'zombie_few');
+  if (isZombieEvent) {
+    logZombieWarning(`吹き出しの強制表示を実行: イベントタイプ="${eventType}", テキスト="${formattedText}"`);
+  }
+
+  if (speechBubble && speechText) {
+    // テキストを直接設定
+    speechText.textContent = formattedText;
+    speechText.innerText = formattedText;
+    
+    // データ属性にバックアップ
+    speechText.dataset.backupText = formattedText;
+    
+    // スタイルをリセットしてクラスも再設定
+    speechBubble.classList.remove('hide', 'show', 'speech-bubble', 'zombie-warning');
+    speechBubble.removeAttribute('style');
+    
+    // 最優先のスタイルを設定
+    speechBubble.style.cssText = `
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      position: absolute !important;
+      z-index: 2147483647 !important;
+      top: 20% !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      pointer-events: auto !important;
+    `;
+
+    // クラスを追加
+    requestAnimationFrame(() => {
+      speechBubble.classList.add('speech-bubble', 'show');
+      
+      if (isZombieEvent) {
+        speechBubble.classList.add('zombie-warning');
+      }
+    });
+  } else {
+    logError('forceShowBubble: 吹き出し要素が見つかりません');
+    initUIElements();
+  }
+}
+
+/**
+ * 秘書たんにセリフを話させる
+ * @param {string} message - セリフ
+ * @param {string} emotion - 感情（normal, happy, surprised, serious, sleepy, relieved, smile）
+ * @param {number} displayTime - 表示時間（ミリ秒）
+ * @param {string} animation - アニメーション（bounce_light, trembling, nervous-shake, null）
+ * @param {string} eventType - イベントタイプ（イベント識別用、デフォルトは'default'）
+ */
+export function speak(message, emotion = 'normal', displayTime = messageDisplayTime, animation = null, eventType = 'default') {
+  try {
+    // 多重実行チェック（同一メッセージ・同一イベントタイプの場合はスキップ）
+    const isDuplicate = (lastSpokenEvent === eventType && lastSpokenMessage === message);
+    if (isDuplicate) {
+      logDebug(`発話スキップ（重複検出）: "${message}" (イベント: ${eventType})`);
+      return;
+    }
+    
+    // 再生中フラグチェック（ゾンビ警告系イベントのみ）
+    if ((eventType === 'zombie_warning' || eventType === 'zombie_few') && isAudioPlaying) {
+      logDebug(`🔁 音声が再生中のためスキップ: "${message}"`);
+      return;
+    }
+    
+    // ゾンビ警告のクールダウン制御
+    if (eventType === "zombie_warning" || eventType === "zombie_few") {
+      const now = Date.now();
+      if (now - lastZombieWarningTime < zombieCooldownMs) {
+        logDebug(`ゾンビ警告をスキップ（クールダウン中: ${Math.round((now - lastZombieWarningTime) / 1000)}秒経過）: "${message}"`);
+        return;
+      }
+      lastZombieWarningTime = now;
+    }
+    
+    logDebug(`発話開始: "${message}" (感情: ${emotion}, 表示時間: ${displayTime}ms, アニメーション: ${animation || 'なし'}, イベントタイプ: ${eventType})`);
+
+    // 状態リセット：新しい発話が始まるたびにリセット
+    hasAlreadyForced = false;
+    lastForceTime = Date.now();
+    currentSpeechEvent = eventType;
+
+    // 既存のタイマーがあれば全てクリア
+    if (hideTimeoutMap.size > 0) {
+      logDebug(`${hideTimeoutMap.size}個の非表示タイマーを一括クリアします`);
+      for (const [key, timerId] of hideTimeoutMap.entries()) {
+        clearTimeout(timerId);
+        logDebug(`タイマー ${key} をクリアしました`);
+      }
+      hideTimeoutMap.clear();
+    }
+
+    // 表情を変更
+    setExpression(emotion);
+    
+    // メッセージを整形して吹き出しに表示
+    const formattedMessage = formatMessage(message);
+    
+    // 吹き出しを表示
+    showBubble(eventType);
+    
+    // テキストを設定
+    const speechText = document.getElementById('speechText');
+    if (speechText) {
+      speechText.textContent = formattedMessage;
+      speechText.innerText = formattedMessage;
+    }
+    
+    // 吹き出しが実際に表示されたか確認するためのデバッグ
+    setTimeout(() => {
+      const speechBubble = document.getElementById('speechBubble');
+      const speechText = document.getElementById('speechText');
+      if (!speechBubble) {
+        logError('吹き出し要素が見つかりません');
+        return;
+      }
+      
+      // 強制的に表示を保証（フラグを考慮）
+      if ((speechBubble.style.display !== 'flex' || speechBubble.style.visibility !== 'visible' || (speechText && speechText.textContent.trim() === '')) && !hasAlreadyForced) {
+        logDebug('吹き出しまたはテキストに問題があります。強制表示します');
+        forceShowBubble(formattedMessage, eventType);
+        hasAlreadyForced = true;
+        lastForceTime = Date.now();
+      }
+    }, 50);
+    
+    // アニメーションの実行（指定されている場合）
+    if (animation) {
+      logDebug(`アニメーション開始: ${animation}`);
+      switch(animation) {
+        case 'bounce_light':
+          startLightBounce();
+          // アニメーション終了タイマー
+          setTimeout(() => {
+            stopLightBounce();
+            logDebug('アニメーション終了: bounce_light');
+          }, displayTime);
+          break;
+        case 'trembling':
+          startTrembling();
+          // アニメーション終了タイマー
+          setTimeout(() => {
+            stopTrembling();
+            logDebug('アニメーション終了: trembling');
+          }, displayTime);
+          break;
+        case 'nervous-shake':
+        case 'nervous_shake': // 両方の形式をサポート
+          startNervousShake();
+          // アニメーション終了タイマー
+          setTimeout(() => {
+            stopNervousShake();
+            logDebug('アニメーション終了: nervous-shake');
+          }, displayTime);
+          break;
+        default:
+          logDebug(`未知のアニメーション種類: ${animation}`);
+      }
+    }
+    
+    // 音声合成をリクエスト
+    requestVoiceSynthesis(message, emotion, eventType, formattedMessage);
+    
+    // 既存のタイマーがあればクリア
+    if (hideTimeoutMap.has(eventType)) {
+      clearTimeout(hideTimeoutMap.get(eventType));
+      logDebug(`イベントタイプ ${eventType} の既存タイマーをクリアしました`);
+    }
+    
+    // 指定された時間後に吹き出しを非表示（イベントタイプごとに管理）
+    const timeoutId = setTimeout(() => {
+      logDebug(`イベントタイプ ${eventType} のタイマーが発火: 吹き出しを非表示にします`);
+      
+      // 現在のイベントと一致する場合のみ吹き出しを非表示にする
+      if (currentSpeechEvent === eventType) {
+        hideBubble();
+        setExpression('normal');
+        currentSpeechEvent = null;
+        
+        // タイマーを削除
+        if (hideTimeoutMap.has(eventType)) {
+          hideTimeoutMap.delete(eventType);
+        }
+      }
+    }, displayTime);
+    
+    hideTimeoutMap.set(eventType, timeoutId);
+    logDebug(`発話表示タイマー設定: 時間=${displayTime}ms, イベントタイプ=${eventType}`);
+
+    // 正常に発話開始した時点で最後の発話情報を記録
+    lastSpokenEvent = eventType;
+    lastSpokenMessage = message;
+  } catch (error) {
+    logError(`発話エラー: ${error.message}`);
+    showError(`発話処理に失敗しました: ${error.message}`);
+  }
+}
+
+/**
+ * 音声合成リクエストを送信する
+ * @param {string} text - 合成するテキスト
+ * @param {string} emotion - 感情
+ * @param {string} eventType - イベントタイプ（イベント識別用）
+ * @param {string} formattedMessage - 表示用の整形済みメッセージ
+ * @returns {Promise<boolean>} 成功したかどうか
+ */
+async function requestVoiceSynthesis(text, emotion = 'normal', eventType = 'default', formattedMessage = null) {
+  try {
+    // 前回のリクエストが残っていればキャンセル
+    if (currentSpeakAbort) {
+      currentSpeakAbort.abort();
+      logDebug("🎙 前回の発話リクエストをキャンセルしました");
+    }
+    
+    // 再生中のAudioがあれば手動で停止
+    if (currentAudio && !currentAudio.paused) {
+      currentAudio.pause();
+      currentAudio.src = "";
+      logDebug("🛑 前の音声再生を手動で停止しました");
+    }
+
+    // 新しいAbortControllerを作成
+    const controller = new AbortController();
+    currentSpeakAbort = controller;
+    
+    // 設定から話者IDを取得
+    const speakerId = config?.voicevox?.speaker_id || 8;
+    
+    // バックエンドAPIのベースURLを設定
+    const apiBaseUrl = 'http://127.0.0.1:8000';
+    
+    logDebug(`バックエンドの音声合成APIを呼び出します (話者ID: ${speakerId}, 感情: ${emotion})`);
+    
+    // タイムアウト設定
+    const timeoutSignal = AbortSignal.timeout(10000); // 10秒でタイムアウト
+    
+    // 複数のシグナルを組み合わせる関数
+    const combineSignals = (...signals) => {
+      const controller = new AbortController();
+      const { signal } = controller;
+      
+      signals.forEach(s => {
+        if (s.aborted) {
+          controller.abort(s.reason);
+          return;
+        }
+        
+        s.addEventListener('abort', () => controller.abort(s.reason), { once: true });
+      });
+      
+      return signal;
+    };
+    
+    // コントローラのシグナルとタイムアウトシグナルを組み合わせる
+    const combinedSignal = combineSignals(controller.signal, timeoutSignal);
+    
+    // リクエストボディを準備
+    const requestBody = {
+      text: text,
+      emotion: emotion,
+      speaker_id: speakerId
+    };
+    
+    logDebug(`リクエスト内容: ${JSON.stringify(requestBody)}`);
+    
+    // バックエンド側で音声合成＆再生するAPIを呼び出す
+    const response = await fetch(`${apiBaseUrl}/api/voice/speak`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
+      signal: combinedSignal
+    });
+    
+    if (!response.ok) {
+      // レスポンスのテキストを取得してエラーメッセージに含める
+      const errorText = await response.text();
+      logError(`バックエンドAPI呼び出し失敗: ${response.status} ${response.statusText}`);
+      logError(`エラー詳細: ${errorText}`);
+      throw new Error(`バックエンドAPI呼び出し失敗: ${response.status} ${response.statusText}`);
+    }
+    
+    // レスポンスからステータスを確認
+    const result = await response.json();
+    if (result.status !== 'success') {
+      logError(`音声再生リクエストエラー: ${result.message}`);
+      throw new Error(`音声再生リクエストエラー: ${result.message}`);
+    }
+    
+    logDebug(`音声再生リクエスト成功: ${result.message}`);
+    
+    // 音声再生開始（バックエンドで再生中と仮定）
+    isAudioPlaying = true;
+    logDebug("🔈 音声再生開始 → フラグON (バックエンド側で再生中)");
+    
+    // 口パクアニメーション開始
+    startTalking();
+    
+    // 約4秒後に再生終了とみなす
+    // 実際のテキスト長に応じて調整するのがベター（1文字あたり約0.15秒が目安）
+    const estimatedDuration = text.length * 150; // ミリ秒単位（1文字あたり約150ms）
+    const minDuration = 2000; // 最低2秒
+    const maxDuration = 10000; // 最大10秒
+    const duration = Math.min(Math.max(estimatedDuration, minDuration), maxDuration);
+    
+    logDebug(`推定音声再生時間: ${duration}ms (テキスト長: ${text.length}文字)`);
+    
+    // 口パクと再生中フラグを制御するタイマー設定
+    setTimeout(() => {
+      // 音声再生フラグをオフに
+      isAudioPlaying = false;
+      logDebug("🔕 音声再生完了（推定時間経過）→ フラグ解除");
+      
+      // 口パクアニメーション停止
+      stopTalking();
+    }, duration);
+    
+    return true;
+  } catch (error) {
+    // エラーハンドリング：AbortErrorの場合は正常処理
+    if (error.name === 'AbortError') {
+      if (error.message === 'The operation was aborted due to timeout') {
+        logDebug("⏱ 音声合成リクエストがタイムアウトしました");
+        showError('バックエンドへの接続がタイムアウトしました。サーバーが起動しているか確認してください。');
+      } else {
+        logDebug("🎙 発話リクエストがキャンセルされました");
+      }
+      return false;
+    }
+    
+    // ネットワークエラーの場合
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      logDebug(`ネットワークエラー: バックエンドサーバーに接続できません`);
+      showError('バックエンドサーバーに接続できません。サーバーが起動しているか確認してください。');
+      return false;
+    }
+    
+    logError(`音声合成エラー: ${error.message}`);
+    showError(`音声合成に失敗しました (${error.message})`);
+    
+    return false;
+  }
+}
+
+/**
+ * VOICEVOXの接続確認
+ * @returns {Promise<boolean>} 接続成功したかどうか
+ */
+export async function checkVoicevoxConnection() {
+  try {
+    // バックエンドAPIのURLを直接指定
+    const apiBaseUrl = 'http://127.0.0.1:8000';
+    const response = await fetch(`${apiBaseUrl}/api/voice/check-connection`);
+    
+    if (response.ok) {
+      const result = await response.json();
+      logDebug(`VOICEVOX接続確認結果: ${result.connected ? '接続成功' : '接続失敗'}`);
+      return result.connected;
+    } else {
+      throw new Error(`接続確認エラー: ${response.status}`);
+    }
+  } catch (error) {
+    logDebug(`VOICEVOX接続エラー: ${error.message}`);
+    showError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
+    return false;
+  }
+}
+
+/**
+ * メッセージの表示と音声合成を行う
+ * @param {string} message - メッセージ
+ * @param {string} emotion - 感情
+ * @param {number} duration - 表示時間
+ */
+export function sayMessage(message, emotion = 'normal', duration = 5000) {
+  // テキストを吹き出しに表示
+  setText(formatMessage(message));
+  showBubble();
+  
+  // 音声合成リクエスト
+  requestVoiceSynthesis(message, emotion);
+  
+  // タイマーを設定して表示を終了
+  if (hideTimeoutMap.has('say_message')) {
+    clearTimeout(hideTimeoutMap.get('say_message'));
+    hideTimeoutMap.delete('say_message');
+  }
+  
+  const timeoutId = setTimeout(() => {
+    hideBubble();
+    setExpression('normal');
+  }, duration);
+  
+  hideTimeoutMap.set('say_message', timeoutId);
+}
+
+// 必ず実行する部分：グローバルに関数を公開
+if (typeof window !== 'undefined') {
+  window.speak = speak;
+  logDebug('speak関数をグローバルスコープに公開しました');
+} 
