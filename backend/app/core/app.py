@@ -13,8 +13,11 @@ from pathlib import Path
 # 設定のインポート
 from ..config import get_settings
 
+# カスタムロガーのインポート
+from .logger import setup_logger
+
 # ロガーの設定
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 def create_application() -> FastAPI:
@@ -53,14 +56,14 @@ def create_application() -> FastAPI:
             dir_path = Path(directory)
             if not dir_path.exists():
                 dir_path.mkdir(parents=True, exist_ok=True)
-                logger.info(f"静的ファイルディレクトリを作成: {directory}")
+                logger.info(f"📁 静的ファイルディレクトリを作成: {directory}")
                 
             # マウント
             app.mount(mount_path, StaticFiles(directory=directory), name=mount_path.strip('/'))
-            logger.info(f"静的ファイルをマウント: {mount_path} -> {directory}")
+            logger.info(f"🔗 静的ファイルをマウント: {mount_path} -> {directory}")
             
     except Exception as e:
-        logger.error(f"静的ファイルのマウント中にエラーが発生: {e}")
+        logger.error(f"❌ 静的ファイルのマウント中にエラー: {e}")
     
     # ルーターの読み込みと登録
     register_routers(app)
@@ -87,10 +90,10 @@ def register_routers(app: FastAPI) -> None:
         app.include_router(voice_router)
         app.include_router(websocket_router)
         
-        logger.info("ルーターを登録しました")
+        logger.info("🔄 ルーターを登録しました")
         
     except Exception as e:
-        logger.error(f"ルーターの登録中にエラーが発生: {e}")
+        logger.error(f"❌ ルーターの登録中にエラー: {e}")
 
 
 def register_event_handlers(app: FastAPI) -> None:
@@ -106,14 +109,14 @@ def register_event_handlers(app: FastAPI) -> None:
     @app.on_event("startup")
     async def startup_event():
         """アプリケーション起動時の処理"""
-        logger.info("アプリケーションを起動しています...")
+        logger.info("🚀 アプリケーションを起動しています...")
         await startup_handler.on_startup()
-        logger.info("アプリケーションの起動が完了しました")
+        logger.info("✅ アプリケーションの起動が完了しました")
     
     # シャットダウンイベント
     @app.on_event("shutdown")
     async def shutdown_event():
         """アプリケーション終了時の処理"""
-        logger.info("アプリケーションをシャットダウンしています...")
+        logger.info("🔌 アプリケーションをシャットダウンしています...")
         await shutdown_handler.on_shutdown()
-        logger.info("アプリケーションのシャットダウンが完了しました") 
+        logger.info("✅ アプリケーションのシャットダウンが完了しました") 

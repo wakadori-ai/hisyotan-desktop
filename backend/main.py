@@ -25,13 +25,10 @@ BASE_DIR = Path(__file__).parent.absolute()
 if str(BASE_DIR) not in sys.path:
     sys.path.append(str(BASE_DIR))
 
-# ロガー設定
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    encoding='utf-8'  # UTF-8エンコーディングを明示的に指定
-)
-logger = logging.getLogger(__name__)
+# カスタムロガー設定
+from app.core.logger import setup_logger
+logger = setup_logger(__name__)
+logger.info("🚀 秘書たんバックエンドサーバーを初期化しています...")
 
 # 環境変数の設定（必要に応じて）
 os.environ.setdefault('DEBUG_MODE', 'false')
@@ -57,19 +54,19 @@ async def shutdown(force: bool = Body(False)):
     Returns:
         dict: 結果メッセージ
     """
-    logger.info(f"シャットダウンリクエストを受信しました。force={force}")
+    logger.info(f"🔌 シャットダウンリクエストを受信しました。force={force}")
     
     # 非同期で終了処理を実行（レスポンスを返してから終了するため）
     def shutdown_app():
         # 少し遅延させてレスポンスが返せるようにする
-        logger.info("3秒後にアプリケーションを終了します...")
+        logger.info("⏱️ 3秒後にアプリケーションを終了します...")
         time.sleep(3)
         
-        logger.info("アプリケーションを終了しています...")
+        logger.info("🔄 アプリケーションを終了しています...")
         if force:
             # 自分自身のプロセスを終了
             pid = os.getpid()
-            logger.info(f"プロセス {pid} を終了します")
+            logger.info(f"🛑 プロセス {pid} を終了します")
             # Windowsの場合はtaskkillを使用
             if os.name == 'nt':
                 os.system(f"taskkill /F /PID {pid}")
@@ -90,9 +87,9 @@ async def main():
     """
     メイン関数：アプリケーションの起動前の初期化処理
     """
-    logger.info("非同期初期化処理を実行しています...")
+    logger.info("🔄 非同期初期化処理を実行しています...")
     # 必要な非同期初期化処理があればここに追加
-    logger.info("非同期初期化処理が完了しました")
+    logger.info("✅ 非同期初期化処理が完了しました")
 
 # サーバー起動
 if __name__ == "__main__":
@@ -118,14 +115,14 @@ if __name__ == "__main__":
         # ゾンビ監視を非同期で開始し、初期化処理と同じループで実行
         monitoring_task = loop.run_until_complete(start_zombie_monitoring())
         if monitoring_task:
-            logger.info("ゾンビ監視を開始しました")
+            logger.info("👁️ ゾンビ監視を開始しました")
         elif monitoring_enabled:
-            logger.warning("ゾンビ監視の自動開始が有効ですが、監視タスクを開始できませんでした")
+            logger.warning("⚠️ ゾンビ監視の自動開始が有効ですが、監視タスクを開始できませんでした")
     except Exception as e:
-        logger.error(f"ゾンビ監視の開始に失敗しました: {e}")
+        logger.error(f"❌ ゾンビ監視の開始に失敗しました: {e}")
     
     # FastAPIサーバーの起動
-    logger.info(f"FastAPIサーバーを起動します (デバッグモード: {debug_mode})")
+    logger.info(f"🌐 FastAPIサーバーを起動します (デバッグモード: {debug_mode})")
     # uvicornの型情報は重要ではないので無視
     uvicorn.run(  # type: ignore
         "main:app", 

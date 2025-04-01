@@ -665,44 +665,44 @@ async function startBackendProcess() {
     backendProcess.stdout.on('data', (data) => {
       // Python側がUTF-8で出力するようになったのでUTF-8でデコード
       const output = iconv.decode(data, 'utf-8').trim();
-      console.log(`バックエンド出力: ${output}`);
+      console.log(`📦 Backend: ${output}`);
     });
     
     // エラー出力のリスニング
     backendProcess.stderr.on('data', (data) => {
       // Python側がUTF-8で出力するようになったのでUTF-8でデコード
       const output = iconv.decode(data, 'utf-8').trim();
-      console.error(`バックエンドエラー: ${output}`);
+      console.error(`🐍 Backend: ${output}`);
     });
     
     // プロセス終了時の処理
     backendProcess.on('close', (code) => {
-      console.log(`バックエンドサーバーが終了しました (コード: ${code})`);
+      console.log(`🔌 Backend: サーバーが終了しました (コード: ${code})`);
       backendProcess = null;
     });
     
     // エラー処理を追加
     backendProcess.on('error', (err) => {
-      console.error(`バックエンドプロセス起動エラー: ${err.message}`);
+      console.error(`⚠️ Backend: プロセス起動エラー: ${err.message}`);
       backendProcess = null;
     });
     
     // バックエンドサーバーの起動を待機（5秒）
-    console.log('バックエンドサーバー起動待機中...');
+    console.log('🕒 Backend: サーバー起動待機中...');
     await new Promise(resolve => setTimeout(resolve, 5000));
-    console.log('バックエンドサーバー起動待機完了');
+    console.log('✅ Backend: サーバー起動待機完了');
     
     // バックエンド接続確認
     try {
       const response = await fetch('http://127.0.0.1:8000/health', { timeout: 3000 });
       if (response.ok) {
-        console.log('🎉 バックエンドサーバーが正常に応答しています');
+        console.log('🎉 Backend: サーバーが正常に応答しています');
       } else {
-        console.warn('⚠️ バックエンドサーバーからの応答がありますが、ステータスが異常です');
+        console.warn('⚠️ Backend: サーバーからの応答がありますが、ステータスが異常です');
       }
     } catch (error) {
-      console.warn('⚠️ バックエンドサーバーへの接続確認に失敗しました:', error.message);
-      console.log('バックエンドサーバーが起動中の可能性があります。少し待ってみてください...');
+      console.warn('⚠️ Backend: サーバーへの接続確認に失敗しました:', error.message);
+      console.log('🔄 Backend: サーバーが起動中の可能性があります。少し待ってみてください...');
     }
     
     return true;
@@ -714,7 +714,7 @@ async function startBackendProcess() {
 
 // バックエンドプロセスを安全に終了する関数
 async function shutdownBackend() {
-  console.log('バックエンドプロセスを終了しています...');
+  console.log('🔌 Backend: プロセスを終了しています...');
   
   try {
     // バックエンドAPIのシャットダウンエンドポイントを呼び出す
@@ -725,7 +725,7 @@ async function shutdownBackend() {
       timeout: 5000 // 5秒でタイムアウト
     });
     
-    console.log('バックエンド終了リクエスト成功:', response.data);
+    console.log('✅ Backend: 終了リクエスト成功:', response.data);
     
     // バックエンドプロセスを直接終了
     if (backendProcess && !backendProcess.killed) {
@@ -735,7 +735,7 @@ async function shutdownBackend() {
     // 少し待ってからプロセスが確実に終了するようにする
     return new Promise(resolve => setTimeout(resolve, 1000));
   } catch (error) {
-    console.error('バックエンド終了APIの呼び出しに失敗:', error.message);
+    console.error('⚠️ Backend: 終了APIの呼び出しに失敗:', error.message);
     
     // APIが失敗した場合でも、直接プロセスを終了する
     if (backendProcess && !backendProcess.killed) {
@@ -750,7 +750,7 @@ async function shutdownBackend() {
         return new Promise((resolve, reject) => {
           killProcess.on('close', (code) => {
             if (code === 0) {
-              console.log('Python プロセスを強制終了しました');
+              console.log('🔄 Backend: Python プロセスを強制終了しました');
               resolve();
             } else {
               reject(new Error('Python プロセスの強制終了に失敗しました'));
@@ -758,7 +758,7 @@ async function shutdownBackend() {
           });
         });
       } catch (killError) {
-        console.error('Python プロセスの強制終了に失敗しました:', killError);
+        console.error('⚠️ Backend: Python プロセスの強制終了に失敗しました:', killError);
       }
     }
     
