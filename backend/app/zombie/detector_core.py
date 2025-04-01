@@ -35,7 +35,7 @@ MAX_DETECTION_DIR_SIZE_MB = 500  # 検出ディレクトリの最大サイズ（
 class ZombieDetector:
     """ゾンビ検出クラス"""
     
-    def __init__(self, model_path: str = None, confidence: float = 0.45, debug_mode: bool = False, target_classes: Optional[List[int]] = None):
+    def __init__(self, model_path: str = None, confidence: float = 0.45, debug_mode: bool = False, target_classes: Optional[List[int]] = None, resnet_enabled: bool = True):
         """
         ZombieDetectorクラスのコンストラクタ
         
@@ -44,6 +44,7 @@ class ZombieDetector:
             confidence: 検出信頼度の閾値（デフォルト: 0.45）
             debug_mode: デバッグモードフラグ
             target_classes: 検出対象のクラスIDリスト（デフォルトは人物クラス[0]のみ）
+            resnet_enabled: ResNet分類器を有効にするかどうか
         """
         # デフォルトのモデルパス
         if model_path is None:
@@ -62,6 +63,10 @@ class ZombieDetector:
         self.resize_factor = PERFORMANCE_SETTINGS["resize_factor"]
         self.skip_ratio = PERFORMANCE_SETTINGS["skip_ratio"]
         self.cpu_threshold = PERFORMANCE_SETTINGS["cpu_threshold"]
+        
+        # ResNet分類器の設定
+        self.resnet_enabled = resnet_enabled
+        self.resnet_classifier = None
         
         # 検出対象クラスの設定
         self.target_classes = target_classes if target_classes is not None else [0]  # デフォルトは人物クラスのみ
@@ -87,7 +92,7 @@ class ZombieDetector:
         os.makedirs(DETECTION_DIR, exist_ok=True)
         os.makedirs(DEBUG_DIR, exist_ok=True)
         
-        logger.info(f"ZombieDetector初期化完了: confidence={self.confidence}, debug_mode={self.debug_mode}, frame_interval={self.adaptive_interval}秒, resize_factor={self.resize_factor}, skip_ratio={self.skip_ratio}")
+        logger.info(f"ZombieDetector初期化完了: confidence={self.confidence}, debug_mode={self.debug_mode}, frame_interval={self.adaptive_interval}秒, resize_factor={self.resize_factor}, skip_ratio={self.skip_ratio}, resnet_enabled={self.resnet_enabled}")
     
     async def load_model(self):
         """YOLOモデルの非同期ロード"""
@@ -96,6 +101,26 @@ class ZombieDetector:
             loop = asyncio.get_event_loop()
             self.model = await loop.run_in_executor(None, lambda: YOLO(self.model_path))
             logger.info(f"YOLOモデルのロードに成功: {self.model_path}")
+            
+            # ResNet分類器も初期化
+            if self.resnet_enabled:
+                try:
+                    # 非同期でResNet分類器を読み込む
+                    from backend.ml.train import ZombieClassifier
+                    
+                    # モデルディレクトリの設定
+                    resnet_model_dir = os.path.join(DATA_DIR, "models")
+                    
+                    # 分類器のインスタンス化と実行
+                    self.resnet_classifier = await loop.run_in_executor(
+                        None, 
+                        lambda: ZombieClassifier(data_path=os.path.join(DATA_DIR, "datasets", "zombie_classifier"))
+                    )
+                    logger.info("ResNet分類器の初期化に成功しました")
+                except Exception as e:
+                    logger.error(f"ResNet分類器の初期化に失敗: {e}")
+                    self.resnet_enabled = False
+            
             return True
         except Exception as e:
             logger.error(f"YOLOモデルのロードに失敗: {e}")
@@ -289,47 +314,103 @@ class ZombieDetector:
         スクリーンショットからゾンビを検出する
         
         Args:
-            screenshot: スクリーンショット画像
+            screenshot: 検出対象のスクリーンショット
             
         Returns:
-            検出結果オブジェクト
+            検出結果のディクショナリ
         """
+        if self.model is None:
+            logger.warning("モデルがロードされていないため検出をスキップ")
+            return None
+        
         try:
-            # モデルが読み込まれていない場合
-            if self.model is None:
-                logger.warning("モデルが読み込まれていません")
-                return None
+            # 画像のリサイズ（パフォーマンス向上のため）
+            if self.resize_factor < 1.0:
+                h, w = screenshot.shape[:2]
+                new_h, new_w = int(h * self.resize_factor), int(w * self.resize_factor)
+                screenshot = cv2.resize(screenshot, (new_w, new_h))
             
-            # 非同期処理でモデル推論を実行
+            # 一時ファイルに保存して検出処理
+            temp_img_path = os.path.join(DEBUG_DIR, f"temp_screenshot_{int(time.time())}.jpg")
+            cv2.imwrite(temp_img_path, screenshot)
+            
+            # YOLOでの検出
+            start_time = time.time()
             loop = asyncio.get_event_loop()
             results = await loop.run_in_executor(
                 None, 
-                lambda: self.model(
-                    screenshot, 
-                    conf=self.confidence,
+                lambda: self.model.predict(
+                    source=temp_img_path, 
+                    conf=self.confidence, 
                     verbose=False
                 )
             )
+            yolo_time = time.time() - start_time
             
-            # デバッグ用：検出結果の内容確認ログ
-            if self.debug_mode:
-                if results and len(results) > 0:
-                    r = results[0]
-                    if hasattr(r, 'boxes') and r.boxes is not None:
-                        num_boxes = len(r.boxes)
-                        logger.info(f"検出結果: {num_boxes}個のボックスを検出")
-                        for i, box in enumerate(r.boxes):
-                            cls_id = int(box.cls.cpu().numpy()[0])
-                            conf = float(box.conf.cpu().numpy()[0])
-                            logger.info(f"  - ボックス {i}: クラスID={cls_id}, 信頼度={conf:.2f}")
-                    else:
-                        logger.warning("検出結果にboxesが含まれていません")
-                else:
-                    logger.info("検出結果が空です")
+            # ResNet分類による画面全体の分析
+            resnet_result = False
+            resnet_prob = 0.0
+            resnet_time = 0.0
             
-            return results
+            if self.resnet_enabled and self.resnet_classifier is not None:
+                try:
+                    start_time = time.time()
+                    # ResNet分類器で画像全体を分析
+                    pred_class, prob = await loop.run_in_executor(
+                        None,
+                        lambda: self.resnet_classifier.predict_image(temp_img_path)
+                    )
+                    resnet_time = time.time() - start_time
+                    
+                    if pred_class is not None:
+                        resnet_result = (pred_class == "zombie")
+                        resnet_prob = prob or 0.0
+                        
+                        logger.debug(f"ResNet分類結果: {pred_class}, 確率: {resnet_prob:.2f}, 処理時間: {resnet_time:.2f}秒")
+                except Exception as e:
+                    logger.error(f"ResNet分類中にエラーが発生: {e}")
+            
+            # 一時ファイルを削除
+            if os.path.exists(temp_img_path) and not self.debug_mode:
+                os.remove(temp_img_path)
+            
+            # 結果から対象のバウンディングボックスを抽出
+            boxes = []
+            for r in results:
+                for box_idx, box in enumerate(r.boxes):
+                    cls_id = int(box.cls.item())
+                    
+                    # 対象クラスの場合のみ処理
+                    if cls_id in self.target_classes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                        conf = float(box.conf.item())
+                        
+                        boxes.append({
+                            "class_id": cls_id,
+                            "bbox": [x1, y1, x2, y2],
+                            "confidence": conf
+                        })
+            
+            # 検出結果をまとめる
+            detection_result = {
+                "timestamp": time.time(),
+                "detection_count": len(boxes),
+                "boxes": boxes,
+                "processing_time": yolo_time,
+                "resnet_result": {
+                    "is_zombie_scene": resnet_result,
+                    "probability": resnet_prob,
+                    "processing_time": resnet_time
+                }
+            }
+            
+            if len(boxes) > 0:
+                logger.info(f"ゾンビ検出: {len(boxes)}体, YOLO処理時間: {yolo_time:.2f}秒, ResNet: {resnet_result}({resnet_prob:.2f})")
+            
+            return detection_result
+            
         except Exception as e:
-            logger.error(f"ゾンビ検出中にエラー発生: {e}")
+            logger.error(f"ゾンビ検出中にエラーが発生: {e}")
             return None
     
     async def _process_detection_results(self, 
@@ -339,201 +420,136 @@ class ZombieDetector:
                                       few_zombies_callback,
                                       warning_zombies_callback):
         """
-        検出結果を処理する
+        検出結果の処理とコールバック実行
         
         Args:
-            results: YOLOによる検出結果
-            screenshot: 検出に使用したスクリーンショット
+            results: 検出結果
+            screenshot: 原画像
             zombie_callback: 多数ゾンビ検出時のコールバック
             few_zombies_callback: 少数ゾンビ検出時のコールバック
             warning_zombies_callback: 警戒レベルゾンビ検出時のコールバック
-            
-        Returns:
-            None
         """
+        if results is None:
+            return
+        
+        count = results["detection_count"]
+        resnet_info = results.get("resnet_result", {"is_zombie_scene": False, "probability": 0.0})
+        resnet_result = resnet_info.get("is_zombie_scene", False)
+        resnet_prob = resnet_info.get("probability", 0.0)
+        
+        # 検出数に応じた処理
         try:
-            # 検出されたオブジェクト数を計算
-            detections = []
-            classes_detected = set()  # 検出されたクラスIDを記録
-            
-            for r in results:
-                boxes = r.boxes
-                
-                # デバッグ用：検出されたすべてのクラスを確認
-                if self.debug_mode and len(boxes) > 0:
-                    all_classes = [int(box.cls.cpu().numpy()[0]) for box in boxes]
-                    logger.info(f"検出されたすべてのクラスID: {all_classes}")
-                
-                for box in boxes:
-                    # クラスIDを取得
-                    cls_id = int(box.cls.cpu().numpy()[0])
-                    classes_detected.add(cls_id)
-                    
-                    # 対象クラスの検出（人物クラス=0およびその他の可能性のあるクラス）
-                    # YOLOv8のCOCOデータセットでは、0=人物(person)
-                    # その他の可能性：YOLOv8 Pose modelでの人物検出や、カスタムデータでのゾンビクラス
-                    target_classes = self.target_classes
-                    
-                    if cls_id in target_classes:
-                        confidence = float(box.conf.cpu().numpy()[0])
-                        if confidence >= self.confidence:
-                            detections.append({
-                                'confidence': confidence,
-                                'box': box.xyxy.cpu().numpy()[0],
-                                'class_id': cls_id
-                            })
-            
-            # デバッグ情報：検出されたクラスの一覧
-            if self.debug_mode:
-                logger.info(f"検出された全クラスID: {classes_detected}")
-                logger.info(f"フィルタ後の検出数: {len(detections)}")
-            
-            zombie_count = len(detections)
-            
             # 検出履歴に追加
-            self.detection_history.append(zombie_count)
-            if len(self.detection_history) > self.history_size:
-                self.detection_history.pop(0)
+            self.detection_history.append(count)
+            self.detection_history = self.detection_history[-self.history_size:]
             
-            # デバッグ用：検出履歴の状態を出力
-            if self.debug_mode:
-                logger.info(f"検出履歴: {self.detection_history}, 必要連続検出数: {self.required_consecutive_detections}")
+            # 一定数以上の連続検出があるか確認
+            if sum(1 for c in self.detection_history if c > 0) >= self.required_consecutive_detections:
+                # ログに記録
+                from .monitor import log_zombie_detection
+                log_zombie_detection(count)
                 
-            # 連続検出条件を満たさない場合は通知スキップ
-            if zombie_count == 0 or len(self.detection_history) < self.required_consecutive_detections:
-                if self.debug_mode and zombie_count > 0:
-                    logger.info(f"検出履歴が不足しているため通知をスキップ: 履歴サイズ={len(self.detection_history)}, 必要={self.required_consecutive_detections}")
-                return
+                # 通知処理用の追加データ
+                callback_data = {
+                    "count": count,
+                    "resnet_result": resnet_result,
+                    "resnet_probability": resnet_prob,
+                    "timestamp": results["timestamp"]
+                }
                 
-            # 履歴内の必要フレーム数で検出があったかチェック
-            confirmed_detections = sum(1 for count in self.detection_history[-self.required_consecutive_detections:] if count > 0)
-            if self.debug_mode:
-                logger.info(f"連続検出数: {confirmed_detections}/{self.required_consecutive_detections}")
+                current_time = time.time()
                 
-            if confirmed_detections < self.required_consecutive_detections:
-                if self.debug_mode:
-                    logger.info(f"連続検出条件を満たしていないため通知をスキップ: {confirmed_detections}/{self.required_consecutive_detections}")
-                return
+                # 多数のゾンビ検出時（10体以上）
+                if count >= 10:
+                    if current_time - self.cooldown_timestamps["many"] > self.cooldown_periods["many"]:
+                        if zombie_callback:
+                            await self._call_callback(zombie_callback, count, screenshot, callback_data)
+                        self.cooldown_timestamps["many"] = current_time
                 
-            # デバッグモードの場合は検出結果を画像に描画して保存
-            if self.debug_mode:
-                debug_img = screenshot.copy()
-                for det in detections:
-                    box = det['box']
-                    x1, y1, x2, y2 = map(int, box)
-                    # クラスIDに応じて色を変える
-                    color = (0, 255, 0)  # 基本は緑色
-                    if 'class_id' in det and det['class_id'] != 0:
-                        color = (0, 0, 255)  # 人物以外は赤色
+                # 警戒レベルのゾンビ検出時（5〜9体）
+                elif count >= 5:
+                    if current_time - self.cooldown_timestamps["warning"] > self.cooldown_periods["warning"]:
+                        if warning_zombies_callback:
+                            await self._call_callback(warning_zombies_callback, count, screenshot, callback_data)
+                        self.cooldown_timestamps["warning"] = current_time
+                
+                # 少数のゾンビ検出時（1〜4体）
+                elif count > 0:
+                    if current_time - self.cooldown_timestamps["few"] > self.cooldown_periods["few"]:
+                        if few_zombies_callback:
+                            await self._call_callback(few_zombies_callback, count, screenshot, callback_data)
+                        self.cooldown_timestamps["few"] = current_time
+                
+                # ResNetが検出したがYOLOが検出しなかった場合（気配感知）
+                elif count == 0 and resnet_result and resnet_prob > 0.7:
+                    if current_time - self.cooldown_timestamps["few"] > self.cooldown_periods["few"]:
+                        # 「気配」として少数ゾンビコールバックを使用
+                        if few_zombies_callback:
+                            await self._call_callback(few_zombies_callback, 0, screenshot, callback_data)
+                        self.cooldown_timestamps["few"] = current_time
+                        logger.info(f"ゾンビの気配を検出: ResNet確率={resnet_prob:.2f}")
+                
+                # デバッグ画像保存
+                if self.debug_mode and count > 0:
+                    self._save_detection_image(screenshot, results["boxes"])
                     
-                    cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(debug_img, f"{det['confidence']:.2f} (cls:{det.get('class_id', 0)})", 
-                                (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-                
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                debug_path = os.path.join(DEBUG_DIR, f"debug_{timestamp}_{zombie_count}.jpg")
-                cv2.imwrite(debug_path, debug_img)
-                logger.info(f"デバッグ画像を保存しました: {debug_path}")
-            
-            current_time = time.time()
-            
-            # クールダウン状態の確認（デバッグ用）
-            if self.debug_mode:
-                for cooldown_type, timestamp in self.cooldown_timestamps.items():
-                    remaining = timestamp - current_time
-                    if remaining > 0:
-                        logger.info(f"クールダウン中 ({cooldown_type}): あと{remaining:.1f}秒")
-            
-            # ゾンビの数に応じたアクション
-            if zombie_count >= 10:
-                # 多数のゾンビが検出された場合
-                if current_time >= self.cooldown_timestamps["many"]:
-                    logger.warning(f"多数のゾンビを検出！ (数: {zombie_count})")
-                    if zombie_callback:
-                        await self._call_callback(zombie_callback, zombie_count, screenshot)
-                    # クールダウン更新
-                    self.cooldown_timestamps["many"] = current_time + self.cooldown_periods["many"]
-                elif self.debug_mode:
-                    remaining = self.cooldown_timestamps["many"] - current_time
-                    logger.info(f"多数ゾンビのクールダウン中: あと{remaining:.1f}秒")
-            elif zombie_count >= 5:
-                # 警戒レベルのゾンビが検出された場合
-                if current_time >= self.cooldown_timestamps["warning"]:
-                    logger.warning(f"警戒レベルのゾンビを検出 (数: {zombie_count})")
-                    if warning_zombies_callback:
-                        await self._call_callback(warning_zombies_callback, zombie_count, screenshot)
-                    # クールダウン更新
-                    self.cooldown_timestamps["warning"] = current_time + self.cooldown_periods["warning"]
-                elif self.debug_mode:
-                    remaining = self.cooldown_timestamps["warning"] - current_time
-                    logger.info(f"警戒レベルゾンビのクールダウン中: あと{remaining:.1f}秒")
-            elif zombie_count > 0:
-                # 少数のゾンビが検出された場合
-                if current_time >= self.cooldown_timestamps["few"]:
-                    logger.info(f"少数のゾンビを検出 (数: {zombie_count})")
-                    if few_zombies_callback:
-                        await self._call_callback(few_zombies_callback, zombie_count, screenshot)
-                    # クールダウン更新
-                    self.cooldown_timestamps["few"] = current_time + self.cooldown_periods["few"]
-                elif self.debug_mode:
-                    remaining = self.cooldown_timestamps["few"] - current_time
-                    logger.info(f"少数ゾンビのクールダウン中: あと{remaining:.1f}秒")
-            
         except Exception as e:
-            logger.error(f"検出結果の処理中にエラー発生: {e}")
-            logger.error(traceback.format_exc())
+            logger.error(f"検出結果の処理中にエラーが発生: {e}")
     
-    async def _call_callback(self, callback, zombie_count, screenshot):
+    async def _call_callback(self, callback, zombie_count, screenshot, additional_data=None):
         """
-        コールバック関数を安全に呼び出す
+        コールバック関数の呼び出し
         
         Args:
             callback: 呼び出すコールバック関数
-            zombie_count: 検出されたゾンビの数
-            screenshot: スクリーンショット画像
-            
-        Returns:
-            None
+            zombie_count: ゾンビの検出数
+            screenshot: スクリーンショット
+            additional_data: 追加データ（ResNet結果など）
         """
         try:
-            if self.debug_mode:
-                logger.info(f"コールバック関数を呼び出します: ゾンビ数={zombie_count}")
-                
-            # コールバックが同期関数か非同期関数かを判定
-            if asyncio.iscoroutinefunction(callback):
-                if self.debug_mode:
-                    logger.info("非同期コールバック関数を実行")
-                await callback(zombie_count, screenshot)
-            else:
-                if self.debug_mode:
-                    logger.info("同期コールバック関数を実行")
-                callback(zombie_count, screenshot)
-                
-            if self.debug_mode:
-                logger.info("コールバック関数の実行が完了しました")
-                
-        except Exception as e:
-            logger.error(f"コールバック呼び出し中にエラー発生: {e}")
-            # スタックトレースを記録
-            logger.error(traceback.format_exc())
+            from .notification import notification_manager
             
-            # カスタムエラー情報
-            if hasattr(callback, "__name__"):
-                callback_name = callback.__name__
-            else:
-                callback_name = str(callback)
-            logger.error(f"エラーが発生したコールバック: {callback_name}, ゾンビ数: {zombie_count}")
+            # コールバックのシグネチャに応じて引数を調整
+            import inspect
+            sig = inspect.signature(callback)
             
-            # 可能であれば通知を送信（コールバックが失敗してもユーザーに情報を提供）
+            # ゾンビ数ごとの通知タイプを決定
+            if zombie_count >= 10:
+                notification_type = "many"
+            elif zombie_count >= 5:
+                notification_type = "warning"
+            elif zombie_count > 0:
+                notification_type = "few"
+            else:
+                # ResNetが検出したが、YOLOが検出しなかった場合
+                resnet_result = additional_data.get("resnet_result", False) if additional_data else False
+                if resnet_result:
+                    notification_type = "presence"  # ゾンビの気配
+                else:
+                    notification_type = "few"  # デフォルト
+            
+            # 通知マネージャから権限を取得
+            allowed, notification_id = notification_manager.try_acquire_notification(
+                zombie_count, source="detector", detection_type=notification_type
+            )
+            
+            if not allowed:
+                logger.debug(f"通知マネージャが{notification_type}タイプのコールバック実行を拒否")
+                return
+            
             try:
-                from ..ws.manager import send_notification
-                await send_notification(
-                    "ゾンビ検出コールバックでエラーが発生しました",
-                    message_type="error",
-                    title="エラー",
-                    importance="high"
-                )
-            except Exception as notification_error:
-                logger.error(f"通知送信中にもエラーが発生: {notification_error}")
+                # コールバック関数の実行
+                if len(sig.parameters) >= 3:  # additional_dataを受け取れる場合
+                    result = await callback(zombie_count, screenshot, additional_data)
+                else:
+                    result = await callback(zombie_count, screenshot)
+                
+                logger.debug(f"ゾンビコールバック実行結果: {result}")
+            finally:
+                # 通知権限を解放
+                notification_manager.release_notification(notification_id)
+            
+        except Exception as e:
+            logger.error(f"コールバック呼び出し中にエラーが発生: {e}")
     
     # 以下、実装の詳細については省略（ファイルサイズの制約のため）
