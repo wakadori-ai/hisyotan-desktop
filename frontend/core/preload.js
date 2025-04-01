@@ -1,4 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const path = require('path');
+const fs = require('fs');
 
 // レンダラープロセスにAPIを公開
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -77,4 +79,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // アプリケーションのパスを取得
   getAppPath: () => ipcRenderer.invoke('get-app-path')
+});
+
+contextBridge.exposeInMainWorld('electronLogger', {
+  logToFile: (message) => ipcRenderer.invoke('log-to-file', message)
+});
+
+// main.jsに追加
+ipcMain.handle('log-to-file', async (event, message) => {
+  const logFile = path.join(__dirname, 'debug-logs.txt');
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] ${message}\n`;
+  
+  fs.appendFileSync(logFile, logEntry);
+  return true;
 }); 

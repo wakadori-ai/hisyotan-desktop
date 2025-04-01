@@ -160,33 +160,34 @@ app.whenReady().then(async () => {
 });
 
 function createWindow() {
-  // ウィンドウ作成
+  // デバッグ用の別ウィンドウ設定
+  const isDebugging = process.argv.includes('--debug');
+  
   mainWindow = new BrowserWindow({
     width: config.window.width || 400,
     height: config.window.height || 600,
-    transparent: config.window.transparent !== false,
-    frame: config.window.frame !== false,
+    transparent: isDebugging ? false : (config.window.transparent !== false),
+    frame: isDebugging ? true : (config.window.frame !== false),
     alwaysOnTop: config.window.alwaysOnTop !== false,
-    backgroundColor: config.window.backgroundColor || '#00000000',
+    backgroundColor: isDebugging ? '#FFFFFF' : (config.window.backgroundColor || '#00000000'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: false // ローカル開発用にwebSecurityを無効化
+      webSecurity: false
     }
   });
 
-  // 開発モードの場合はViteサーバーからロード、本番モードの場合はローカルファイルをロード
+  // 開発モードの場合
   if (isDev) {
-    // 開発サーバーからロードする
-    mainWindow.loadURL('http://localhost:3000/frontend/ui/index.html');
-    // 開発者ツールを自動で開く
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-    console.log('開発モードでアプリケーションを起動しました');
+    mainWindow.loadURL('http://localhost:3000/');
+    
+    // デバッグフラグがある場合は別ウィンドウでDevToolsを開く
+    if (isDebugging) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
-    // 本番モードではローカルファイルを読み込む
-    mainWindow.loadFile(path.join(__dirname, 'frontend/ui/index.html'));
-    console.log('本番モードでアプリケーションを起動しました');
+    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   }
 
   // ... existing code ...

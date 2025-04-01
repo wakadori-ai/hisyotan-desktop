@@ -76,6 +76,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // パフォーマンス最適化
     optimizePerformance();
     
+    // 設定を読み込んで適用
+    await loadAndApplySettings();
+    
+    setupAssistantImage();
+    
+    setupDebugPanel();
+    
     logDebug('すべての機能の初期化が完了しました');
     
     // 起動完了フラグを設定（10秒後に通常動作へ移行）
@@ -169,6 +176,12 @@ async function loadAndApplySettings() {
         if (typeof config.assistant.size === 'number') {
           const assistantImage = document.getElementById('assistantImage');
           if (assistantImage) {
+            // まずサイズ制限を確認
+            if (!assistantImage.style.maxWidth) {
+              assistantImage.style.maxWidth = '35vw';
+              assistantImage.style.maxHeight = '70vh';  
+            }
+            // 次にスケールを適用
             assistantImage.style.transform = `scale(${config.assistant.size / 100})`;
           }
           
@@ -443,4 +456,88 @@ if (window.electronAPI) {
       document.body.classList.add('pointer-events-enabled');
     }
   });
+}
+
+// 画像ロード処理の修正
+function setupAssistantImage() {
+  const assistantImage = document.getElementById('assistantImage');
+  if (assistantImage) {
+    // 即時適用
+    assistantImage.style.maxWidth = '35vw';
+    assistantImage.style.maxHeight = '70vh';
+    
+    // onloadも設定
+    assistantImage.onload = function() {
+      logDebugToPanel(`画像読み込み完了: ${this.naturalWidth}x${this.naturalHeight}`);
+      this.style.maxWidth = '35vw';
+      this.style.maxHeight = '70vh';
+      // スケール適用
+      if (window.currentSettings && window.currentSettings.assistant && 
+          typeof window.currentSettings.assistant.size === 'number') {
+        this.style.transform = `scale(${window.currentSettings.assistant.size / 100})`;
+      }
+    };
+  }
+}
+
+function setupDebugPanel() {
+  // 既存のdebug-panelがあれば削除
+  const oldPanel = document.getElementById('floating-debug');
+  if (oldPanel) oldPanel.remove();
+
+  // 新しいデバッグパネルを作成
+  const panel = document.createElement('div');
+  panel.id = 'floating-debug';
+  panel.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 999999;
+    max-width: 300px;
+    max-height: 400px;
+    overflow: auto;
+    font-size: 12px;
+    font-family: monospace;
+    pointer-events: auto;
+  `;
+  
+  // ログエリア
+  const logArea = document.createElement('div');
+  logArea.id = 'debug-log';
+  panel.appendChild(logArea);
+  
+  // テスト用ボタン
+  const testButton = document.createElement('button');
+  testButton.textContent = '画像サイズ確認';
+  testButton.onclick = () => {
+    const img = document.getElementById('assistantImage');
+    logDebugToPanel(`画像サイズ: ${img.width}x${img.height}, style: ${img.style.cssText}`);
+  };
+  panel.appendChild(testButton);
+  
+  document.body.appendChild(panel);
+  
+  // デバッグ関数
+  window.logDebugToPanel = function(message) {
+    const logArea = document.getElementById('debug-log');
+    if (logArea) {
+      const entry = document.createElement('div');
+      entry.textContent = message;
+      logArea.appendChild(entry);
+      
+      // ファイルにも記録
+      if (window.electronLogger && window.electronLogger.logToFile) {
+        window.electronLogger.logToFile(message);
+      }
+      
+      // 10行を超えたら古いものを削除
+      while (logArea.children.length > 10) {
+        logArea.removeChild(logArea.firstChild);
+      }
+    }
+  };
 }

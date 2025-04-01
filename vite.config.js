@@ -3,6 +3,7 @@ import { resolve } from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  root: 'frontend/ui', // 開発サーバーのルートディレクトリを指定
   base: './', // 相対パスでビルドするために必要
   
   // Electron統合のためのサーバー設定
@@ -28,12 +29,10 @@ export default defineConfig({
   
   // Electronでの使用に適した設定
   build: {
-    outDir: 'dist',
+    outDir: '../../dist', // rootからの相対パスになるため調整
     emptyOutDir: true,
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'frontend/ui/index.html')
-      }
+      // ビルド時の設定 (開発時には影響しない)
     }
   }
 }); 

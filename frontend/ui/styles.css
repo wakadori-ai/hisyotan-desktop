@@ -31,32 +31,34 @@ body, html {
 }
 
 .assistant-container {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  z-index: 9999;
-  height: 100%;
-  padding: 10px;
-  pointer-events: none;
-  padding-right: 30px;
+  overflow: hidden !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 40vw !important;
+  height: 75vh !important;
+  pointer-events: none !important;
 }
 
-.assistant-image {
-  max-height: 50vh;
-  width: auto;
-  object-fit: contain;
-  opacity: 1;
-  transform: translateY(0);
-  filter: drop-shadow(0 5px 10px var(--shadow-color));
-  transition: transform 0.3s ease, opacity 0.3s ease;
-  z-index: 1;
-  position: relative;
-  pointer-events: none; /* キャラクター画像をクリック透過に */
+/* 立ち絵サイズコントロール */
+#assistantImage {
+  max-width: 35vw !important;
+  max-height: 70vh !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  transform-origin: bottom right !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  right: 0 !important;
+}
+
+/* 画面サイズに応じた調整（レスポンシブ対応） */
+@media (max-width: 768px) {
+  #assistantImage {
+    max-width: 50vw;
+    max-height: 60vh;
+  }
 }
 
 /* マウス操作時の透明度設定 */

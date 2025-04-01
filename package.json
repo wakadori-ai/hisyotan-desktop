@@ -10,7 +10,9 @@
     "build": "vite build",
     "build:electron": "electron-builder",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dev:debug": "cross-env NODE_ENV=development electron . --debug",
+    "dev:log": "cross-env NODE_ENV=development electron . > debug-log.txt 2>&1"
   },
   "author": "",
   "license": "MIT",
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
     "vite": "^6.2.4",
