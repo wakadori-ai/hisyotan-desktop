@@ -16,10 +16,9 @@ from fastapi import Body
 import argparse
 
 # 標準出力・標準エラー出力のエンコーディングを明示的に設定
-if sys.stdout.encoding != 'utf-8':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # ベースディレクトリの設定
 BASE_DIR = Path(__file__).parent.absolute()
@@ -30,11 +29,14 @@ if str(BASE_DIR) not in sys.path:
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    encoding='utf-8'  # UTF-8エンコーディングを明示的に指定
 )
 logger = logging.getLogger(__name__)
 
 # 環境変数の設定（必要に応じて）
 os.environ.setdefault('DEBUG_MODE', 'false')
+# UTF-8エンコーディングを強制
+os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 # アプリケーションの作成
 from app.core import create_application

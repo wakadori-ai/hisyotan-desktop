@@ -65,15 +65,15 @@ async function startBackendServer() {
     
     // 標準出力のリスニング
     backendProcess.stdout.on('data', (data) => {
-      // iconv-liteを使ってShift-JISデコード
-      const output = iconv.decode(data, 'cp932').trim();
+      // Python側がUTF-8で出力するようになったのでUTF-8でデコード
+      const output = iconv.decode(data, 'utf-8').trim();
       console.log(`バックエンド出力: ${output}`);
     });
     
     // エラー出力のリスニング
     backendProcess.stderr.on('data', (data) => {
-      // iconv-liteを使ってShift-JISデコード
-      const output = iconv.decode(data, 'cp932').trim();
+      // Python側がUTF-8で出力するようになったのでUTF-8でデコード
+      const output = iconv.decode(data, 'utf-8').trim();
       console.error(`バックエンドエラー: ${output}`);
     });
     
