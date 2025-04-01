@@ -278,6 +278,7 @@
       <button id="normalBubbleBtn" onclick="testNormalBubble()">通常吹き出し</button>
       <button id="testBubbleBtn" onclick="testBubble()">赤吹き出し</button>
       <button id="randomLineBtn" onclick="testRandomLine()">ランダムセリフ</button>
+      <button id="testZombieBtn" onclick="testZombieOverlay()">ゾンビ検出テスト</button>
       <button id="toggleClickThroughBtn" onclick="toggleClickThroughMode()">操作モード切替</button>
       <button id="devToolsBtn" onclick="openDevTools()">開発者ツール</button>
       <button id="closeMenuBtn" onclick="toggleDebugMenu()">閉じる</button>
@@ -465,9 +466,14 @@
           }
         }
       } else if (typeof window.showRandomLine === 'function') {
-        // 代替手段としてshowRandomLine関数を使用
-        console.log('showRandomLine関数を使用してランダムセリフを表示します');
-        window.showRandomLine();
+        // showRandomLine関数があればそれを使う
+        console.log('✅ showRandomLine関数を使用してランダムセリフを有効化します');
+        
+        // 簡易コントローラーを作成
+        window.randomLinesController = {
+          showNow: window.showRandomLine,
+          stop: function() { console.log('ランダムセリフを停止しました'); }
+        };
       } else {
         console.error('ランダムセリフ関数が見つかりません');
         alert('ランダムセリフ機能が初期化されていません');
@@ -642,6 +648,20 @@
         }
       } else {
         panel.style.display = 'none';
+      }
+    }
+  </script>
+
+  <script>
+    // テスト用: ゾンビオーバーレイのテスト
+    function testZombieOverlay() {
+      // オーバーレイマネージャーが存在するか確認
+      if (window.zombieOverlayManager) {
+        console.log('ゾンビオーバーレイのテストを実行します');
+        window.zombieOverlayManager.testOverlay();
+      } else {
+        console.error('ゾンビオーバーレイマネージャーが見つかりません');
+        alert('ゾンビオーバーレイマネージャーが初期化されていません');
       }
     }
   </script>

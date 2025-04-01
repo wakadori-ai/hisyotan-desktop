@@ -8,6 +8,7 @@ import { initExpressionElements, setExpression } from './expressionManager.js';
 import { setConfig as setWebSocketConfig, initWebSocket } from './websocketHandler.js';
 import { setConfig as setSpeechConfig, checkVoicevoxConnection } from './speechManager.js';
 import { initRandomLines } from './emotionHandler.js';
+import zombieOverlayManager from './overlayManager.js';
 
 // 初期化
 document.addEventListener('DOMContentLoaded', async () => {
@@ -27,6 +28,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 各モジュールに設定を渡す
     setWebSocketConfig(config);
     setSpeechConfig(config);
+    
+    // ゾンビオーバーレイマネージャーを初期化
+    zombieOverlayManager.initialize();
+    
+    // デバッグ用グローバル公開（開発者ツールからテストできるように）
+    if (typeof window !== 'undefined') {
+      window.zombieOverlayManager = zombieOverlayManager;
+    }
     
     // バックエンドとの接続
     initWebSocket();

@@ -16,6 +16,7 @@ import {
   setExpression
 } from './expressionManager.js';
 import { playPresetSound } from './audioReactor.js';
+import zombieOverlayManager from './overlayManager.js';
 
 let websocket = null; // WebSocketオブジェクト
 let isConnected = false; // 接続状態
@@ -308,6 +309,39 @@ function handleWebSocketMessage(message) {
     
     // handleZombieWarning関数を呼び出す
     handleZombieWarning(message.data);
+  } else if (message.type === 'detection') {
+    logDebug(`検出データを受信: ${JSON.stringify(message.data)}`);
+    
+    // データ検証
+    if (!message.data) {
+      logError('検出データが存在しません');
+      return;
+    }
+    
+    // YOLOとResNetのデータを取得
+    const yoloData = message.data.yolo || [];
+    const resnetAlive = message.data.resnet_alive || false;
+    
+    // オーバーレイマネージャーを呼び出してデータを表示
+    zombieOverlayManager.showDetection(yoloData, resnetAlive);
+    
+    logDebug(`ゾンビ検出データを表示: YOLO=${yoloData.length}個, ResNet=${resnetAlive}`);
+  } else if (message.type === 'test_detection') {
+    logDebug('テスト検出データを受信しました');
+    
+    // テストデータを取得
+    const testData = message.data || {
+      yolo: [
+        {x1: 100, y1: 200, x2: 200, y2: 300, confidence: 0.92},
+        {x1: 400, y1: 100, x2: 480, y2: 220, confidence: 0.55}
+      ],
+      resnet_alive: true
+    };
+    
+    // オーバーレイマネージャーを呼び出してテストデータを表示
+    zombieOverlayManager.showDetection(testData.yolo, testData.resnet_alive);
+    
+    logDebug('テスト検出データを表示しました');
   } else {
     // 未知のメッセージタイプ
     logDebug(`未知のメッセージタイプです: ${message.type}`);

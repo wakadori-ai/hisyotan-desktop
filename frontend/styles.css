@@ -5,6 +5,8 @@
   --shadow-color: rgba(160, 120, 90, 0.2);
   --bubble-bg: rgba(255, 250, 245, 0.95);
   --error-bg: rgba(255, 235, 235, 0.85);
+  --zombie-warning-color: rgba(255, 0, 0, 0.2);
+  --zombie-shadow-color: rgba(100, 20, 20, 0.7);
 }
 
 * {
@@ -639,4 +641,94 @@ body.mouse-active .speech-bubble.show {
 .reduce-animations .speech-bubble,
 .reduce-animations .assistant-image {
   transition-duration: 0.1s !important;
+}
+
+/* ゾンビオーバーレイ関連のスタイル */
+.zombie-overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9990;
+  overflow: hidden;
+}
+
+.zombie-warning-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--zombie-warning-color);
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+  pointer-events: none;
+  z-index: 9991;
+  box-shadow: inset 0 0 50px rgba(255, 0, 0, 0.5);
+}
+
+.zombie-shadow {
+  position: absolute;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out, transform 0.3s ease-in-out;
+  pointer-events: none;
+  z-index: 9992;
+  filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.5));
+}
+
+.zombie-shadow.weak {
+  filter: blur(3px) drop-shadow(0 0 5px rgba(255, 30, 30, 0.4));
+}
+
+.zombie-shadow.strong {
+  filter: drop-shadow(0 0 15px rgba(255, 0, 0, 0.7));
+  animation: zombie-pulse 2s infinite ease-in-out;
+}
+
+@keyframes zombie-pulse {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 15px rgba(255, 0, 0, 0.7));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 20px rgba(255, 30, 30, 0.9));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 15px rgba(255, 0, 0, 0.7));
+  }
+}
+
+/* ゾンビ影のフェードインアニメーション */
+@keyframes zombie-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ゾンビ全体警告のパルスアニメーション */
+@keyframes zombie-warning-pulse {
+  0% {
+    opacity: 0.2;
+    box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.3);
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: inset 0 0 50px rgba(255, 0, 0, 0.6);
+  }
+  100% {
+    opacity: 0.2;
+    box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.3);
+  }
 } 
