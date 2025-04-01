@@ -24,6 +24,9 @@
   - HTML/CSS/JavaScript
   - WebSocket通信によるリアルタイム更新
   - 感情表現・UI制御・音声再生機能
+  - axios v1.6.2（HTTP通信）
+  - electron-log v5.3.3（ログ管理）
+  - electron-store v8.1.0（設定保存）
 
 - **バックエンド**: 
   - Python/FastAPI v0.104.1
@@ -35,6 +38,7 @@
   - YOLO v8（ultralytics 8.0.207）
   - OpenCV 4.8.1
   - ゲーム画面からのゾンビ検出機能
+  - 転移学習によるカスタムモデル
 
 - **音声合成**: 
   - VOICEVOX連携
@@ -43,7 +47,8 @@
 
 - **プロジェクト構造**:
   - Electron（フロントエンド）+ FastAPI（バックエンド）のハイブリッド構造
-  - ファイル構造の詳細は「プロジェクト構造」セクションを参照
+  - 機械学習モジュールによる高精度検出
+  - PowerShellスクリプトによる簡単なセットアップと起動
 
 ## 🔧 インストールと設定
 
@@ -54,7 +59,7 @@
   - npm（Node.jsに含まれています）
 
 - **バックエンド**：
-  - [Python](https://www.python.org/) 3.9以上
+  - [Python](https://www.python.org/) 3.9以上（推奨：3.10）
   - [VOICEVOX](https://voicevox.hiroshiba.jp/) のインストール（音声合成エンジン）
 
 ### インストール手順
@@ -70,11 +75,29 @@ npm install
 # バックエンド依存関係のインストール
 pip install -r requirements.txt
 
+# 機械学習モジュールの依存関係（オプション、ゾンビ検出機能を使用する場合）
+pip install -r backend/ml/requirements.txt
+
 # アプリケーションの起動
 npm start
 ```
 
 アプリケーションの起動時に自動的にバックエンド（Python FastAPI）が起動します。通常は手動でバックエンドを起動する必要はありません。
+
+### コマンドラインオプション
+
+バックエンドサーバーは以下のオプションをサポートしています：
+
+```bash
+# ゾンビ監視を有効にして起動
+python backend/main.py --enable-monitoring
+
+# ゾンビ検出機能を有効にして起動
+python backend/main.py --zombie-detection
+
+# デバッグモードで起動
+python backend/main.py --debug
+```
 
 ### Windows向け便利な起動方法
 
@@ -324,6 +347,12 @@ hisyotan-desktop/
 │   │   ├── models/       # データモデル
 │   │   ├── events/       # イベント処理
 │   │   └── config/       # 設定
+│   ├── ml/               # 機械学習モジュール
+│   │   ├── models/       # トレーニング済みモデル
+│   │   ├── train.py      # モデルトレーニングスクリプト
+│   │   ├── infer.py      # 推論スクリプト
+│   │   ├── README.md     # MLモジュールの説明
+│   │   └── requirements.txt # ML固有の依存関係
 │   ├── data/             # データ保存・キャッシュ
 │   └── main.py           # バックエンドエントリーポイント
 ├── logs/                  # ログファイル格納ディレクトリ
@@ -335,6 +364,34 @@ hisyotan-desktop/
 ├── diagnose.ps1          # 診断スクリプト
 └── README.md             # プロジェクト説明
 ```
+
+## 🤖 機械学習モジュール
+
+`backend/ml` ディレクトリには、ゾンビ検出のためのモデルトレーニングと推論に関連するコードが含まれています：
+
+- **train.py**: YOLOv8ベースのカスタムモデルをトレーニングするためのスクリプト
+  - 転移学習を利用したゾンビ画像分類器
+  - データ拡張機能を搭載（回転、反転、明るさ調整など）
+  - 学習結果の可視化（混同行列、学習履歴）
+- **infer.py**: トレーニング済みモデルを使用して画像から対象物を検出するための推論スクリプト
+  - リアルタイム推論用に最適化
+  - バッチ処理と単一画像処理の両方に対応
+- **models/**: トレーニング済みの検出モデルが保存されるディレクトリ
+  - YOLOv8ベースのカスタムモデル
+  - 高精度なゾンビ検出を実現
+- **confusion_matrix.png**: モデルの性能評価のための混同行列
+- **training_history.png**: 学習過程の可視化グラフ
+- **sample_images.png**: 実際の検出例を示すサンプル画像
+
+データセット構造は以下のようになっています：
+
+```
+data/datasets/zombie_classifier/
+├── zombie/       # ゾンビの画像（.png形式）
+└── not_zombie/   # ゾンビではない画像（.png形式）
+```
+
+このモジュールは、ゲーム「7 Days to Die」の画面からリアルタイムでゾンビを検出するための機械学習基盤を提供します。モデルトレーニングの詳細については、`backend/ml/README.md` を参照してください。
 
 ## 🔄 通信アーキテクチャ
 
