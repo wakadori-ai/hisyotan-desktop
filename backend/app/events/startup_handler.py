@@ -85,14 +85,22 @@ async def start_zombie_monitoring() -> None:
             # VOICEVOXの準備ができるまで少し待機
             wait_count = 0
             max_wait = 15  # 最大15秒待機
-            while wait_count < max_wait:
+            interval = 0.3  # 最初は0.3秒間隔でリトライ
+
+            while wait_count * interval < max_wait:
                 if await is_voicevox_ready():
                     logger.info("VOICEVOXの準備が完了しました。ゾンビ監視を開始します。")
                     break
-                await asyncio.sleep(1)
+                await asyncio.sleep(interval)
                 wait_count += 1
-                if wait_count % 5 == 0:
-                    logger.info(f"VOICEVOXの準備を待機中... ({wait_count}秒)")
+
+                # 5秒経過後はインターバルを1秒にしてCPU負荷を軽減
+                if wait_count * interval > 5:
+                    interval = 1.0
+
+                if wait_count % int(5 / interval) == 0:
+                    logger.info(f"VOICEVOXの準備を待機中... ({wait_count * interval:.1f}秒)")
+
             
             # ゾンビサービスの取得
             zombie_service = get_zombie_service()
