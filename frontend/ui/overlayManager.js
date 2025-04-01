@@ -1,7 +1,7 @@
 // overlayManager.js
 // ゾンビの存在感を画面上に可視化するためのモジュール
 
-import { logDebug } from '../core/logger.js';
+import { logDebug } from '@core/logger.js';
 
 class ZombieOverlayManager {
   constructor() {
@@ -14,9 +14,9 @@ class ZombieOverlayManager {
     // 設定
     this.config = {
       fadeOutTime: 3000, // フェードアウト時間 (ミリ秒)
-      weakShadowImage: '../assets/images/zombie_shadow_weak.png', // 弱いゾンビ影画像パス
-      strongShadowImage: '../assets/images/zombie_shadow_strong.png', // 強いゾンビ影画像パス
-      warningOverlayImage: '../assets/images/warning_overlay.png', // 全画面警告オーバーレイ画像パス
+      weakShadowImage: '@assets/images/zombie_shadow_weak.png', // 弱いゾンビ影画像パス
+      strongShadowImage: '@assets/images/zombie_shadow_strong.png', // 強いゾンビ影画像パス
+      warningOverlayImage: '@assets/images/warning_overlay.png', // 全画面警告オーバーレイ画像パス
       confidenceThreshold: 0.7 // 「強い」判定の閾値
     };
     

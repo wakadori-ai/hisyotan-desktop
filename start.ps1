@@ -12,6 +12,29 @@ try {
     exit
 }
 
+# パラメータの定義
+param (
+    [switch]$Dev,
+    [switch]$Help
+)
+
+# ヘルプの表示
+if ($Help) {
+    Write-Host @"
+秘書たん一発起動スクリプト - ヘルプ
+
+使用方法:
+  .\start.ps1             通常モードで起動
+  .\start.ps1 -Dev        開発モードで起動（Vite + HMR対応）
+  .\start.ps1 -Help       このヘルプを表示
+
+オプション:
+  -Dev        開発モードで起動します（Vite開発サーバー + Electron）
+  -Help       ヘルプを表示して終了します
+"@ -ForegroundColor Cyan
+    exit
+}
+
 # ディレクトリ設定
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $AppName = "秘書たん"
@@ -137,21 +160,41 @@ try {
         }
     }
     
-    # アプリケーション起動（バックグラウンドでnpm startを実行）
+    # アプリケーション起動
     Write-Host "🌟 秘書たんアプリを起動しています..." -ForegroundColor Cyan
     
-    # PowerShellのジョブ機能を使用してバックグラウンドで実行
-    $job = Start-Job -ScriptBlock {
-        param($workDir)
-        Set-Location $workDir
-        # バッチファイルを経由して実行
-        cmd.exe /c "npm start"
-    } -ArgumentList $ScriptDir
+    # 開発モードかどうかでコマンドを変更
+    if ($Dev) {
+        Write-Host "🔧 開発モードで起動します（Vite + Electron）" -ForegroundColor Cyan
+        
+        # PowerShellのジョブ機能を使用してバックグラウンドで実行
+        $job = Start-Job -ScriptBlock {
+            param($workDir)
+            Set-Location $workDir
+            # 開発モードで実行
+            npm run dev:electron
+        } -ArgumentList $ScriptDir
+    } else {
+        # PowerShellのジョブ機能を使用してバックグラウンドで実行（通常モード）
+        $job = Start-Job -ScriptBlock {
+            param($workDir)
+            Set-Location $workDir
+            # バッチファイルを経由して実行
+            cmd.exe /c "npm start"
+        } -ArgumentList $ScriptDir
+    }
     
     # 起動完了メッセージ
     Write-Host "`n✨✨ 秘書たんを起動しました！ ✨✨`n" -ForegroundColor Magenta
     Write-Host "💡 メインプロセスが自動的にバックエンドを起動します" -ForegroundColor Cyan
     Write-Host "💡 Electronを閉じるとバックエンドも自動的に終了します" -ForegroundColor Cyan
+    
+    if ($Dev) {
+        Write-Host "`n🔧 開発モード情報:" -ForegroundColor Yellow
+        Write-Host "   🌐 Vite開発サーバー: http://localhost:3000/" -ForegroundColor Yellow
+        Write-Host "   💻 HMR (Hot Module Replacement) は有効です" -ForegroundColor Yellow
+        Write-Host "   🛠️ コードを変更すると自動的に更新されます" -ForegroundColor Yellow
+    }
     
     if (-not $voicevoxRunning -and -not $voicevoxStartResult) {
         Write-Host "`n⚠️ 注意: VOICEVOXが起動していないため、音声合成機能は使えません" -ForegroundColor Yellow

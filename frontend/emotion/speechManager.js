@@ -1,9 +1,9 @@
 // speechManager.js
 // 発話・音声合成用のモジュール
 
-import { logDebug, logError, logZombieWarning } from '../core/logger.js';
-import { showError, shouldShowError } from '../ui/uiHelper.js';
-import { setText, showBubble, hideBubble, initUIElements } from '../ui/uiHelper.js';
+import { logDebug, logError, logZombieWarning } from '@core/logger.js';
+import { showError, shouldShowError } from '@ui/uiHelper.js';
+import { setText, showBubble, hideBubble, initUIElements } from '@ui/uiHelper.js';
 import { 
   setExpression, 
   startTalking, 
@@ -14,8 +14,8 @@ import {
   stopTrembling,
   startNervousShake,
   stopNervousShake
-} from './expressionManager.js';
-import { playPresetSound } from '../voice/audioReactor.js';
+} from '@emotion/expressionManager.js';
+import { playPresetSound } from '@voice/audioReactor.js';
 
 // 設定データ
 let config = null;

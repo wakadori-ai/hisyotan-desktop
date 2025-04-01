@@ -407,4 +407,45 @@ MIT License
 
 ## 🤝 貢献
 
-プルリクエストや機能提案は大歓迎です！バグ修正や新機能の提案は、Issue機能を使ってお気軽にお知らせください。 
+プルリクエストや機能提案は大歓迎です！バグ修正や新機能の提案は、Issue機能を使ってお気軽にお知らせください。
+
+## 🛠️ Vite導入について
+
+プロジェクトにViteを導入し、以下の機能が利用可能になりました：
+
+### パスエイリアス
+相対パスの代わりに、以下のエイリアスが使用できます：
+
+```js
+// 変更前
+import { logger } from '../core/logger.js';
+
+// 変更後
+import { logger } from '@core/logger.js';
+```
+
+利用可能なエイリアス：
+- `@core` -> `frontend/core`
+- `@ui` -> `frontend/ui`
+- `@emotion` -> `frontend/emotion`
+- `@assets` -> `frontend/assets`
+- `@config` -> `frontend/config`
+- `@voice` -> `frontend/voice`
+
+### 開発サーバーの起動
+
+```
+npm run dev        # Vite開発サーバーのみ起動
+npm run dev:electron # Vite + Electron同時起動（HMR対応）
+```
+
+### ビルド
+
+```
+npm run build      # フロントエンドのビルド
+npm run build:electron # Electronアプリのビルド
+```
+
+### 注意点
+- 開発中はViteサーバー経由でアプリを表示するため、アセットパスなどが変わる場合があります
+- ビルド時は相対パスに変換されるため、最終的には従来通りの動作になります 

@@ -1,14 +1,17 @@
 // renderer.js
 // 秘書たんのUI制御用エントリポイント
 
-import { logDebug, logError, saveErrorLog } from '../core/logger.js';
-import { loadConfig } from '../config/configLoader.js';
-import { initUIElements, showError, shouldShowError } from './uiHelper.js';
-import { initExpressionElements, setExpression } from '../emotion/expressionManager.js';
-import { setConfig as setWebSocketConfig, initWebSocket } from '../core/websocketHandler.js';
-import { setConfig as setSpeechConfig, checkVoicevoxConnection } from '../emotion/speechManager.js';
-import { initRandomLines } from '../emotion/emotionHandler.js';
-import zombieOverlayManager from './overlayManager.js';
+// スタイルシートをインポート
+import '../styles.css';
+
+import { logDebug, logError, saveErrorLog } from '@core/logger.js';
+import { loadConfig } from '@config/configLoader.js';
+import { initUIElements, showError, shouldShowError } from '@ui/uiHelper.js';
+import { initExpressionElements, setExpression } from '@emotion/expressionManager.js';
+import { setConfig as setWebSocketConfig, initWebSocket } from '@core/websocketHandler.js';
+import { setConfig as setSpeechConfig, checkVoicevoxConnection } from '@emotion/speechManager.js';
+import { initRandomLines } from '@emotion/emotionHandler.js';
+import zombieOverlayManager from '@ui/overlayManager.js';
 
 // 起動中フラグ
 let isStartupInProgress = true;

@@ -4,6 +4,9 @@ const path = require('path');
 const { spawn } = require('child_process');
 const fetch = require('node-fetch');
 
+// 開発モードかどうかを判定
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
 // 設定読み込み
 let config = {};
 try {
@@ -172,6 +175,19 @@ function createWindow() {
       webSecurity: false // ローカル開発用にwebSecurityを無効化
     }
   });
+
+  // 開発モードの場合はViteサーバーからロード、本番モードの場合はローカルファイルをロード
+  if (isDev) {
+    // 開発サーバーからロードする
+    mainWindow.loadURL('http://localhost:3000/frontend/ui/index.html');
+    // 開発者ツールを自動で開く
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    console.log('開発モードでアプリケーションを起動しました');
+  } else {
+    // 本番モードではローカルファイルを読み込む
+    mainWindow.loadFile(path.join(__dirname, 'frontend/ui/index.html'));
+    console.log('本番モードでアプリケーションを起動しました');
+  }
 
   // ... existing code ...
 }
