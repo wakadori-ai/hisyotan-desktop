@@ -73,7 +73,7 @@ class ZombieClassifier:
         
         # GPUが利用可能かチェック
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"🖥️ 使用デバイス: {self.device}")
+        print(f"使用デバイス: {self.device}")
         
         # 変換の定義
         self.train_transform = transforms.Compose([
@@ -167,7 +167,7 @@ class ZombieClassifier:
         best_valid_acc = 0
         
         # 学習ループ
-        print(f"🚀 {epochs}エポックの学習を開始します...")
+        print(f"開始: {epochs}エポックの学習を開始します...")
         for epoch in range(epochs):
             # 訓練フェーズ
             self.model.train()
@@ -248,15 +248,15 @@ class ZombieClassifier:
                     'valid_acc': valid_acc,
                     'classes': self.classes
                 }, model_path)
-                print(f"✅ 精度が向上しました！モデルを保存しました: {model_path}")
+                print(f"精度向上: モデルを保存しました: {model_path}")
         
-        print(f"🎉 学習完了！最終精度: {valid_acc:.4f}")
+        print(f"完了: 学習完了！最終精度: {valid_acc:.4f}")
         return self.model, history
     
     def evaluate(self):
         """モデルの評価"""
         if self.model is None:
-            print("❌ モデルが学習されていません。train()を先に実行してください。")
+            print("エラー: モデルが学習されていません。train()を先に実行してください。")
             return
         
         # 混同行列のデータ収集
@@ -300,56 +300,55 @@ class ZombieClassifier:
         return accuracy
     
     def predict_image(self, img_path):
-        """単一画像に対する予測
+        """画像の予測
         
         Args:
-            img_path: 予測したい画像のパス
+            img_path: 予測する画像のパス
             
         Returns:
-            予測クラス、確率
+            予測クラス, 信頼度
         """
         if self.model is None:
             try:
                 # モデルの読み込み
-                checkpoint = torch.load(self.model_path/'zombie_classifier.pth', map_location=self.device)
+                model_path = self.model_path/'zombie_classifier.pth'
+                checkpoint = torch.load(model_path)
                 
                 # ResNet18モデルの作成
                 self.model = models.resnet18(weights=None)
                 num_ftrs = self.model.fc.in_features
                 self.model.fc = nn.Linear(num_ftrs, len(self.classes))
                 
-                # パラメータの読み込み
+                # 保存されたパラメータを読み込み
                 self.model.load_state_dict(checkpoint['model_state_dict'])
-                self.model = self.model.to(self.device)
-                self.classes = checkpoint['classes']
-                
+                self.model.to(self.device)
                 self.model.eval()
+                
+                print(f"モデルを読み込みました: {model_path}")
             except Exception as e:
-                print(f"❌ モデルの読み込みに失敗しました: {e}")
-                print("train()を先に実行してください。")
-                return None, None
+                print(f"エラー: モデルの読み込みに失敗しました: {e}")
+                return None, 0.0
         
-        # 画像の前処理
         try:
-            image = Image.open(img_path).convert('RGB')
-            image_tensor = self.valid_transform(image).unsqueeze(0).to(self.device)
+            # 画像の前処理
+            img = Image.open(img_path).convert('RGB')
+            image_tensor = self.valid_transform(img).unsqueeze(0).to(self.device)
             
-            # 予測
+            # 予測の実行
             with torch.no_grad():
                 outputs = self.model(image_tensor)
-                probabilities = torch.nn.functional.softmax(outputs, dim=1)[0]
+                probabilities = torch.nn.functional.softmax(outputs, dim=1)
+                confidence, predicted = torch.max(probabilities, 1)
                 
-                # 最も確率の高いクラスを取得
-                pred_idx = torch.argmax(probabilities).item()
-                pred_class = self.classes[pred_idx]
-                prob = probabilities[pred_idx].item()
-                
-                print(f"🧠 予測: {pred_class} (確率: {prob:.4f})")
-                
-                return pred_class, prob
+            # 結果の返却
+            predicted_class = self.classes[predicted[0].item()]
+            confidence_value = confidence[0].item()
+            
+            return predicted_class, confidence_value
+        
         except Exception as e:
-            print(f"❌ 画像の予測中にエラーが発生しました: {e}")
-            return None, None
+            print(f"エラー: 画像の予測中にエラーが発生しました: {e}")
+            return None, 0.0
 
 def plot_training_history(history):
     """学習履歴をプロット"""
@@ -388,7 +387,7 @@ def main():
     classifier = ZombieClassifier()
     
     # データの準備
-    print("📁 データを準備しています...")
+    print("開始: モデルの学習を開始します...")
     train_loader, valid_loader = classifier.prepare_data(batch_size=8)
     
     # データサンプルの表示（オプション）
@@ -432,7 +431,7 @@ def main():
         print(f"🧪 テスト画像での推論: {test_img}")
         pred_class, prob = classifier.predict_image(test_img)
     except IndexError:
-        print("⚠️ テスト画像が見つかりませんでした。モデルは正常に学習されています。")
+        print("警告: テスト画像が見つかりませんでした。モデルは正常に学習されています。")
 
 if __name__ == "__main__":
     main() 

@@ -14,6 +14,16 @@ const presetMap = {
   sad: "assets/sounds/presets/sigh_sad.wav"        // 悲しい
 };
 
+// プリセット音声ファイルの名前から実際のパスへのマッピング
+const presetNameMap = {
+  "altu": "assets/sounds/presets/altu.wav",       // 小さく驚く
+  "funya": "assets/sounds/presets/funya.wav",     // ふにゃっと反応
+  "gasp": "assets/sounds/presets/gasp.wav",       // 息を飲む（緊張）
+  "kya": "assets/sounds/presets/kya.wav",         // 軽く叫ぶ（驚き）
+  "scream": "assets/sounds/presets/scream.wav",   // 大声（襲撃時）
+  "sigh": "assets/sounds/presets/sigh.wav"        // 安堵、落ち着いたとき
+};
+
 // VOICEVOX生成音声ファイルのマッピング定義
 const voiceMap = {
   surprised: "assets/sounds/generated/surprised_01.wav",   // 驚き
@@ -263,4 +273,61 @@ export function reactToGameEvent(gameEvent) {
   logDebug(`ゲームイベント検出: ${gameEvent} => 感情=${emotion}`);
   
   return reactWithVoice(emotion);
+}
+
+/**
+ * 指定した名前のプリセット音声を再生する
+ * 
+ * @param {string} presetName - プリセット音声の名前 (altu, funya, gasp, kya, scream, sigh など)
+ * @return {Promise<boolean>} - 再生開始に成功したかどうかを返すPromise
+ */
+export function playPresetSound(presetName) {
+  return new Promise((resolve, reject) => {
+    try {
+      const soundPath = presetNameMap[presetName];
+      
+      if (!soundPath) {
+        logDebug(`指定されたプリセット音声がありません: ${presetName}`);
+        resolve(false);
+        return;
+      }
+      
+      logDebug(`プリセット音声再生開始: ${presetName} => ${soundPath}`);
+      
+      // 前のSEがあれば停止
+      if (currentSE) {
+        currentSE.pause();
+        currentSE.currentTime = 0;
+        currentSE = null;
+      }
+      
+      currentSE = new Audio(soundPath);
+      
+      currentSE.addEventListener('ended', () => {
+        currentSE = null;
+        logDebug(`プリセット音声再生完了: ${presetName}`);
+        resolve(true);
+      });
+      
+      // エラーハンドリング
+      currentSE.addEventListener('error', (e) => {
+        logDebug(`プリセット音声再生エラー: ${e.message || 'unknown error'}`);
+        currentSE = null;
+        resolve(false);
+      });
+      
+      currentSE.play()
+        .then(() => {
+          logDebug(`プリセット音声再生開始: ${presetName}`);
+        })
+        .catch(err => {
+          logDebug(`プリセット音声再生失敗: ${err.message}`);
+          currentSE = null;
+          resolve(false);
+        });
+    } catch (err) {
+      logDebug(`プリセット音声再生エラー: ${err.message}`);
+      resolve(false);
+    }
+  });
 } 

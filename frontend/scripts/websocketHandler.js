@@ -4,7 +4,7 @@
 import { logDebug, logError, logZombieWarning } from './logger.js';
 import { showError } from './uiHelper.js';
 import { updateConnectionStatus } from './uiHelper.js';
-import { speak } from './speechManager.js';
+import { speak, speakWithPreset } from './speechManager.js';
 import { hideTimeoutMap } from './speechManager.js';
 import { 
   startLightBounce, 
@@ -15,6 +15,7 @@ import {
   stopNervousShake,
   setExpression
 } from './expressionManager.js';
+import { playPresetSound } from './audioReactor.js';
 
 let websocket = null; // WebSocketオブジェクト
 let isConnected = false; // 接続状態
@@ -140,6 +141,61 @@ function handleWebSocketMessage(message) {
       return;
     }
     
+    // 新しい通知フォーマットの処理（presetSound, speakText, emotion）
+    if (message.data.presetSound || message.data.speakText) {
+      logDebug(`新しい通知フォーマットを検出: presetSound=${message.data.presetSound}, emotion=${message.data.emotion}`);
+      
+      const presetSound = message.data.presetSound;
+      const speakText = message.data.speakText;
+      const emotion = message.data.emotion || 'normal';
+      
+      // プリセット音声と合成音声の両方が指定されている場合
+      if (presetSound && speakText) {
+        // 統合関数を使用
+        speakWithPreset(presetSound, speakText, emotion, 5000, 'notification');
+        return;
+      }
+      
+      // プリセット音声のみの場合
+      if (presetSound && !speakText) {
+        // 表情を即座に変更
+        if (emotion) {
+          setExpression(emotion);
+        }
+        
+        // プリセット音声を再生
+        playPresetSound(presetSound)
+          .then(success => {
+            logDebug(`プリセット音声のみ再生結果: ${success ? '成功' : '失敗'}`);
+          })
+          .catch(err => {
+            logError(`プリセット音声再生中にエラー: ${err}`);
+          });
+        return;
+      }
+      
+      // 合成音声のみの場合
+      if (speakText && !presetSound) {
+        // ディスプレイ時間はデフォルトの5000ms
+        const displayTime = 5000;
+        
+        // アニメーション指定
+        let animation = null;
+        if (emotion === 'surprised' || emotion === 'fearful') {
+          animation = 'nervous_shake';
+        } else if (emotion === 'serious') {
+          animation = 'trembling';
+        }
+        
+        // 発話を実行
+        logDebug(`合成音声のみの発話リクエスト: "${speakText}", 感情=${emotion}`);
+        speak(speakText, emotion, displayTime, animation, 'notification');
+        return;
+      }
+      
+      return;
+    }
+    
     const messageType = message.data.messageType;
     
     // messageTypeに基づいてハンドラを呼び出す
@@ -165,6 +221,37 @@ function handleWebSocketMessage(message) {
     // デバッグ情報を追加
     logDebug(`発話メッセージを受信: ${message.text}, 感情: ${message.emotion}, 表示時間: ${message.display_time}`);
     
+    // プリセット音声と合成音声の両方がある場合は統合関数を使用
+    if (message.presetSound && message.text) {
+      speakWithPreset(
+        message.presetSound,
+        message.text,
+        message.emotion || 'normal',
+        message.display_time || 5000,
+        'speak'
+      );
+      return;
+    }
+    
+    // プリセット音声の指定がある場合は先に再生
+    if (message.presetSound) {
+      logDebug(`発話メッセージにプリセット音声指定あり: ${message.presetSound}`);
+      
+      // 表情を即座に変更
+      if (message.emotion) {
+        setExpression(message.emotion);
+      }
+      
+      // プリセット音声を再生
+      playPresetSound(message.presetSound)
+        .then(success => {
+          logDebug(`プリセット音声再生結果: ${success ? '成功' : '失敗'}`);
+        })
+        .catch(err => {
+          logError(`プリセット音声再生中にエラー: ${err}`);
+        });
+    }
+    
     // アニメーション指定がある場合
     if (message.animation) {
       logDebug(`アニメーション指定あり: ${message.animation}`);
@@ -185,6 +272,11 @@ function handleWebSocketMessage(message) {
           stopNervousShake();
         }, 2000);
       }
+    }
+    
+    // プリセット音声と統合処理済みの場合はここでリターン
+    if (message.presetSound && message.text) {
+      return;
     }
     
     speak(message.text, message.emotion, message.display_time, message.animation);

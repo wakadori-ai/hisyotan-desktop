@@ -15,6 +15,7 @@ import {
   startNervousShake,
   stopNervousShake
 } from './expressionManager.js';
+import { playPresetSound } from './audioReactor.js';
 
 // 設定データ
 let config = null;
@@ -136,8 +137,9 @@ function forceShowBubble(formattedText, eventType = 'default') {
  * @param {number} displayTime - 表示時間（ミリ秒）
  * @param {string} animation - アニメーション（bounce_light, trembling, nervous-shake, null）
  * @param {string} eventType - イベントタイプ（イベント識別用、デフォルトは'default'）
+ * @param {string} presetSound - 先行再生するプリセット音声の名前（オプション）
  */
-export function speak(message, emotion = 'normal', displayTime = messageDisplayTime, animation = null, eventType = 'default') {
+export function speak(message, emotion = 'normal', displayTime = messageDisplayTime, animation = null, eventType = 'default', presetSound = null) {
   try {
     // 多重実行チェック（同一メッセージ・同一イベントタイプの場合はスキップ）
     const isDuplicate = (lastSpokenEvent === eventType && lastSpokenMessage === message);
@@ -195,6 +197,88 @@ export function speak(message, emotion = 'normal', displayTime = messageDisplayT
       speechText.innerText = formattedMessage;
     }
     
+    // プリセット音声が指定されている場合は先に再生し、再生完了後に合成音声をリクエスト
+    if (presetSound) {
+      logDebug(`プリセット音声を先に再生: ${presetSound}`);
+      playPresetSound(presetSound)
+        .then(success => {
+          if (success) {
+            logDebug(`プリセット音声再生完了、合成音声リクエストを開始`);
+            // プリセット音声再生完了後、合成音声リクエストを行う
+            requestVoiceSynthesis(message, emotion, eventType, formattedMessage);
+          } else {
+            logError(`プリセット音声再生失敗、合成音声のみでリカバリ`);
+            // 失敗した場合も合成音声リクエストは行う
+            requestVoiceSynthesis(message, emotion, eventType, formattedMessage);
+          }
+        })
+        .catch(err => {
+          logError(`プリセット音声再生エラー: ${err}`);
+          // エラー時も合成音声リクエストは行う
+          requestVoiceSynthesis(message, emotion, eventType, formattedMessage);
+        });
+    } else {
+      // 通常通り合成音声リクエスト
+      requestVoiceSynthesis(message, emotion, eventType, formattedMessage);
+    }
+    
+    // アニメーション制御
+    if (animation) {
+      if (animation === 'bounce_light') {
+        startLightBounce();
+        
+        // 数秒後にバウンスアニメーションを停止
+        setTimeout(() => {
+          stopLightBounce();
+        }, 2000);
+      } else if (animation === 'trembling') {
+        startTrembling();
+        
+        // 数秒後に震えアニメーションを停止
+        setTimeout(() => {
+          stopTrembling();
+        }, 2000);
+      } else if (animation === 'nervous_shake') {
+        startNervousShake();
+        
+        // 数秒後に不安震えアニメーションを停止
+        setTimeout(() => {
+          stopNervousShake();
+        }, 2000);
+      }
+    }
+    
+    // 会話状態を記録（多重実行防止用）
+    lastSpokenEvent = eventType;
+    lastSpokenMessage = message;
+    
+    // 非表示タイマーをセット（デフォルトのディスプレイタイム）
+    const hideTimerId = setTimeout(() => {
+      hideBubble();
+      hideTimeoutMap.delete(eventType);
+      
+      // アニメーションも停止
+      if (animation) {
+        if (animation === 'bounce_light') {
+          stopLightBounce();
+        } else if (animation === 'trembling') {
+          stopTrembling();
+        } else if (animation === 'nervous_shake') {
+          stopNervousShake();
+        }
+      }
+      
+      // 通常表情に戻す（少し時間差を付ける）
+      setTimeout(() => {
+        setExpression('normal');
+        stopTalking();
+      }, 500);
+      
+    }, displayTime);
+    
+    // タイマーIDをMapに保存
+    hideTimeoutMap.set(eventType, hideTimerId);
+    
     // 吹き出しが実際に表示されたか確認するためのデバッグ
     setTimeout(() => {
       const speechBubble = document.getElementById('speechBubble');
@@ -212,73 +296,6 @@ export function speak(message, emotion = 'normal', displayTime = messageDisplayT
         lastForceTime = Date.now();
       }
     }, 50);
-    
-    // アニメーションの実行（指定されている場合）
-    if (animation) {
-      logDebug(`アニメーション開始: ${animation}`);
-      switch(animation) {
-        case 'bounce_light':
-          startLightBounce();
-          // アニメーション終了タイマー
-          setTimeout(() => {
-            stopLightBounce();
-            logDebug('アニメーション終了: bounce_light');
-          }, displayTime);
-          break;
-        case 'trembling':
-          startTrembling();
-          // アニメーション終了タイマー
-          setTimeout(() => {
-            stopTrembling();
-            logDebug('アニメーション終了: trembling');
-          }, displayTime);
-          break;
-        case 'nervous-shake':
-        case 'nervous_shake': // 両方の形式をサポート
-          startNervousShake();
-          // アニメーション終了タイマー
-          setTimeout(() => {
-            stopNervousShake();
-            logDebug('アニメーション終了: nervous-shake');
-          }, displayTime);
-          break;
-        default:
-          logDebug(`未知のアニメーション種類: ${animation}`);
-      }
-    }
-    
-    // 音声合成をリクエスト
-    requestVoiceSynthesis(message, emotion, eventType, formattedMessage);
-    
-    // 既存のタイマーがあればクリア
-    if (hideTimeoutMap.has(eventType)) {
-      clearTimeout(hideTimeoutMap.get(eventType));
-      logDebug(`イベントタイプ ${eventType} の既存タイマーをクリアしました`);
-    }
-    
-    // 指定された時間後に吹き出しを非表示（イベントタイプごとに管理）
-    const timeoutId = setTimeout(() => {
-      logDebug(`イベントタイプ ${eventType} のタイマーが発火: 吹き出しを非表示にします`);
-      
-      // 現在のイベントと一致する場合のみ吹き出しを非表示にする
-      if (currentSpeechEvent === eventType) {
-        hideBubble();
-        setExpression('normal');
-        currentSpeechEvent = null;
-        
-        // タイマーを削除
-        if (hideTimeoutMap.has(eventType)) {
-          hideTimeoutMap.delete(eventType);
-        }
-      }
-    }, displayTime);
-    
-    hideTimeoutMap.set(eventType, timeoutId);
-    logDebug(`発話表示タイマー設定: 時間=${displayTime}ms, イベントタイプ=${eventType}`);
-
-    // 正常に発話開始した時点で最後の発話情報を記録
-    lastSpokenEvent = eventType;
-    lastSpokenMessage = message;
   } catch (error) {
     logError(`発話エラー: ${error.message}`);
     showError(`発話処理に失敗しました: ${error.message}`);
@@ -482,6 +499,39 @@ export function sayMessage(message, emotion = 'normal', duration = 5000) {
   }, duration);
   
   hideTimeoutMap.set('say_message', timeoutId);
+}
+
+/**
+ * プリセット音声とセリフを組み合わせて発話させる
+ * @param {string} presetSound - プリセット音声名
+ * @param {string} message - セリフ
+ * @param {string} emotion - 感情
+ * @param {number} displayTime - 表示時間（ミリ秒）
+ * @param {string} eventType - イベントタイプ
+ */
+export function speakWithPreset(presetSound, message, emotion = 'normal', displayTime = messageDisplayTime, eventType = 'notification') {
+  try {
+    if (!presetSound || !message) {
+      logError('プリセット音声または発話テキストが指定されていません');
+      return;
+    }
+    
+    logDebug(`プリセット音声付き発話: プリセット=${presetSound}, メッセージ="${message}", 感情=${emotion}`);
+    
+    // アニメーション判定
+    let animation = null;
+    if (emotion === 'surprised' || emotion === 'fearful') {
+      animation = 'nervous_shake';
+    } else if (emotion === 'serious') {
+      animation = 'trembling';
+    }
+    
+    // プリセット音声付き発話処理を実行
+    speak(message, emotion, displayTime, animation, eventType, presetSound);
+    
+  } catch (err) {
+    logError(`プリセット音声付き発話処理でエラー: ${err.message}`);
+  }
 }
 
 // 必ず実行する部分：グローバルに関数を公開

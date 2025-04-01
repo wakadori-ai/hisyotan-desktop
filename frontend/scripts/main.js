@@ -58,8 +58,14 @@ let mainWindow = null;
 // 感情管理
 let currentEmotion = 0; // -100〜100の範囲で感情を管理
 
+// バックエンドプロセス
+let backendProcess = null;
+
 // アプリケーションの初期化
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // バックエンドサーバーを自動起動
+  await startBackendProcess();
+  
   createWindow();
   
   // グローバルショートカットの登録
@@ -539,7 +545,167 @@ function registerGlobalShortcuts() {
 app.on('will-quit', () => {
   // すべてのグローバルショートカットを解除
   globalShortcut.unregisterAll();
+  
+  // バックエンドプロセスを終了
+  if (backendProcess && !backendProcess.killed) {
+    console.log('アプリケーション終了時にバックエンドプロセスを終了します');
+    backendProcess.kill('SIGINT');
+  }
 });
+
+// バックエンドプロセスを起動する関数
+async function startBackendProcess() {
+  // すでにバックエンドが実行中の場合は何もしない
+  if (backendProcess !== null) {
+    console.log('バックエンドサーバーはすでに起動しています');
+    return;
+  }
+  
+  console.log('バックエンドサーバーを起動します...');
+  
+  try {
+    // アプリケーションのルートディレクトリを取得
+    const appRootDir = app.getAppPath();
+    console.log(`アプリケーションルートディレクトリ: ${appRootDir}`);
+    
+    // バックエンドのディレクトリパス
+    const backendDir = path.join(appRootDir, 'backend');
+    const backendScript = path.join(backendDir, 'main.py');
+    
+    // バックエンドディレクトリが存在するか確認
+    if (!fs.existsSync(backendDir)) {
+      console.error(`バックエンドディレクトリが見つかりません: ${backendDir}`);
+      throw new Error(`バックエンドディレクトリが見つかりません: ${backendDir}`);
+    }
+    
+    // スクリプトファイルが存在するか確認
+    if (!fs.existsSync(backendScript)) {
+      console.error(`バックエンドスクリプトが見つかりません: ${backendScript}`);
+      throw new Error(`バックエンドスクリプトが見つかりません: ${backendScript}`);
+    }
+    
+    // Pythonパスを複数の場所から探す（優先順位順）
+    let pythonPath = null;
+    const possiblePythonPaths = [
+      // 仮想環境内のPython
+      path.join(backendDir, '.venv', 'Scripts', 'python.exe'),
+      // システムのPython
+      'python',
+      'python3'
+    ];
+    
+    // 最初に見つかったPythonを使用
+    for (const pp of possiblePythonPaths) {
+      if (pp === 'python' || pp === 'python3') {
+        pythonPath = pp;
+        console.log(`システムの${pp}を使用します`);
+        break;
+      } else if (fs.existsSync(pp)) {
+        pythonPath = pp;
+        console.log(`仮想環境のPythonを使用します: ${pp}`);
+        break;
+      }
+    }
+    
+    if (!pythonPath) {
+      throw new Error('Pythonの実行ファイルが見つかりませんでした');
+    }
+    
+    console.log(`Pythonパス: ${pythonPath}`);
+    console.log(`バックエンドスクリプト: ${backendScript}`);
+    
+    // Windows環境の場合、cmd.exeを使ってPythonを実行
+    if (process.platform === 'win32') {
+      // ゾンビ検出フラグを追加
+      const args = [backendScript, '--enable-monitoring', '--zombie-detection'];
+      
+      // Windowsでは、バッチファイル経由で実行（仮想環境があればアクティベートする）
+      const venvPath = path.join(backendDir, '.venv');
+      let cmd;
+      let cmdArgs;
+      
+      if (fs.existsSync(venvPath)) {
+        // 仮想環境を使用してPythonを実行
+        cmd = 'cmd.exe';
+        cmdArgs = [
+          '/c',
+          `cd ${backendDir} && .venv\\Scripts\\activate && python main.py --enable-monitoring --zombie-detection`
+        ];
+        console.log('仮想環境を使用してバックエンドを起動します...');
+      } else {
+        // 仮想環境なしでPythonを実行
+        cmd = pythonPath;
+        cmdArgs = args;
+        console.log('システムPythonを使用してバックエンドを起動します...');
+      }
+      
+      // バックエンドサーバーをサブプロセスとして起動
+      backendProcess = spawn(cmd, cmdArgs, {
+        stdio: 'pipe', // 標準出力とエラー出力を親プロセスにパイプ
+        detached: false, // 親プロセスが終了した場合に子プロセスも終了させる
+        windowsHide: true, // Windowsでコマンドウィンドウを表示しない
+        cwd: backendDir, // 作業ディレクトリをバックエンドディレクトリに設定
+        shell: true // シェル経由で実行
+      });
+    } else {
+      // Mac/Linux環境の場合
+      // ゾンビ検出フラグを追加
+      const args = [backendScript, '--enable-monitoring', '--zombie-detection'];
+      
+      // バックエンドサーバーをサブプロセスとして起動
+      backendProcess = spawn(pythonPath, args, {
+        stdio: 'pipe', // 標準出力とエラー出力を親プロセスにパイプ
+        detached: false, // 親プロセスが終了した場合に子プロセスも終了させる
+        cwd: backendDir, // 作業ディレクトリをバックエンドディレクトリに設定
+      });
+    }
+    
+    // 標準出力のリスニング
+    backendProcess.stdout.on('data', (data) => {
+      console.log(`バックエンド出力: ${data.toString().trim()}`);
+    });
+    
+    // エラー出力のリスニング
+    backendProcess.stderr.on('data', (data) => {
+      console.error(`バックエンドエラー: ${data.toString().trim()}`);
+    });
+    
+    // プロセス終了時の処理
+    backendProcess.on('close', (code) => {
+      console.log(`バックエンドサーバーが終了しました (コード: ${code})`);
+      backendProcess = null;
+    });
+    
+    // エラー処理を追加
+    backendProcess.on('error', (err) => {
+      console.error(`バックエンドプロセス起動エラー: ${err.message}`);
+      backendProcess = null;
+    });
+    
+    // バックエンドサーバーの起動を待機（5秒）
+    console.log('バックエンドサーバー起動待機中...');
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    console.log('バックエンドサーバー起動待機完了');
+    
+    // バックエンド接続確認
+    try {
+      const response = await fetch('http://127.0.0.1:8000/health', { timeout: 3000 });
+      if (response.ok) {
+        console.log('🎉 バックエンドサーバーが正常に応答しています');
+      } else {
+        console.warn('⚠️ バックエンドサーバーからの応答がありますが、ステータスが異常です');
+      }
+    } catch (error) {
+      console.warn('⚠️ バックエンドサーバーへの接続確認に失敗しました:', error.message);
+      console.log('バックエンドサーバーが起動中の可能性があります。少し待ってみてください...');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('バックエンドサーバー起動エラー:', error);
+    return false;
+  }
+}
 
 // バックエンドプロセスを安全に終了する関数
 async function shutdownBackend() {
@@ -556,10 +722,20 @@ async function shutdownBackend() {
     
     console.log('バックエンド終了リクエスト成功:', response.data);
     
+    // バックエンドプロセスを直接終了
+    if (backendProcess && !backendProcess.killed) {
+      backendProcess.kill('SIGINT');
+    }
+    
     // 少し待ってからプロセスが確実に終了するようにする
     return new Promise(resolve => setTimeout(resolve, 1000));
   } catch (error) {
     console.error('バックエンド終了APIの呼び出しに失敗:', error.message);
+    
+    // APIが失敗した場合でも、直接プロセスを終了する
+    if (backendProcess && !backendProcess.killed) {
+      backendProcess.kill('SIGINT');
+    }
     
     // APIが失敗した場合は、プロセスを強制終了しようとする（Windowsのみ）
     if (process.platform === 'win32') {
