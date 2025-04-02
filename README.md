@@ -16,6 +16,7 @@
 - **カスタマイズ可能**: 画像や音声キャラクターを自由に変更可能
 - **透明度・サイズ調整**: UI設定から簡単に見た目をカスタマイズ
 - **位置調整**: 画面上の好きな位置に配置可能（左上・右上・左下・右下）
+- **一発起動スクリプト**: 簡単な操作でアプリケーション全体を起動（v1.1.0）
 
 ## 📋 技術仕様
 
@@ -27,6 +28,7 @@
   - axios v1.6.2（HTTP通信）
   - electron-log v5.3.3（ログ管理）
   - electron-store v8.1.0（設定保存）
+  - Vite v6.2.4（開発ビルドツール）
 
 - **バックエンド**: 
   - Python/FastAPI v0.104.1
@@ -101,7 +103,7 @@ python backend/main.py --debug
 
 ### Windows向け便利な起動方法
 
-#### 簡単な起動方法
+#### 簡単な起動方法（v1.1.0）
 
 1. PowerShellを開きます
 2. 以下のコマンドを実行します：
@@ -110,6 +112,17 @@ python backend/main.py --debug
    ```
    
 このスクリプトは自動的に必要な環境をチェックし、フロントエンドとバックエンドを起動します。
+
+#### 起動オプション
+
+```
+.\start.ps1                 通常モードで起動（Electron + Backend）
+.\start.ps1 -Dev            開発モード起動（Vite + Electron + Backend）
+.\start.ps1 -BackendOnly    バックエンド（FastAPI）のみ起動
+.\start.ps1 -FrontendOnly   フロントエンド（Vite）のみ起動
+.\start.ps1 -ElectronOnly   Electronのみ起動（他は手動で起動）
+.\start.ps1 -Help           ヘルプ表示
+```
 
 #### 診断ツール
 
@@ -157,7 +170,7 @@ python backend/main.py --debug
 
 主な設定ファイルは以下の2つです：
 
-### フロントエンド設定 (`frontend/scripts/config.json`)
+### フロントエンド設定 (`frontend/config/config.json`)
 
 ```json
 {
@@ -192,21 +205,30 @@ python backend/main.py --debug
 ### 開発モード
 
 ```bash
-# 開発モードで実行（ホットリロード有効）
+# 開発モードで実行（Vite開発サーバーのみ）
 npm run dev
+
+# 開発モードで実行（Vite + Electron）
+npm run dev:electron
 ```
 
 ### アプリケーションのビルド
 
 ```bash
+# フロントエンドビルド
+npm run build
+
+# Electronアプリケーションビルド
+npm run build:electron
+
 # Windows用ビルド
-npm run build -- --win
+npm run dist -- --win
 
 # macOS用ビルド
-npm run build -- --mac
+npm run dist -- --mac
 
 # Linux用ビルド
-npm run build -- --linux
+npm run dist -- --linux
 ```
 
 ビルド設定は`package.json`の`build`セクションで定義されています。
@@ -315,18 +337,21 @@ hisyotan-desktop/
 │   ├── models/           # AIモデルファイル
 │   └── sounds/           # 効果音・音声ファイル
 ├── frontend/              # フロントエンドコード
-│   ├── scripts/          # JavaScriptファイル
+│   ├── core/             # コア機能
 │   │   ├── main.js       # メインプロセス
+│   │   ├── logger.js     # ログ管理
+│   │   └── preload.js    # プリロードスクリプト
+│   ├── ui/               # UI関連コード
 │   │   ├── renderer.js   # レンダラープロセス
-│   │   ├── speechManager.js # 音声・吹き出し管理
+│   │   ├── uiHelper.js   # UI操作ヘルパー
+│   ├── emotion/          # 感情表現システム
 │   │   ├── expressionManager.js # 表情管理
 │   │   ├── emotionHandler.js # 感情状態管理
-│   │   ├── websocketHandler.js # WebSocket通信
+│   ├── voice/            # 音声処理
+│   │   ├── speechManager.js # 音声・吹き出し管理
+│   ├── config/           # 設定関連
 │   │   ├── configLoader.js # 設定読み込み
 │   │   ├── config.js     # 設定管理
-│   │   ├── logger.js     # ログ管理
-│   │   ├── uiHelper.js   # UI操作ヘルパー
-│   │   ├── preload.js    # プリロードスクリプト
 │   │   └── config.json   # フロントエンド設定
 │   ├── index.html        # メインHTML
 │   └── styles.css        # スタイルシート
@@ -358,9 +383,10 @@ hisyotan-desktop/
 ├── logs/                  # ログファイル格納ディレクトリ
 ├── main.js               # Electronエントリーポイント
 ├── package.json          # npm設定とスクリプト
+├── vite.config.js        # Vite設定ファイル
 ├── requirements.txt      # Pythonパッケージ依存
 ├── .python-version       # Pythonバージョン指定
-├── start.ps1             # 起動スクリプト
+├── start.ps1             # 起動スクリプト (v1.1.0)
 ├── diagnose.ps1          # 診断スクリプト
 └── README.md             # プロジェクト説明
 ```
@@ -448,4 +474,3 @@ npm run build:electron # Electronアプリのビルド
 
 ### 注意点
 - 開発中はViteサーバー経由でアプリを表示するため、アセットパスなどが変わる場合があります
-- ビルド時は相対パスに変換されるため、最終的には従来通りの動作になります 
