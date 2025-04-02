@@ -42,11 +42,50 @@
                 transform: scale(1.00);
             }
         }
+
+        @keyframes popIn {
+            0% { 
+                opacity: 0;
+                transform: scale(0.6) translateY(20px);
+            }
+            70% { 
+                transform: scale(1.05) translateY(-5px);
+            }
+            100% { 
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
         
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes bounceIn {
+            0% { 
+                opacity: 0;
+                transform: scale(0.3) translateY(40px);
+            }
+            40% { 
+                transform: scale(1.1) translateY(-10px);
+            }
+            60% { 
+                transform: scale(0.9) translateY(5px);
+            }
+            80% { 
+                transform: scale(1.05) translateY(-2px);
+            }
+            100% { 
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
         .paw-button-wrapper {
             position: relative;
-            width: 160px;
-            height: 160px;
+            width: 240px;
+            height: 240px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -64,6 +103,7 @@
             backdrop-filter: blur(2px);
             box-shadow: 0 0 15px rgba(255, 192, 203, 0.3);
             transition: all 0.3s ease;
+            bottom: 40px;
         }
         
         #paw-button {
@@ -85,7 +125,8 @@
                 drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2))
                 drop-shadow(0 0 8px rgba(255, 192, 203, 0.6));
             text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-            position: relative;
+            position: absolute;
+            bottom: 30px;
         }
         
         #paw-button:hover {
@@ -181,15 +222,100 @@
             opacity: 1;
             transform: translateY(0);
         }
+
+        /* 秘書たん画像のスタイル */
+        #secretary-tan {
+            position: absolute;
+            width: 140px;
+            height: auto;
+            bottom: 80px;
+            left: 20px;
+            z-index: 998;
+            transform-origin: bottom center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        #secretary-tan.active {
+            animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* 秘書たんの吹き出し */
+        .speech-bubble {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 12px 16px;
+            font-size: 14px;
+            min-width: 180px;
+            max-width: 200px;
+            color: #333;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 200, 220, 0.5);
+            z-index: 1002;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            transform: translateY(-5px) scale(0.95);
+            display: none;
+        }
+
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 40px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid rgba(255, 255, 255, 0.95);
+        }
+
+        .speech-bubble.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            display: block;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .speech-bubble .bubble-close {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 12px;
+            color: #999;
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.05);
+            pointer-events: auto;
+        }
+
+        .speech-bubble .bubble-close:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: #555;
+        }
     </style>
 </head>
 <body>
     <div class="paw-button-wrapper">
+        <img id="secretary-tan" src="/assets/images/secretary_normal.png" alt="秘書たん" />
         <div id="paw-button">🐾</div>
         <div class="paw-background"></div>
         <div id="quit-button">
             <span>✨</span>
             <div class="quit-bubble">おつかれさま？ 終了するの？</div>
+        </div>
+        <div id="speechBubble" class="speech-bubble">
+            <span id="speechText">秘書たんだよ！何かお手伝いできることはある？</span>
+            <div class="bubble-close" onclick="hideBubble()">×</div>
         </div>
     </div>
 
@@ -197,22 +323,165 @@
         // Electron APIが利用可能かチェック
         const isElectron = window && window.electronAPI;
         
+        // ランダムセリフと表情の組み合わせ
+        const greetings = [
+            { text: "秘書たんだよ！何かお手伝いできることはある？", emotion: "normal" },
+            { text: "どうしたの？なにか手伝えることあるかな？", emotion: "happy" },
+            { text: "呼んでくれてありがと！何かできることはある？", emotion: "normal" },
+            { text: "お疲れさま！少し休憩する？", emotion: "smile" },
+            { text: "秘書たんと一緒に頑張ろう！", emotion: "happy" },
+            { text: "ふにゃ〜、なにかな？", emotion: "relieved" }
+        ];
+        
         // 肉球ボタンのクリックイベント
         document.getElementById('paw-button').addEventListener('click', () => {
             if (isElectron) {
-                window.electronAPI.toggleMainWindow();
+                showSpeechBubble();
             }
         });
         
+        // 吹き出しを表示する関数
+        async function showSpeechBubble() {
+            const speechBubble = document.getElementById('speechBubble');
+            const speechText = document.getElementById('speechText');
+            const secretaryTan = document.getElementById('secretary-tan');
+            
+            if (speechBubble && speechText && secretaryTan) {
+                // ランダムなセリフと表情を選択
+                const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+                
+                // テキストを設定
+                speechText.textContent = greeting.text;
+                
+                // 吹き出しを表示
+                speechBubble.classList.add('active');
+                
+                // 秘書たん画像の表情に応じた画像に変更
+                let imagePath = `/assets/images/secretary_${greeting.emotion}.png`;
+                
+                // Electron API が利用可能な場合は画像パスを解決
+                if (isElectron && window.electronAPI.resolveAssetPath) {
+                    try {
+                        const resolvedPath = await window.electronAPI.resolveAssetPath(`assets/images/secretary_${greeting.emotion}.png`);
+                        if (resolvedPath) {
+                            imagePath = resolvedPath;
+                        }
+                    } catch (error) {
+                        console.error('画像パス解決エラー:', error);
+                    }
+                }
+                
+                secretaryTan.src = imagePath;
+                secretaryTan.style.opacity = '1';
+                secretaryTan.classList.add('active');
+                
+                // 音声合成API呼び出し
+                if (isElectron && window.electronAPI.speakText) {
+                    window.electronAPI.speakText(greeting.text, greeting.emotion)
+                        .then(result => {
+                            console.log('音声合成結果:', result);
+                        })
+                        .catch(error => {
+                            console.error('音声合成エラー:', error);
+                        });
+                }
+                
+                // 表情を変更
+                if (isElectron && window.electronAPI.changeSecretaryExpression) {
+                    window.electronAPI.changeSecretaryExpression(greeting.emotion);
+                }
+                
+                // 5秒後に自動で閉じる
+                setTimeout(() => {
+                    hideBubble();
+                }, 5000);
+            }
+        }
+        
+        // 吹き出しを非表示にする関数
+        function hideBubble() {
+            const speechBubble = document.getElementById('speechBubble');
+            const secretaryTan = document.getElementById('secretary-tan');
+            
+            if (speechBubble) {
+                speechBubble.classList.remove('active');
+            }
+            
+            if (secretaryTan) {
+                secretaryTan.classList.remove('active');
+                // アニメーション終了後に非表示
+                setTimeout(() => {
+                    secretaryTan.style.opacity = '0';
+                }, 300);
+            }
+        }
+        
         // 終了ボタンのクリックイベント
-        document.getElementById('quit-button').addEventListener('click', (e) => {
+        document.getElementById('quit-button').addEventListener('click', async (e) => {
             e.stopPropagation(); // イベントの伝播を停止
             if (isElectron) {
                 console.log('🚨 終了ボタンがクリックされました');
-                // 1秒後にアプリを終了
+                
+                // 終了確認の吹き出しを表示
+                const speechBubble = document.getElementById('speechBubble');
+                const speechText = document.getElementById('speechText');
+                const secretaryTan = document.getElementById('secretary-tan');
+                
+                if (speechBubble && speechText) {
+                    // テキストを設定
+                    speechText.textContent = "本当に終了するの？またね〜！";
+                    
+                    // 吹き出しを表示
+                    speechBubble.classList.add('active');
+                    
+                    // 秘書たん画像を表示
+                    if (secretaryTan) {
+                        // 画像パスを解決
+                        let imagePath = "/assets/images/secretary_sad.png";
+                        
+                        // Electron API が利用可能な場合は画像パスを解決
+                        if (window.electronAPI.resolveAssetPath) {
+                            try {
+                                const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_sad.png');
+                                if (resolvedPath) {
+                                    imagePath = resolvedPath;
+                                }
+                            } catch (error) {
+                                console.error('画像パス解決エラー:', error);
+                            }
+                        }
+                        
+                        secretaryTan.src = imagePath;
+                        secretaryTan.style.opacity = '1';
+                        secretaryTan.classList.add('active');
+                    }
+                    
+                    // 音声合成API呼び出し
+                    if (isElectron && window.electronAPI.speakText) {
+                        window.electronAPI.speakText("本当に終了するの？またね〜！", "sad")
+                            .catch(error => {
+                                console.error('音声合成エラー:', error);
+                            });
+                    }
+                }
+                
+                // 1.5秒後にアプリを終了
                 setTimeout(() => {
-                    window.electronAPI.quitApp();
-                }, 1000);
+                    if (secretaryTan) {
+                        // フェードアウトアニメーション
+                        secretaryTan.style.transition = 'opacity 0.5s ease';
+                        secretaryTan.style.opacity = '0';
+                    }
+                    
+                    if (speechBubble) {
+                        speechBubble.classList.remove('active');
+                    }
+                    
+                    // さらに0.5秒後に実際に終了
+                    setTimeout(() => {
+                        window.electronAPI.quitApp();
+                    }, 500);
+                }, 1500);
             }
         });
         
@@ -228,7 +497,7 @@
         // マウスダウンイベント - ドラッグ開始
         wrapper.addEventListener('mousedown', (e) => {
             // 終了ボタンをクリックした場合はドラッグを開始しない
-            if (e.target.closest('#quit-button')) return;
+            if (e.target.closest('#quit-button') || e.target.closest('.bubble-close')) return;
             
             // ドラッグ中はアニメーションを一時停止
             pawButton.style.animationPlayState = 'paused';
@@ -279,8 +548,27 @@
             }
         });
         
-        // コンソールに初期化メッセージを表示
-        console.log('🐾 肉球UIが初期化されました');
+        // ページ読み込み時に初期化
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('🐾 統合肉球UI初期化完了');
+            
+            // 秘書たん画像を非表示に初期化
+            const secretaryTan = document.getElementById('secretary-tan');
+            if (secretaryTan) {
+                secretaryTan.style.opacity = '0';
+                
+                // Electron API が利用可能な場合は画像パスを解決
+                if (isElectron && window.electronAPI.resolveAssetPath) {
+                    try {
+                        const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_normal.png');
+                        secretaryTan.src = resolvedPath || '/assets/images/secretary_normal.png';
+                        console.log('画像パスを解決しました:', resolvedPath);
+                    } catch (error) {
+                        console.error('画像パス解決エラー:', error);
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html> 
