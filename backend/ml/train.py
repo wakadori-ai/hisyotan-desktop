@@ -66,8 +66,16 @@ class ZombieClassifier:
             data_path: データセットへのパス
         """
         self.data_path = Path(data_path)
-        self.model_path = Path('models')
-        self.model_path.mkdir(exist_ok=True)
+        # 絶対パスで正確にbackend/models ディレクトリを指定
+        current_file = Path(os.path.abspath(__file__))  # 現在のファイルの絶対パス
+        backend_dir = current_file.parent.parent  # backendディレクトリ
+        self.model_path = backend_dir / 'models'
+        print(f"モデルディレクトリパス: {self.model_path} (存在: {self.model_path.exists()})")
+        
+        # モデルファイルの存在確認
+        model_file = self.model_path / 'zombie_classifier.pth'
+        print(f"モデルファイル: {model_file} (存在: {model_file.exists()})")
+        
         self.model = None
         self.classes = ['not_zombie', 'zombie']  # クラスラベル
         
@@ -312,8 +320,24 @@ class ZombieClassifier:
             try:
                 # モデルの読み込み
                 model_path = self.model_path/'zombie_classifier.pth'
-                # PyTorch 2.6以降対応: weights_only=Falseを明示的に指定
-                checkpoint = torch.load(model_path, weights_only=False)
+                print(f"モデルパス: {model_path} (存在: {model_path.exists()})")
+                
+                if not model_path.exists():
+                    print(f"エラー: モデルファイルが見つかりません: {model_path}")
+                    print(f"現在の作業ディレクトリ: {os.getcwd()}")
+                    print(f"フルパス: {os.path.abspath(str(model_path))}")
+                    return None, 0.0
+                
+                # PyTorch 2.6以降対応: weights_onlyを条件分岐
+                try:
+                    checkpoint = torch.load(str(model_path), weights_only=False)
+                except TypeError:
+                    # 古いバージョンのPyTorchでは weights_only パラメータがないため
+                    checkpoint = torch.load(str(model_path), map_location=self.device)
+                except Exception as e:
+                    print(f"モデル読み込み例外: {e}")
+                    # 最後の手段としてシンプルな方法を試す
+                    checkpoint = torch.load(str(model_path))
                 
                 # ResNet18モデルの作成
                 self.model = models.resnet18(weights=None)

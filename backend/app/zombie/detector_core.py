@@ -50,9 +50,6 @@ class ZombieDetector:
             target_classes: 検出対象のクラスIDリスト（デフォルトは人物クラス[0]のみ）
             resnet_enabled: ResNet分類器を有効にするかどうか
         """
-        # デフォルトのモデルパス
-        if model_path is None:
-            model_path = os.path.join(DATA_DIR, "models", "yolov8n.pt")
         
         self.model_path = model_path
         self.confidence = confidence
@@ -386,8 +383,8 @@ class ZombieDetector:
                 except Exception as e:
                     logger.error(f"ResNet分類中にエラーが発生: {e}")
             
-            # 一時ファイルを削除
-            if os.path.exists(temp_img_path) and not self.debug_mode:
+            # 一時ファイルを削除（debug_modeに関わらず削除）
+            if os.path.exists(temp_img_path):
                 os.remove(temp_img_path)
             
             # 結果から対象のバウンディングボックスを抽出

@@ -57,7 +57,7 @@ async def start_zombie_monitoring() -> None:
         
         # モデルのパスを取得
         model_name = "yolov8n.pt"  # デフォルトモデル
-        data_models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "models")
+        data_models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))) "models")
         model_path = os.path.join(data_models_dir, model_name)
         
         # モデルファイルの存在確認

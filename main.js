@@ -131,6 +131,10 @@ async function checkBackendConnection() {
 
 // アプリケーションの初期化
 app.whenReady().then(async () => {
+  // 文字化け対策の設定を追加
+  app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
+  app.commandLine.appendSwitch('force-color-profile', 'srgb');
+  
   // バックエンドサーバーを起動
   await startBackendServer();
   
