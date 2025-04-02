@@ -60,6 +60,11 @@ if ($Help) {
   -FrontendOnly   Viteのみ起動（Ctrl+Cで停止可）
   -ElectronOnly   Electronのみ起動（Ctrl+Cで停止可）
   -Help           このヘルプを表示
+
+特徴:
+  - 通常・開発モードではターミナルを閉じてもプロセスは実行されたままになります
+  - 個別起動モードはCtrl+Cで停止できます（ターミナル依存）
+  - アプリを終了するには通常のアプリ終了操作かタスクマネージャーを使用してください
 "@ -ForegroundColor Cyan
     exit
 }
@@ -73,18 +78,21 @@ Set-Location $ScriptDir
 
 if ($BackendOnly) {
     Write-Log "FastAPI バックエンドを起動します（Ctrl+Cで停止可）" "Info"
+    # 直接実行することでCtrl+Cで停止できるようにする
     python -m uvicorn backend.main:app --reload --port 8000
     exit
 }
 
 if ($FrontendOnly) {
     Write-Log "Vite フロントエンドを起動します（Ctrl+Cで停止可）" "Info"
+    # 直接実行することでCtrl+Cで停止できるようにする
     npm run dev
     exit
 }
 
 if ($ElectronOnly) {
     Write-Log "Electron アプリのみ起動します（Ctrl+Cで停止可）" "Info"
+    # 直接実行することでCtrl+Cで停止できるようにする
     npm start
     exit
 }
@@ -119,22 +127,34 @@ Write-Log "秘書たんアプリを起動しています..." "Info"
 if ($Dev) {
     Write-Log "🔧 開発モード（Vite + Electron）で起動します" "Info"
 
-    Start-Job -ScriptBlock {
-        param($dir)
-        Set-Location $dir
-        npm run dev:electron
-    } -ArgumentList $ScriptDir | Out-Null
+    # バックエンド（FastAPI）を独立プロセスとして起動
+    Start-Process -FilePath "python.exe" -ArgumentList "-m", "uvicorn", "backend.main:app", "--reload", "--port", "8000" -WindowStyle Hidden
+
+    # Viteを独立プロセスとして起動
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev" -WindowStyle Hidden
+    
+    # 少し待機してからElectronを起動（Viteとバックエンドの起動を待つ）
+    Start-Sleep -Seconds 5
+    
+    # 開発モード用Electronを独立プロセスとして起動
+    $env:VITE_DEV_SERVER_URL = "http://localhost:3000/"
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npx electron ." -WindowStyle Hidden
 
     Write-Log "`n🌐 Vite: http://localhost:3000/ にアクセスできます" "Info"
+    Write-Log "🌐 API: http://localhost:8000/ で起動しています" "Info" 
     Write-Log "🛠️ 変更は自動で反映されます（HMR有効）" "Info"
 } else {
-    Start-Job -ScriptBlock {
-        param($dir)
-        Set-Location $dir
-        cmd.exe /c "npm start"
-    } -ArgumentList $ScriptDir | Out-Null
+    # バックエンド（FastAPI）を独立プロセスとして起動
+    Start-Process -FilePath "python.exe" -ArgumentList "-m", "uvicorn", "backend.main:app", "--port", "8000" -WindowStyle Hidden
+    
+    # 少し待機してからElectronを起動（バックエンドの起動を待つ）
+    Start-Sleep -Seconds 3
+    
+    # 通常モードでElectronを独立プロセスとして起動
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm start" -WindowStyle Hidden
 }
 
 Write-Log "`n✨✨ 秘書たんを起動しました！ ✨✨" "Cute"
-Write-Log "💡 Electronを閉じるとバックエンドも自動終了します" "Info"
+Write-Log "💡 ターミナルを閉じてもアプリは引き続き実行されます" "Info"
+Write-Log "💡 アプリを終了する場合は、タスクマネージャーから個別に終了してください" "Info"
 Write-Log "🎀 今日もふにゃっと、がんばっていこ〜！" "Cute"
