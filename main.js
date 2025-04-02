@@ -215,6 +215,24 @@ ipcMain.handle('check-file-exists', async (event, filePath) => {
   }
 });
 
+// アプリケーション終了ハンドラ
+ipcMain.on('app:quit', () => {
+  console.log('🌸 アプリケーションの終了を開始します...');
+  
+  // バックエンドサーバーの終了
+  if (backendProcess) {
+    console.log('バックエンドサーバーを終了します...');
+    backendProcess.kill();
+    backendProcess = null;
+  }
+  
+  // その他起動している子プロセスを終了（もし存在すれば）
+  
+  // Electronアプリを終了
+  console.log('さようなら、また会いましょう！');
+  app.quit();
+});
+
 // ファイル保存
 ipcMain.handle('save-voice-file', async (event, filePath, uint8Array) => {
   try {

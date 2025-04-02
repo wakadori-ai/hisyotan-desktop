@@ -50,7 +50,7 @@ export function setExpression(expression) {
         // Electronの場合は絶対パスを使う
         if (window.electronAPI.getAssetPath) {
           try {
-            const assetPath = `images/secretary_${expression}.png`;
+            const assetPath = `assets/images/secretary_${expression}.png`;
             window.electronAPI.getAssetPath(assetPath)
               .then(path => {
                 logDebug(`画像の絶対パスを取得: ${path}`);
@@ -61,7 +61,7 @@ export function setExpression(expression) {
                 logDebug(`絶対パス取得エラー: ${err.message}`);
                 
                 // フォールバックとして直接パスを指定
-                const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png?t=${timestamp}`;
+                const directPath = `file:///C:/Users/wakad/hisyotan-desktop/frontend/ui/public/assets/images/secretary_${expression}.png?t=${timestamp}`;
                 logDebug(`直接絶対パスを使用: ${directPath}`);
                 assistantImage.src = directPath;
               });
@@ -69,19 +69,19 @@ export function setExpression(expression) {
             logDebug(`getAssetPath実行エラー: ${err.message}`);
             
             // エラー時は直接絶対パスを設定
-            const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png?t=${timestamp}`;
+            const directPath = `file:///C:/Users/wakad/hisyotan-desktop/frontend/ui/public/assets/images/secretary_${expression}.png?t=${timestamp}`;
             logDebug(`直接絶対パスを使用: ${directPath}`);
             assistantImage.src = directPath;
           }
         } else {
           // getAssetPathがない場合は直接絶対パスを設定
-          const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png?t=${timestamp}`;
+          const directPath = `file:///C:/Users/wakad/hisyotan-desktop/frontend/ui/public/assets/images/secretary_${expression}.png?t=${timestamp}`;
           logDebug(`直接絶対パスを使用: ${directPath}`);
           assistantImage.src = directPath;
         }
       } else {
         // 非Electron環境（ブラウザなど）
-        const imagePath = `http://127.0.0.1:8000/static/images/secretary_${expression}.png?t=${timestamp}`;
+        const imagePath = `/assets/images/secretary_${expression}.png?t=${timestamp}`;
         logDebug(`非Electron環境用画像パス: ${imagePath}`);
         assistantImage.src = imagePath;
       }
@@ -95,7 +95,7 @@ export function setExpression(expression) {
       
       // エラー発生時の最終手段として直接絶対パスを設定
       try {
-        const directPath = `file:///C:/Users/wakad/hisyotan-desktop/assets/images/secretary_${expression}.png`;
+        const directPath = `file:///C:/Users/wakad/hisyotan-desktop/frontend/ui/public/assets/images/secretary_${expression}.png`;
         assistantImage.src = directPath;
         logDebug(`エラー発生後の直接パス設定: ${directPath}`);
       } catch (e) {

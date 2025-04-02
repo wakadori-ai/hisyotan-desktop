@@ -75,6 +75,30 @@ app.whenReady().then(async () => {
   // グローバルショートカットの登録
   registerGlobalShortcuts();
   
+  // 肉球ウィンドウ移動のIPCハンドラ
+  ipcMain.on('move-paw-window', (event, { deltaX, deltaY }) => {
+    if (pawWindow && !pawWindow.isDestroyed()) {
+      const [x, y] = pawWindow.getPosition();
+      pawWindow.setPosition(x + deltaX, y + deltaY);
+    }
+  });
+  
+  // 肉球ウィンドウの位置を取得するIPCハンドラ（新規追加）
+  ipcMain.handle('get-paw-window-position', (event) => {
+    if (pawWindow && !pawWindow.isDestroyed()) {
+      const [x, y] = pawWindow.getPosition();
+      return { x, y };
+    }
+    return { x: 0, y: 0 };
+  });
+  
+  // 肉球ウィンドウの位置を直接設定するIPCハンドラ（新規追加）
+  ipcMain.on('set-paw-window-position', (event, { x, y }) => {
+    if (pawWindow && !pawWindow.isDestroyed()) {
+      pawWindow.setPosition(Math.round(x), Math.round(y));
+    }
+  });
+  
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -207,10 +231,10 @@ function createPawWindow() {
   
   // 肉球ボタンウィンドウの作成
   pawWindow = new BrowserWindow({
-    width: 70,
-    height: 70,
-    x: width - 100, // 画面右端から少し内側に配置
-    y: height - 120, // 画面右下に配置
+    width: 160,
+    height: 160,
+    x: width - 180, // 画面右端から少し内側に配置
+    y: height - 190, // 画面右下に配置
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -284,6 +308,20 @@ ipcMain.on('close-window', () => {
     app.quit();
   }).catch(error => {
     console.error('バックエンド終了処理に失敗しました:', error);
+    app.quit(); // エラーが発生しても強制終了
+  });
+});
+
+// アプリケーション終了ハンドラ
+ipcMain.on('app:quit', () => {
+  console.log('🌸 アプリケーションの終了を開始します...');
+  
+  // バックエンドプロセスの終了処理
+  shutdownBackend().then(() => {
+    console.log('さようなら、また会いましょう！');
+    app.quit();
+  }).catch(error => {
+    console.error('バックエンド終了処理中にエラーが発生しました:', error);
     app.quit(); // エラーが発生しても強制終了
   });
 });

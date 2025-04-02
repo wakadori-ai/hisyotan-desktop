@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeWindow: () => ipcRenderer.send('close-window'),
   toggleAlwaysOnTop: () => ipcRenderer.send('toggle-always-on-top'),
   
+  // アプリケーションの終了
+  quitApp: () => ipcRenderer.send('app:quit'),
+  
   // マウスイベント制御
   enableMouseEvents: () => ipcRenderer.send('enable-mouse-events'),
   disableMouseEvents: () => ipcRenderer.send('disable-mouse-events'),

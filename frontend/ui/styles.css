@@ -591,21 +591,95 @@ body.mouse-active .speech-bubble.show {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* 終了ボタンのスタイル */
-.exit-button {
-  background-color: #f9e0d2;
-  color: #b97455;
-  border: 1px solid #d9b197;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.2s;
+/* 終了ボタン */
+.quit-button {
+  position: fixed !important;
+  bottom: 15px !important;
+  right: 15px !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background-color: rgba(255, 100, 150, 0.9) !important;
+  color: #fff !important;
+  font-size: 20px !important;
+  display: flex !important; /* 初期表示はJSで制御 */
+  justify-content: center !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 0 15px rgba(255, 100, 150, 0.6) !important;
+  backdrop-filter: blur(3px) !important;
+  z-index: 2147483647 !important; /* 最大z-index値 */
+  border: 2px solid rgba(255, 255, 255, 0.7) !important;
+  pointer-events: auto !important;
+  transform: none !important; /* transformをリセット */
+  outline: 3px solid rgba(255, 100, 150, 0.8) !important; /* 視認性確保 */
+  isolation: isolate !important; /* 新しい積み重ね文脈を作成 */
+  contain: layout !important; /* レイアウト分離 */
+  touch-action: manipulation !important; /* タッチ操作の最適化 */
+  will-change: transform !important; /* GPU高速化のヒント */
+  user-select: none !important; /* テキスト選択を無効化 */
+  
+  /* 透明部分でもクリック可能にする */
+  -webkit-text-fill-color: transparent !important;
+  
+  /* Webkit特有のスタイル */
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.5) !important;
 }
 
-.exit-button:hover {
-  background-color: #ffc9af;
-  color: #a55a3c;
+.quit-button * {
+  pointer-events: none !important; /* 子要素のポインターイベントを無効化 */
+}
+
+.quit-button:hover {
+  opacity: 1 !important;
+  transform: scale(1.1) !important; /* これは問題ない - ホバー時のみ適用 */
+  background-color: rgba(255, 80, 120, 0.9) !important;
+  box-shadow: 0 0 20px rgba(255, 100, 150, 0.8) !important;
+  outline: 3px solid rgba(255, 50, 100, 1) !important;
+}
+
+.quit-bubble {
+  position: absolute !important;
+  top: -70px !important;
+  right: -10px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 12px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif !important;
+  white-space: nowrap !important;
+  color: #333 !important;
+  opacity: 0 !important;
+  transform: translateY(5px) !important;
+  transition: all 0.2s ease !important;
+  pointer-events: none !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(255, 200, 220, 0.5) !important;
+  z-index: 2147483646 !important;
+  width: auto !important;
+  min-width: 160px !important;
+  overflow: visible !important;
+  line-height: 1.4 !important;
+  text-align: center !important;
+}
+
+.quit-bubble:after {
+  content: '' !important;
+  position: absolute !important;
+  bottom: -8px !important;
+  right: 14px !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-left: 8px solid transparent !important;
+  border-right: 8px solid transparent !important;
+  border-top: 8px solid rgba(255, 255, 255, 0.95) !important;
+}
+
+.quit-button:hover .quit-bubble {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
 }
 
 /* オーバーレイメニュー表示アニメーション */

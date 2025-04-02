@@ -7,7 +7,8 @@ export default defineConfig({
   base: './', // 相対パスでビルドするために必要
   
   // 静的アセット用のパブリックディレクトリを設定
-  publicDir: resolve(__dirname, 'assets'),
+  // frontend/ui/public が実際のパブリックフォルダになります
+  publicDir: 'public',
   
   // Electron統合のためのサーバー設定
   server: {
@@ -24,7 +25,7 @@ export default defineConfig({
       '@core': resolve(__dirname, 'frontend/core'),
       '@ui': resolve(__dirname, 'frontend/ui'),
       '@emotion': resolve(__dirname, 'frontend/emotion'),
-      '@assets': resolve(__dirname, 'assets'),
+      '@assets': resolve(__dirname, 'frontend/ui/public/assets'), // 新しいパスに修正
       '@config': resolve(__dirname, 'frontend/config'),
       '@voice': resolve(__dirname, 'frontend/voice')
     }
