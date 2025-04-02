@@ -70,6 +70,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveErrorLog(error);
     }
     
+    // 表示・非表示アニメーションのイベントリスナーを設定
+    setupWindowAnimations();
+    
     // マウスイベント処理の設定
     setupMouseEventHandling();
     
@@ -540,4 +543,54 @@ function setupDebugPanel() {
       }
     }
   };
+}
+
+// 表示・非表示アニメーションのセットアップ
+function setupWindowAnimations() {
+  // electronAPIが利用可能な場合のみ設定
+  if (!window.electronAPI) return;
+  
+  // assistantContainerを取得
+  const assistantContainer = document.querySelector('.assistant-container');
+  if (!assistantContainer) {
+    console.warn('assistant-containerが見つかりません。アニメーションは設定されません。');
+    return;
+  }
+  
+  // 表示アニメーションの準備
+  window.electronAPI.onPrepareShowAnimation(() => {
+    // cssアニメーション用のクラスを付与
+    assistantContainer.classList.remove('hide-animation');
+    assistantContainer.classList.add('show-animation');
+    
+    // 音声再生（オプション）
+    const appearSound = new Audio('../../assets/sounds/presets/appear.wav');
+    appearSound.volume = 0.5;
+    appearSound.play().catch(err => console.log('音声再生エラー:', err));
+    
+    // 秘書たんに「しゅぽっ」と言わせるオプション
+    // セリフがあれば話す
+    if (window.speak) {
+      setTimeout(() => {
+        window.speak('しゅぽっ♪', 'happy');
+      }, 100);
+    }
+  });
+  
+  // 非表示アニメーションの準備
+  window.electronAPI.onPrepareHideAnimation(() => {
+    // cssアニメーション用のクラスを付与
+    assistantContainer.classList.remove('show-animation');
+    assistantContainer.classList.add('hide-animation');
+    
+    // 音声再生（オプション）
+    const disappearSound = new Audio('../../assets/sounds/presets/disappear.mp3');
+    disappearSound.volume = 0.5;
+    disappearSound.play().catch(err => console.log('音声再生エラー:', err));
+    
+    // 秘書たんに「ふわ〜」と言わせるオプション
+    if (window.speak) {
+      window.speak('ふわ〜', 'normal');
+    }
+  });
 }

@@ -40,6 +40,7 @@ body, html {
   width: 40vw !important;
   height: 75vh !important;
   pointer-events: none !important;
+  transition: transform 0.3s ease, opacity 0.3s ease !important;
 }
 
 /* 立ち絵サイズコントロール */
@@ -833,5 +834,41 @@ body.mouse-active .speech-bubble.show {
   100% {
     opacity: 0.2;
     box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.3);
+  }
+}
+
+/* 秘書たん表示アニメーション */
+.assistant-container.show-animation {
+  animation: showAssistant 0.5s ease forwards !important;
+}
+
+/* 秘書たん非表示アニメーション */
+.assistant-container.hide-animation {
+  animation: hideAssistant 0.5s ease forwards !important;
+}
+
+@keyframes showAssistant {
+  0% {
+    opacity: 0;
+    transform: translateY(100px) scale(0.8);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes hideAssistant {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100px) scale(0.8);
   }
 } 

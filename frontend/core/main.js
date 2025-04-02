@@ -55,6 +55,8 @@ try {
 
 // メインウィンドウ
 let mainWindow = null;
+// 肉球ボタンウィンドウ
+let pawWindow = null;
 
 // 感情管理
 let currentEmotion = 0; // -100〜100の範囲で感情を管理
@@ -68,6 +70,7 @@ app.whenReady().then(async () => {
   await startBackendProcess();
   
   createWindow();
+  createPawWindow(); // 肉球ボタンウィンドウを作成
   
   // グローバルショートカットの登録
   registerGlobalShortcuts();
@@ -75,6 +78,7 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      createPawWindow();
     }
   });
   
@@ -114,6 +118,7 @@ function createWindow() {
     backgroundColor: '#00000000',
     skipTaskbar: true, // タスクバーに表示しない
     fullscreen: true, // 全画面表示
+    show: false, // 起動時は非表示に設定
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -179,6 +184,45 @@ function createWindow() {
   // ウィンドウが閉じられたときの処理
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+}
+
+// 肉球ボタンウィンドウ作成関数
+function createPawWindow() {
+  // screen モジュールを取得して画面サイズを取得
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  
+  // 肉球ボタンウィンドウの作成
+  pawWindow = new BrowserWindow({
+    width: 70,
+    height: 70,
+    x: width - 100, // 画面右端から少し内側に配置
+    y: height - 120, // 画面右下に配置
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    hasShadow: false,
+    skipTaskbar: true,
+    resizable: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'paw-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  
+  // 肉球ボタンウィンドウの設定
+  pawWindow.setAlwaysOnTop(true, 'screen-saver'); // screen-saverは最も高い優先度
+  
+  // 肉球ボタンページの読み込み
+  const pawPath = path.join(__dirname, '..', 'ui', 'paw.html');
+  pawWindow.loadFile(pawPath);
+  
+  // ウィンドウが閉じられたときの処理
+  pawWindow.on('closed', () => {
+    pawWindow = null;
   });
 }
 
@@ -1045,4 +1089,32 @@ function showRetryBackendButton() {
   } catch (error) {
     logDebug(`再接続ボタン表示エラー: ${error.message}`);
   }
-} 
+}
+
+// メインウィンドウの表示・非表示を切り替える
+ipcMain.on('toggle-main-window', () => {
+  if (!mainWindow) return;
+  
+  if (mainWindow.isVisible()) {
+    // 非表示アニメーション（フェードアウトなど）をレンダラープロセスに通知
+    mainWindow.webContents.send('prepare-hide-animation');
+    
+    // 少し遅延を入れてアニメーションの完了を待つ
+    setTimeout(() => {
+      mainWindow.hide();
+    }, 300); // アニメーション時間に合わせて調整
+  } else {
+    // 表示前の準備をレンダラープロセスに通知
+    mainWindow.webContents.send('prepare-show-animation');
+    
+    // 表示状態に切り替え
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
+// メインウィンドウの表示状態を取得
+ipcMain.handle('get-main-window-visibility', () => {
+  if (!mainWindow) return false;
+  return mainWindow.isVisible();
+}); 

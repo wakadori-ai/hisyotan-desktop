@@ -78,7 +78,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveErrorLog: (errorLog) => ipcRenderer.invoke('save-error-log', errorLog),
   
   // アプリケーションのパスを取得
-  getAppPath: () => ipcRenderer.invoke('get-app-path')
+  getAppPath: () => ipcRenderer.invoke('get-app-path'),
+  
+  // 表示・非表示アニメーションのイベント
+  onPrepareShowAnimation: (callback) => {
+    ipcRenderer.on('prepare-show-animation', () => callback());
+  },
+  
+  onPrepareHideAnimation: (callback) => {
+    ipcRenderer.on('prepare-hide-animation', () => callback());
+  }
 });
 
 contextBridge.exposeInMainWorld('electronLogger', {
