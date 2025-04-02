@@ -168,6 +168,34 @@ app.whenReady().then(async () => {
   });
 });
 
+// すべてのウィンドウが閉じられたときの処理
+app.on('window-all-closed', () => {
+  console.log('🌸 すべてのウィンドウが閉じられました');
+  
+  // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+  try {
+    console.log('🛑 すべてのウィンドウ終了時にstop_hisyotan.ps1スクリプトを実行します');
+    const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
+    const { exec } = require('child_process');
+    
+    // PowerShellスクリプトを実行
+    exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
+      } else {
+        console.log(`✅ 停止スクリプト出力:\n${stdout}`);
+      }
+    });
+  } catch (stopScriptError) {
+    console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+  }
+  
+  // macOS以外ではアプリケーションを終了する
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
 function createWindow() {
   // デバッグ用の別ウィンドウ設定
   const isDebugging = process.argv.includes('--debug');
@@ -199,7 +227,28 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   }
 
-  // ... existing code ...
+  // ウィンドウが閉じられる前に実行
+  mainWindow.on('close', (event) => {
+    console.log('🛑 メインウィンドウが閉じられます');
+    
+    // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+    try {
+      console.log('🛑 ウィンドウ終了時にstop_hisyotan.ps1スクリプトを実行します');
+      const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
+      const { exec } = require('child_process');
+      
+      // PowerShellスクリプトを実行
+      exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
+        } else {
+          console.log(`✅ 停止スクリプト出力:\n${stdout}`);
+        }
+      });
+    } catch (stopScriptError) {
+      console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+    }
+  });
 }
 
 // IPC通信ハンドラ（音声キャッシュ関連）
@@ -218,6 +267,24 @@ ipcMain.handle('check-file-exists', async (event, filePath) => {
 // アプリケーション終了ハンドラ
 ipcMain.on('app:quit', () => {
   console.log('🌸 アプリケーションの終了を開始します...');
+  
+  // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+  try {
+    console.log('🛑 アプリケーション終了時にstop_hisyotan.ps1スクリプトを実行します');
+    const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
+    const { exec } = require('child_process');
+    
+    // PowerShellスクリプトを実行
+    exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
+      } else {
+        console.log(`✅ 停止スクリプト出力:\n${stdout}`);
+      }
+    });
+  } catch (stopScriptError) {
+    console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+  }
   
   // バックエンドサーバーの終了
   if (backendProcess) {
@@ -294,5 +361,23 @@ ipcMain.handle('write-json-file', async (event, filePath, jsonData) => {
   } catch (error) {
     console.error('JSONファイル書き込みエラー:', error);
     return false;
+  }
+});
+
+// アプリケーション終了直前の処理
+app.on('will-quit', () => {
+  console.log('🌸 アプリケーション終了直前: will-quit');
+  
+  // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる（同期実行）
+  try {
+    console.log('🛑 アプリケーション終了直前にstop_hisyotan.ps1スクリプトを実行します');
+    const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
+    
+    // PowerShellスクリプトを同期的に実行して確実に処理を完了させる
+    const { execSync } = require('child_process');
+    const result = execSync(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`);
+    console.log(`✅ 停止スクリプト出力:\n${result.toString()}`);
+  } catch (stopScriptError) {
+    console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
   }
 }); 

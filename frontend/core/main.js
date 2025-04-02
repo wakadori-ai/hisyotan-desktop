@@ -163,6 +163,26 @@ function createPawWindow() {
   
   // ウィンドウが閉じられたときの処理
   pawWindow.on('closed', () => {
+    console.log('肉球ウィンドウが閉じられました');
+    
+    // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+    try {
+      console.log('🛑 ウィンドウ終了時にstop_hisyotan.ps1スクリプトを実行します');
+      const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
+      const { exec } = require('child_process');
+      
+      // PowerShellスクリプトを実行
+      exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
+        } else {
+          console.log(`✅ 停止スクリプト出力:\n${stdout}`);
+        }
+      });
+    } catch (stopScriptError) {
+      console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+    }
+    
     pawWindow = null;
   });
 
@@ -173,6 +193,24 @@ function createPawWindow() {
 // アプリケーションの終了処理
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+    try {
+      console.log('🛑 すべてのウィンドウ終了時にstop_hisyotan.ps1スクリプトを実行します');
+      const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
+      const { exec } = require('child_process');
+      
+      // PowerShellスクリプトを実行
+      exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
+        } else {
+          console.log(`✅ 停止スクリプト出力:\n${stdout}`);
+        }
+      });
+    } catch (stopScriptError) {
+      console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+    }
+    
     shutdownBackend().then(() => {
       app.quit();
     }).catch(error => {
@@ -196,6 +234,24 @@ ipcMain.handle('speak-text', async (event, text, emotion = 'normal') => {
 // アプリケーション終了ハンドラ
 ipcMain.on('app:quit', () => {
   console.log('🌸 アプリケーションの終了を開始します...');
+  
+  // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+  try {
+    console.log('🛑 アプリケーション終了時にstop_hisyotan.ps1スクリプトを実行します');
+    const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
+    const { exec } = require('child_process');
+    
+    // PowerShellスクリプトを実行
+    exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
+      } else {
+        console.log(`✅ 停止スクリプト出力:\n${stdout}`);
+      }
+    });
+  } catch (stopScriptError) {
+    console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+  }
   
   // 肉球ウィンドウを閉じる
   if (pawWindow && !pawWindow.isDestroyed()) {
@@ -464,6 +520,24 @@ async function shutdownBackend() {
   try {
     console.log('バックエンドプロセスを終了しています...');
     
+    // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+    try {
+      console.log('🛑 stop_hisyotan.ps1スクリプトを実行して秘書たん関連プロセスを終了します');
+      const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
+      const { exec } = require('child_process');
+      
+      // PowerShellスクリプトを実行
+      exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
+        } else {
+          console.log(`✅ 停止スクリプト出力:\n${stdout}`);
+        }
+      });
+    } catch (stopScriptError) {
+      console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+    }
+    
     // 直接起動したバックエンドプロセスの終了
     if (backendProcess && !backendProcess.killed) {
       try {
@@ -532,6 +606,20 @@ app.on('ready', () => {
 // アプリケーション終了時の処理
 app.on('will-quit', () => {
   console.log('🌸 アプリケーション終了イベント発生: will-quit');
+  
+  // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
+  try {
+    console.log('🛑 アプリケーション終了前にstop_hisyotan.ps1スクリプトを実行します');
+    const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
+    const { exec } = require('child_process');
+    
+    // PowerShellスクリプトを実行（同期的に実行して確実に処理を完了させる）
+    const { execSync } = require('child_process');
+    const result = execSync(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`);
+    console.log(`✅ 停止スクリプト出力:\n${result.toString()}`);
+  } catch (stopScriptError) {
+    console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+  }
   
   // すべてのグローバルショートカットを解除
   globalShortcut.unregisterAll();
