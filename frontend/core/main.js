@@ -98,14 +98,22 @@ app.whenReady().then(async () => {
 
 // ウィンドウ作成関数
 function createWindow() {
+  // screen モジュールを取得して画面サイズを取得
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  
   mainWindow = new BrowserWindow({
-    width: 400,  // 立ち絵の幅に合わせて調整
-    height: 600, // 立ち絵の高さ + 吹き出しの高さに合わせて調整
+    width: width,  // 画面幅いっぱいに設定
+    height: height, // 画面高さいっぱいに設定
+    x: 0,  // 画面左端から表示
+    y: 0,  // 画面上端から表示
     transparent: true,
     frame: false,
     alwaysOnTop: true,
     backgroundColor: '#00000000',
     skipTaskbar: true, // タスクバーに表示しない
+    fullscreen: true, // 全画面表示
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -128,7 +136,7 @@ function createWindow() {
     });
   });
   
-  // マウスイベントを透過するように設定
+  // マウスイベントを透過するように設定（キャラの上からゲーム操作可能に）
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
   
   // 特定の領域だけマウスイベントを受け取れるようにする
@@ -155,15 +163,9 @@ function createWindow() {
     }
   });
   
-  // 常に全面表示を確実にする
+  // 常に全面表示を確実にする（最大の優先度で）
   mainWindow.setAlwaysOnTop(true, 'screen-saver'); // screen-saverは最も高い優先度
   
-  // ウィンドウの位置を画面右下に設定（オプション）
-  const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-  mainWindow.setPosition(width - 400, height - 600);
-
   // 開発者ツールを開く（デバッグ用）
   // mainWindow.webContents.openDevTools();
 
