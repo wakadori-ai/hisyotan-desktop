@@ -23,6 +23,70 @@
       z-index: 9999;
       pointer-events: none;
     }
+
+    /* ドラッグモード用スタイル */
+    .drag-mode-enabled .assistant-image {
+      opacity: 0.8 !important;
+      cursor: grab !important;
+      pointer-events: auto !important;
+    }
+    
+    .drag-mode-enabled .assistant-image:active {
+      cursor: grabbing !important;
+    }
+    
+    /* ドラッグモード通知 */
+    .drag-mode-enabled:after {
+      content: "ドラッグモード";
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(255, 165, 0, 0.8);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    /* ドラッグモードボタンのスタイル */
+    .drag-button {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 40px;
+      height: 40px;
+      background-color: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      z-index: 9999;
+      font-size: 18px;
+      pointer-events: auto;
+      transition: all 0.2s ease;
+    }
+    
+    .drag-button:hover {
+      transform: scale(1.1);
+      background-color: rgba(255, 240, 245, 0.9);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* ドラッグモード有効時のスタイル */
+    .drag-mode-enabled .drag-button {
+      background-color: rgba(255, 165, 0, 0.8);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
   </style>
   <script>
     // グローバル設定
@@ -282,6 +346,11 @@
       </div>
       <img id="assistantImage" class="assistant-image" src="../assets/images/secretary_normal.png" alt="秘書たん" />
       <div class="close-button" id="closeButton" onclick="closeApp()">×</div>
+      
+      <!-- ドラッグモードボタン -->
+      <div class="drag-button" id="dragButton" onclick="toggleDragMode()" title="秘書たんをドラッグできるモードに切り替えます (Ctrl+Shift+P)">
+        <span>🐾</span>
+      </div>
     </div>
     <div class="error-bubble" id="errorBubble">
       <span class="bubble-icon">⚠️</span>
@@ -376,6 +445,17 @@
       const silentAudio = new Audio();
       silentAudio.volume = 0.01;
       silentAudio.play().catch(err => console.log('初期サイレント再生：', err));
+      
+      // 秘書たんの位置を復元
+      restoreImagePosition();
+      
+      // toggleDragMode関数をグローバルスコープに確実に公開（二重確認）
+      if (typeof window.toggleDragMode !== 'function') {
+        console.log('🔄 DOMContentLoadedでtoggleDragMode関数をグローバル化します');
+        window.toggleDragMode = toggleDragMode;
+      } else {
+        console.log('✅ toggleDragMode関数は既にグローバルスコープに公開されています');
+      }
     });
     
     // Electron環境かどうかをチェック
@@ -608,7 +688,151 @@
         toggleOverlayMenu();
         event.preventDefault(); // デフォルトの動作を防止
       }
+
+      // Ctrl+Shift+P でドラッグモード切り替え
+      if (event.ctrlKey && event.shiftKey && (event.key === 'P' || event.key === 'p')) {
+        toggleDragMode();
+        event.preventDefault(); // デフォルトの動作を防止
+      }
     });
+
+    // ドラッグモード切り替え
+    function toggleDragMode() {
+      const body = document.body;
+      const isDragMode = body.classList.toggle('drag-mode-enabled');
+      
+      console.log('🐾 toggleDragMode関数が呼び出されました！isDragMode:', isDragMode);
+      // デバッグ用アラート（テスト後に削除してください）
+      alert('ドラッグモード切替！🐾 ' + (isDragMode ? 'ON' : 'OFF'));
+      
+      if (isDragMode) {
+        console.log('ドラッグモード有効化');
+        initDraggable();
+        if (typeof speak === 'function') {
+          speak('ドラッグモードを有効にしました。秘書たんを好きな位置に移動できます。', 'normal', 3000);
+        }
+      } else {
+        console.log('ドラッグモード無効化');
+        if (typeof speak === 'function') {
+          speak('ドラッグモードを無効にしました。', 'normal', 3000);
+        }
+        
+        // 位置情報を保存
+        saveImagePosition();
+      }
+    }
+
+    // 確実にグローバルスコープに公開
+    window.toggleDragMode = toggleDragMode;
+
+    // ドラッグ機能の初期化
+    function initDraggable() {
+      const img = document.getElementById('assistantImage');
+      const container = document.querySelector('.assistant-container');
+      
+      if (!img || !container) return;
+      
+      // ドラッグ開始時の位置情報
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let imgStartLeft = 0;
+      let imgStartTop = 0;
+      
+      // マウスダウンイベント
+      img.addEventListener('mousedown', startDrag);
+      
+      function startDrag(e) {
+        e.preventDefault();
+        
+        // ドラッグモードでなければ何もしない
+        if (!document.body.classList.contains('drag-mode-enabled')) return;
+        
+        // 現在のスタイルを取得
+        const style = window.getComputedStyle(img);
+        
+        // 画像の現在位置
+        const left = parseInt(img.style.left) || 0;
+        const top = parseInt(img.style.top) || 0;
+        
+        // マウス押下位置
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        imgStartLeft = left;
+        imgStartTop = top;
+        
+        // 画像にドラッグ中スタイルを適用
+        img.style.cursor = 'grabbing';
+        
+        // マウス移動とマウスアップのイベントを追加
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('mouseup', dragEnd);
+      }
+      
+      function dragMove(e) {
+        e.preventDefault();
+        
+        // マウスの移動量を計算
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        
+        // 新しい位置を計算
+        const newLeft = imgStartLeft + dx;
+        const newTop = imgStartTop + dy;
+        
+        // 位置を更新
+        img.style.position = 'absolute';
+        img.style.left = `${newLeft}px`;
+        img.style.top = `${newTop}px`;
+      }
+      
+      function dragEnd() {
+        // イベントリスナーを削除
+        document.removeEventListener('mousemove', dragMove);
+        document.removeEventListener('mouseup', dragEnd);
+        
+        // スタイルを元に戻す
+        img.style.cursor = 'grab';
+        
+        // 位置保存
+        saveImagePosition();
+      }
+    }
+    
+    // 位置情報の保存
+    function saveImagePosition() {
+      const img = document.getElementById('assistantImage');
+      if (!img) return;
+      
+      const left = parseInt(img.style.left) || 0;
+      const top = parseInt(img.style.top) || 0;
+      
+      // ローカルストレージに保存
+      localStorage.setItem('secretaryImagePosition', JSON.stringify({ left, top }));
+      console.log(`秘書たんの位置を保存しました: left=${left}, top=${top}`);
+    }
+    
+    // 位置情報の復元
+    function restoreImagePosition() {
+      const img = document.getElementById('assistantImage');
+      if (!img) return;
+      
+      // ローカルストレージから読み込み
+      const positionStr = localStorage.getItem('secretaryImagePosition');
+      if (!positionStr) return;
+      
+      try {
+        const position = JSON.parse(positionStr);
+        if (typeof position.left === 'number' && typeof position.top === 'number') {
+          // 位置を設定
+          img.style.position = 'absolute';
+          img.style.left = `${position.left}px`;
+          img.style.top = `${position.top}px`;
+          console.log(`秘書たんの位置を復元しました: left=${position.left}, top=${position.top}`);
+        }
+      } catch (error) {
+        console.error('位置情報の復元に失敗しました:', error);
+      }
+    }
   </script>
 
   <!-- デバッグパネル -->
