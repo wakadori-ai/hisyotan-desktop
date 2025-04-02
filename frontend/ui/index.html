@@ -342,8 +342,14 @@
     
     // アプリケーションを終了する関数
     function closeApp() {
-      if (window.electronAPI && window.electronAPI.closeWindow) {
-        window.electronAPI.closeWindow();
+      if (window.electronAPI && window.electronAPI.quitApp) {
+        // 終了前に「さようなら」と言う
+        showBubble('またね、おつかれさま〜✨');
+        
+        // 少し待ってから終了する
+        setTimeout(() => {
+          window.electronAPI.quitApp();
+        }, 1500);
       }
     }
   </script>
@@ -359,6 +365,7 @@
       <img id="assistantImage" class="assistant-image" src="/assets/images/secretary_normal.png" alt="秘書たん" />
       <div class="close-button" id="closeButton" onclick="closeApp()">×</div>
     </div>
+    
     <div class="error-bubble" id="errorBubble">
       <span class="bubble-icon">⚠️</span>
       <span class="bubble-text" id="errorText"></span>

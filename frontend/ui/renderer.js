@@ -552,6 +552,8 @@ function setupWindowAnimations() {
   
   // assistantContainerを取得
   const assistantContainer = document.querySelector('.assistant-container');
+  const quitButton = document.getElementById('quitButton');
+  
   if (!assistantContainer) {
     console.warn('assistant-containerが見つかりません。アニメーションは設定されません。');
     return;
@@ -561,7 +563,13 @@ function setupWindowAnimations() {
   window.electronAPI.onPrepareShowAnimation(() => {
     // cssアニメーション用のクラスを付与
     assistantContainer.classList.remove('hide-animation');
+    assistantContainer.classList.remove('hidden');
     assistantContainer.classList.add('show-animation');
+    
+    // 終了ボタンを表示
+    if (quitButton) {
+      quitButton.style.display = 'flex';
+    }
     
     // 音声再生（オプション）
     const appearSound = new Audio('../../assets/sounds/presets/appear.wav');
@@ -582,6 +590,12 @@ function setupWindowAnimations() {
     // cssアニメーション用のクラスを付与
     assistantContainer.classList.remove('show-animation');
     assistantContainer.classList.add('hide-animation');
+    assistantContainer.classList.add('hidden');
+    
+    // 終了ボタンを非表示
+    if (quitButton) {
+      quitButton.style.display = 'none';
+    }
     
     // 音声再生（オプション）
     const disappearSound = new Audio('../../assets/sounds/presets/disappear.mp3');
@@ -604,7 +618,7 @@ async function resolveImagePath(relativePath) {
   // ただし、先頭が / だけの場合（絶対パス）は保持する
   
   try {
-    // 0. 既に絶対パスで始まっている場合（/assets/images/...）はそのまま返す
+    // 0. 既に絶対パスで始まっている場合はそのまま返す
     if (relativePath.startsWith('/assets/')) {
       console.log(`絶対パスをそのまま使用: ${relativePath}`);
       return relativePath;
@@ -615,7 +629,14 @@ async function resolveImagePath(relativePath) {
       // 新しいresolveImagePath APIがあればそれを使用
       if (window.electronAPI.resolveImagePath) {
         try {
-          const resolvedPath = await window.electronAPI.resolveImagePath(cleanPath);
+          // パスにfrontend/ui/public/が含まれていなければVite対応パスに調整
+          const adjustedPath = cleanPath.includes('frontend/ui/public/') 
+            ? cleanPath 
+            : cleanPath.startsWith('assets/') 
+              ? cleanPath 
+              : `assets/${cleanPath}`;
+              
+          const resolvedPath = await window.electronAPI.resolveImagePath(adjustedPath);
           if (resolvedPath) {
             console.log(`画像パスを解決しました: ${relativePath} → ${resolvedPath}`);
             return resolvedPath;
@@ -628,7 +649,12 @@ async function resolveImagePath(relativePath) {
       // 代替手段としてgetAssetPathを使用
       if (window.electronAPI.getAssetPath) {
         try {
-          const assetPath = await window.electronAPI.getAssetPath(cleanPath);
+          // 古いパスから新しいパスへの変換を試みる
+          const adjustedPath = cleanPath.startsWith('assets/') 
+            ? cleanPath 
+            : `assets/${cleanPath}`;
+            
+          const assetPath = await window.electronAPI.getAssetPath(adjustedPath);
           if (assetPath) {
             console.log(`アセットパスを解決しました: ${relativePath} → ${assetPath}`);
             return assetPath;
@@ -676,16 +702,20 @@ async function loadSecretaryImage(emotion = 'normal') {
     
     // 複数のパスパターンを試す（優先順位順）
     const pathOptions = [
-      `/assets/images/${imageFileName}`,       // Vite開発サーバー（絶対パス）- 最優先
-      `assets/images/${imageFileName}`,        // assetsフォルダ直下から
-      `./assets/images/${imageFileName}`,      // 相対パス
-      `../../assets/images/${imageFileName}`,  // 上位ディレクトリから
-      `/images/${imageFileName}`,              // 別構造のケース
-      `/static/images/${imageFileName}`        // バックエンド静的ファイル
+      `/assets/images/${imageFileName}`,           // Vite開発サーバー（絶対パス）- 最優先
+      `assets/images/${imageFileName}`,            // assetsフォルダ直下から
+      `./public/assets/images/${imageFileName}`,   // public内のassets（開発環境用）
+      `./assets/images/${imageFileName}`,          // 相対パス
+      `../public/assets/images/${imageFileName}`,  // UI階層から見たpublic
+      `../../assets/images/${imageFileName}`,      // 旧構造（上位ディレクトリから）
     ];
+
+    // デバッグ用にパスを表示
+    console.log('試行パスパターン:', pathOptions);
 
     // 最初のパスを設定
     let imagePath = await resolveImagePath(pathOptions[0]);
+    console.log(`初期画像パス設定: ${imagePath}`);
     imgElement.src = imagePath;
     
     // 画像が読み込めなかった場合のエラーハンドリング
@@ -695,19 +725,34 @@ async function loadSecretaryImage(emotion = 'normal') {
       // 他のパスオプションを試す
       for (let i = 1; i < pathOptions.length; i++) {
         const altPath = await resolveImagePath(pathOptions[i]);
-        console.log(`代替パスを試行: ${altPath}`);
+        console.log(`代替パスを試行(${i}/${pathOptions.length-1}): ${altPath}`);
         
         // ファイルが存在するか確認（electronAPIを使用）
         if (window.electronAPI && window.electronAPI.checkImageExists) {
-          const exists = await window.electronAPI.checkImageExists(altPath);
-          if (exists) {
-            console.log(`有効な画像パスを見つけました: ${altPath}`);
-            imgElement.src = altPath;
-            return;
+          try {
+            const exists = await window.electronAPI.checkImageExists(altPath);
+            if (exists) {
+              console.log(`有効な画像パスを見つけました: ${altPath}`);
+              imgElement.src = altPath;
+              return;
+            }
+          } catch (err) {
+            console.warn(`存在確認エラー: ${err.message}`);
           }
         } else {
           // 確認できない場合は単純に設定してみる
+          console.log(`代替パスを直接設定: ${altPath}`);
           imgElement.src = altPath;
+          
+          // 一時的なタイムアウトを設定し、次のパスを試す前に少し待機
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // srcが変わっていなければエラーとみなして次へ
+          if (imgElement.src === altPath && imgElement.complete && imgElement.naturalWidth === 0) {
+            console.warn(`画像の読み込みに失敗（代替パス ${i}）: ${altPath}`);
+            continue;
+          }
+          
           return;
         }
       }
@@ -715,6 +760,11 @@ async function loadSecretaryImage(emotion = 'normal') {
       // すべてのパスが失敗した場合、プレースホルダー画像を表示
       console.error('すべての画像パスが失敗しました');
       imgElement.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjI0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBhbGlnbm1lbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0iIzk5OSI+6KaL44Gk44GL44KK44G+44Gb44KTPC90ZXh0Pjwvc3ZnPg==';
+      
+      // デバッグパネルにエラーを表示
+      if (window.logDebugToPanel) {
+        window.logDebugToPanel('画像読み込み失敗: すべてのパスが無効でした');
+      }
     };
   } catch (error) {
     console.error(`秘書たん画像読み込みエラー: ${error.message}`);

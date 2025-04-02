@@ -11,7 +11,13 @@
             overflow: hidden;
             background-color: transparent;
             user-select: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
         }
+
         
         @keyframes floaty {
             0% { transform: translateY(0); }
@@ -39,11 +45,14 @@
         
         .paw-button-wrapper {
             position: relative;
-            width: 100%;
-            height: 100%;
+            width: 160px;
+            height: 160px;
             display: flex;
             justify-content: center;
             align-items: center;
+            pointer-events: none;
+            z-index: 999;
+            margin: auto;
         }
         
         .paw-background {
@@ -58,8 +67,8 @@
         }
         
         #paw-button {
-            width: 100%;
-            height: 100%;
+            width: 100px;
+            height: 100px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -67,7 +76,8 @@
             cursor: pointer;
             transition: all 0.3s ease;
             opacity: 0.9;
-            z-index: 99999;
+            z-index: 1000;
+            pointer-events: auto;
             animation: 
                 floaty 3s ease-in-out infinite,
                 fuwafuwa 2s ease-in-out infinite;
@@ -99,12 +109,88 @@
             transform: scale(0.9);
             filter: drop-shadow(0 0 15px rgba(255, 130, 180, 1));
         }
+        
+        /* 終了ボタンのスタイル更新 - より控えめに */
+        #quit-button {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: rgba(255, 100, 150, 0.7);
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 1001;
+            pointer-events: auto;
+            box-shadow: 0 0 4px rgba(255, 100, 150, 0.3);
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            opacity: 0.6;
+        }
+
+        #quit-button:hover {
+            opacity: 1;
+            transform: scale(1.1);
+            background-color: rgba(255, 80, 120, 0.9);
+            box-shadow: 0 0 15px rgba(255, 100, 150, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+        }
+        
+        /* 吹き出しの表示位置を調整 - ウィンドウ内に収まるように */
+        .quit-bubble {
+            position: absolute;
+            bottom: 48px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 14px;
+            white-space: nowrap;
+            color: #333;
+            opacity: 0;
+            transform: translateY(5px);
+            transition: all 0.2s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 200, 220, 0.5);
+            z-index: 1002;
+            width: auto;
+            min-width: 160px;
+            line-height: 1.4;
+            text-align: center;
+        }
+
+        .quit-bubble:after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 17px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid rgba(255, 255, 255, 0.95);
+        }
+
+        #quit-button:hover .quit-bubble {
+            opacity: 1;
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
     <div class="paw-button-wrapper">
         <div id="paw-button">🐾</div>
         <div class="paw-background"></div>
+        <div id="quit-button">
+            <span>✨</span>
+            <div class="quit-bubble">おつかれさま？ 終了するの？</div>
+        </div>
     </div>
 
     <script>
@@ -117,6 +203,84 @@
                 window.electronAPI.toggleMainWindow();
             }
         });
+        
+        // 終了ボタンのクリックイベント
+        document.getElementById('quit-button').addEventListener('click', (e) => {
+            e.stopPropagation(); // イベントの伝播を停止
+            if (isElectron) {
+                console.log('🚨 終了ボタンがクリックされました');
+                // 1秒後にアプリを終了
+                setTimeout(() => {
+                    window.electronAPI.quitApp();
+                }, 1000);
+            }
+        });
+        
+        // 肉球ボタンのドラッグ機能
+        const pawButton = document.getElementById('paw-button');
+        const wrapper = document.querySelector('.paw-button-wrapper');
+        let isDragging = false;
+        let offsetX = 0, offsetY = 0;
+        
+        // ドラッグ可能領域を拡大（肉球ボタンだけでなくラッパー全体）
+        wrapper.style.pointerEvents = 'auto';
+        
+        // マウスダウンイベント - ドラッグ開始
+        wrapper.addEventListener('mousedown', (e) => {
+            // 終了ボタンをクリックした場合はドラッグを開始しない
+            if (e.target.closest('#quit-button')) return;
+            
+            // ドラッグ中はアニメーションを一時停止
+            pawButton.style.animationPlayState = 'paused';
+            
+            // ウィンドウの現在位置を取得してオフセットを計算
+            if (isElectron && window.electronAPI) {
+                window.electronAPI.getWindowPosition().then(position => {
+                    // マウスカーソルとウィンドウ左上の相対位置（オフセット）を計算
+                    offsetX = e.screenX - position.x;
+                    offsetY = e.screenY - position.y;
+                    isDragging = true;
+                });
+            }
+            
+            // イベントの伝播を防止（テキスト選択を防止）
+            e.preventDefault();
+        });
+        
+        // マウス移動イベント - ドラッグ中
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            // マウス位置からオフセットを引いて新しいウィンドウ位置を計算
+            const newX = e.screenX - offsetX;
+            const newY = e.screenY - offsetY;
+            
+            // 絶対位置をウィンドウに設定
+            if (isElectron && window.electronAPI) {
+                window.electronAPI.setWindowPosition(newX, newY);
+            }
+        });
+        
+        // マウスアップイベント - ドラッグ終了
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            
+            // ドラッグ終了後、アニメーションを再開
+            pawButton.style.animationPlayState = '';
+        });
+        
+        // マウスがウィンドウ外に出た時もドラッグ終了
+        document.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                pawButton.style.animationPlayState = '';
+            }
+        });
+        
+        // コンソールに初期化メッセージを表示
+        console.log('🐾 肉球UIが初期化されました');
     </script>
 </body>
 </html> 
