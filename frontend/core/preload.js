@@ -51,6 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 画像ファイルの存在確認（メインプロセスに委譲）
   checkImageExists: (imagePath) => ipcRenderer.invoke('check-image-exists', imagePath),
   
+  // 画像パスを解決（Electron専用の機能）
+  resolveImagePath: (imagePath) => ipcRenderer.invoke('resolve-image-path', imagePath),
+  
   // クリックスルーを無効化（要素をクリック可能に）
   enableClickThrough: () => {
     return ipcRenderer.invoke('enable-click-through');
@@ -92,14 +95,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 contextBridge.exposeInMainWorld('electronLogger', {
   logToFile: (message) => ipcRenderer.invoke('log-to-file', message)
-});
-
-// main.jsに追加
-ipcMain.handle('log-to-file', async (event, message) => {
-  const logFile = path.join(__dirname, 'debug-logs.txt');
-  const timestamp = new Date().toISOString();
-  const logEntry = `[${timestamp}] ${message}\n`;
-  
-  fs.appendFileSync(logFile, logEntry);
-  return true;
 }); 

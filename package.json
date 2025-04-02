@@ -6,13 +6,14 @@
   "scripts": {
     "start": "electron .",
     "dev": "vite",
-    "dev:electron": "concurrently \"vite --host\" \"wait-on http://localhost:3000 && electron .\"",
-    "build": "vite build",
-    "build:electron": "electron-builder",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "dev:debug": "cross-env NODE_ENV=development electron . --debug",
-    "dev:log": "cross-env NODE_ENV=development electron . > debug-log.txt 2>&1"
+    "dev:electron": "concurrently \"vite --host\" \"wait-on http://localhost:3000 && cross-env VITE_DEV_SERVER_URL=http://localhost:3000/ electron .\"",
+    "build": "vite build && node copy-preload.js",
+    "build:electron": "vite build && node copy-preload.js && electron-builder",
+    "pack": "vite build && node copy-preload.js && electron-builder --dir",
+    "dist": "vite build && node copy-preload.js && electron-builder",
+    "dev:debug": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:3000/ electron . --debug",
+    "dev:log": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:3000/ electron . > debug-log.txt 2>&1",
+    "copy-preload": "node copy-preload.js"
   },
   "author": "",
   "license": "MIT",

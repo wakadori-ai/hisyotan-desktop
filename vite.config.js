@@ -31,8 +31,12 @@ export default defineConfig({
   build: {
     outDir: '../../dist', // rootからの相対パスになるため調整
     emptyOutDir: true,
+    // preloadスクリプトをコピーしてdistに含める
     rollupOptions: {
-      // ビルド時の設定 (開発時には影響しない)
+      input: {
+        index: resolve(__dirname, 'frontend/ui/index.html'),
+        paw: resolve(__dirname, 'frontend/ui/paw.html')
+      }
     }
   }
 }); 

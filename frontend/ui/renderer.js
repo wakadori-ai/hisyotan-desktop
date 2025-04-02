@@ -594,3 +594,236 @@ function setupWindowAnimations() {
     }
   });
 }
+
+console.log('📝 秘書たんレンダラープロセス初期化...');
+
+// 画像パス解決のための関数
+async function resolveImagePath(relativePath) {
+  if (!window.electronAPI) {
+    console.warn('electronAPI が利用できません');
+    return relativePath;
+  }
+
+  try {
+    // 先頭の./ or / を削除
+    const cleanPath = relativePath.replace(/^(\.\/|\/)/g, '');
+    
+    // 新しいresolveImagePath APIがあればそれを使用
+    if (window.electronAPI.resolveImagePath) {
+      const resolvedPath = await window.electronAPI.resolveImagePath(cleanPath);
+      if (resolvedPath) {
+        console.log(`画像パスを解決しました: ${relativePath} → ${resolvedPath}`);
+        return resolvedPath;
+      }
+    }
+    
+    // 代替手段としてgetAssetPathを使用
+    if (window.electronAPI.getAssetPath) {
+      const assetPath = await window.electronAPI.getAssetPath(cleanPath);
+      if (assetPath) {
+        console.log(`アセットパスを解決しました: ${relativePath} → ${assetPath}`);
+        return assetPath;
+      }
+    }
+    
+    console.warn(`画像パスを解決できませんでした: ${relativePath}`);
+    return relativePath;
+  } catch (error) {
+    console.error(`画像パス解決エラー: ${error.message}`);
+    return relativePath;
+  }
+}
+
+// 秘書たんの画像を設定
+async function loadSecretaryImage(emotion = 'normal') {
+  try {
+    const imgElement = document.getElementById('assistantImage');
+    if (!imgElement) {
+      console.error('秘書たん画像要素が見つかりません');
+      return;
+    }
+
+    // 感情に基づいて画像ファイル名を決定
+    const imageFileName = `secretary_${emotion}.png`;
+    
+    // 複数のパスパターンを試す
+    const pathOptions = [
+      `./assets/images/${imageFileName}`,
+      `assets/images/${imageFileName}`,
+      `/assets/images/${imageFileName}`,
+      `../../assets/images/${imageFileName}`,
+      `images/${imageFileName}`,
+      `/images/${imageFileName}`,
+      `/static/images/${imageFileName}`
+    ];
+
+    // 最初のパスを設定
+    let imagePath = await resolveImagePath(pathOptions[0]);
+    imgElement.src = imagePath;
+    
+    // 画像が読み込めなかった場合のエラーハンドリング
+    imgElement.onerror = async () => {
+      console.warn(`画像の読み込みに失敗: ${imagePath}`);
+      
+      // 他のパスオプションを試す
+      for (let i = 1; i < pathOptions.length; i++) {
+        const altPath = await resolveImagePath(pathOptions[i]);
+        console.log(`代替パスを試行: ${altPath}`);
+        
+        // ファイルが存在するか確認（electronAPIを使用）
+        if (window.electronAPI && window.electronAPI.checkImageExists) {
+          const exists = await window.electronAPI.checkImageExists(altPath);
+          if (exists) {
+            console.log(`有効な画像パスを見つけました: ${altPath}`);
+            imgElement.src = altPath;
+            return;
+          }
+        } else {
+          // 確認できない場合は単純に設定してみる
+          imgElement.src = altPath;
+          return;
+        }
+      }
+      
+      // すべてのパスが失敗した場合、プレースホルダー画像を表示
+      console.error('すべての画像パスが失敗しました');
+      imgElement.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjI0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBhbGlnbm1lbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0iIzk5OSI+6KaL44Gk44GL44KK44G+44Gb44KTPC90ZXh0Pjwvc3ZnPg==';
+    };
+  } catch (error) {
+    console.error(`秘書たん画像読み込みエラー: ${error.message}`);
+  }
+}
+
+// DOMロード完了時の処理
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🐾 DOMがロードされました');
+  
+  try {
+    // 秘書たん画像の初期ロード
+    await loadSecretaryImage('normal');
+    
+    // Electron APIが利用可能かチェック
+    if (window.electronAPI) {
+      console.log('✅ Electron APIが利用可能です');
+      
+      // 感情変化イベントの監視
+      if (window.electronAPI.onEmotionChange) {
+        window.electronAPI.onEmotionChange((emotionValue) => {
+          console.log(`😊 感情状態が変化しました: ${emotionValue}`);
+          
+          // 感情値に応じて画像を切り替え
+          let emotion = 'normal';
+          if (emotionValue > 30) emotion = 'happy';
+          else if (emotionValue < -30) emotion = 'sad';
+          
+          loadSecretaryImage(emotion);
+        });
+      }
+      
+      // アニメーション関連イベントの登録
+      if (window.electronAPI.onPrepareShowAnimation) {
+        window.electronAPI.onPrepareShowAnimation(() => {
+          console.log('🎬 表示アニメーション準備');
+          // 表示アニメーションの準備処理
+        });
+      }
+      
+      if (window.electronAPI.onPrepareHideAnimation) {
+        window.electronAPI.onPrepareHideAnimation(() => {
+          console.log('🎬 非表示アニメーション準備');
+          // 非表示アニメーションの準備処理
+        });
+      }
+    } else {
+      console.warn('⚠️ Electron APIが利用できません');
+    }
+  } catch (error) {
+    console.error(`初期化エラー: ${error.message}`);
+  }
+});
+
+// 吹き出しを表示する関数
+function showBubble(text, duration = 5000) {
+  try {
+    const speechBubble = document.getElementById('speechBubble');
+    const speechText = document.getElementById('speechText');
+    
+    if (!speechBubble || !speechText) {
+      console.error('吹き出し要素が見つかりません');
+      return;
+    }
+    
+    // テキストを設定
+    speechText.textContent = text;
+    
+    // 吹き出しを表示
+    speechBubble.style.display = 'flex';
+    speechBubble.style.visibility = 'visible';
+    speechBubble.style.opacity = '1';
+    speechBubble.className = 'speech-bubble show';
+    
+    // 自動的に消える設定（durationが0より大きい場合）
+    if (duration > 0) {
+      setTimeout(() => {
+        hideBubble();
+      }, duration);
+    }
+  } catch (error) {
+    console.error(`吹き出し表示エラー: ${error.message}`);
+  }
+}
+
+// 吹き出しを非表示にする関数
+function hideBubble() {
+  try {
+    const speechBubble = document.getElementById('speechBubble');
+    if (!speechBubble) {
+      console.error('吹き出し要素が見つかりません');
+      return;
+    }
+    
+    // 吹き出しを非表示にする
+    speechBubble.className = 'speech-bubble hide';
+    
+    // アニメーション完了まで少し待ってから完全に非表示
+    setTimeout(() => {
+      speechBubble.style.display = 'none';
+      speechBubble.style.visibility = 'hidden';
+      speechBubble.style.opacity = '0';
+    }, 300);
+  } catch (error) {
+    console.error(`吹き出し非表示エラー: ${error.message}`);
+  }
+}
+
+// グローバルスコープに関数を公開
+window.showBubble = showBubble;
+window.hideBubble = hideBubble;
+window.loadSecretaryImage = loadSecretaryImage;
+
+// テスト用関数
+window.testNormalBubble = function() {
+  showBubble('ふにゃ〜、どうしたの？何かお手伝いすることある？', 5000);
+};
+
+window.testBubble = function() {
+  const bubble = document.getElementById('speechBubble');
+  if (bubble) {
+    bubble.style.backgroundColor = 'rgba(255, 100, 100, 0.9)';
+    showBubble('エラーが発生しました！', 3000);
+    
+    // 元に戻す
+    setTimeout(() => {
+      bubble.style.backgroundColor = '';
+    }, 3000);
+  }
+};
+
+// 開発者ツールを開く
+window.openDevTools = function() {
+  if (window.electronAPI && window.electronAPI.openDevTools) {
+    window.electronAPI.openDevTools();
+  }
+};
+
+console.log('�� レンダラープロセス初期化完了');

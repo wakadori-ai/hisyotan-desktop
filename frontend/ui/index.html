@@ -44,6 +44,75 @@
       }
     };
     
+    // 画像パスを環境に応じて調整する関数
+    function getCorrectImagePath(relativePath) {
+      // Electron環境のチェック
+      if (window.electronAPI && window.electronAPI.getAssetPath) {
+        // 既に正しいパスを持っている場合はそのまま返す
+        if (relativePath.startsWith('file://') || relativePath.startsWith('http://')) {
+          return relativePath;
+        }
+        
+        // パスの先頭の/を取り除く
+        const cleanPath = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+        
+        // getAssetPathを使用して正しいパスを取得
+        window.electronAPI.getAssetPath(cleanPath)
+          .then(correctPath => {
+            if (correctPath) {
+              console.log(`画像パス変換: ${relativePath} → ${correctPath}`);
+              return correctPath;
+            }
+            return relativePath;
+          })
+          .catch(err => {
+            console.error(`パス変換エラー: ${err}`);
+            return relativePath;
+          });
+      }
+      return relativePath;
+    }
+    
+    // 画像要素のsrc属性を修正する
+    function fixImagePaths() {
+      // ページ読み込み完了後に実行
+      window.addEventListener('DOMContentLoaded', () => {
+        // 全ての画像要素を取得
+        const images = document.querySelectorAll('img[src]');
+        
+        // 各画像のパスを修正
+        images.forEach(img => {
+          const originalSrc = img.getAttribute('src');
+          
+          // パスの先頭が/または./の場合のみ処理
+          if (originalSrc && (originalSrc.startsWith('/') || originalSrc.startsWith('./') || originalSrc.startsWith('images/'))) {
+            try {
+              if (window.electronAPI && window.electronAPI.getAssetPath) {
+                // パスの先頭の/を取り除く
+                const cleanPath = originalSrc.startsWith('/') ? originalSrc.substring(1) : originalSrc;
+                
+                window.electronAPI.getAssetPath(cleanPath)
+                  .then(newPath => {
+                    if (newPath) {
+                      img.src = newPath;
+                      console.log(`画像パス修正: ${originalSrc} → ${newPath}`);
+                    }
+                  })
+                  .catch(err => {
+                    console.error(`画像パス修正エラー: ${err}`);
+                  });
+              }
+            } catch (error) {
+              console.error(`画像パス処理エラー: ${error}`);
+            }
+          }
+        });
+      });
+    }
+    
+    // 画像パス修正を実行
+    fixImagePaths();
+    
     // デバッグ用フェッチラッパー
     async function debugFetch(url, options) {
       console.log(`[DEBUG] Fetch開始: ${url}`, options);
@@ -287,7 +356,7 @@
         <span class="bubble-text" id="speechText"></span>
         <div class="bubble-close-button" id="bubbleCloseButton" onclick="hideBubble()">×</div>
       </div>
-      <img id="assistantImage" class="assistant-image" src="../../assets/images/secretary_normal.png" alt="秘書たん" />
+      <img id="assistantImage" class="assistant-image" src="./assets/images/secretary_normal.png" alt="秘書たん" />
       <div class="close-button" id="closeButton" onclick="closeApp()">×</div>
     </div>
     <div class="error-bubble" id="errorBubble">

@@ -1,0 +1,30 @@
+const fs = require('fs');
+const path = require('path');
+
+console.log('📝 preloadスクリプトをdistフォルダにコピーします...');
+
+// コピー元のパス
+const preloadPath = path.join(__dirname, 'frontend', 'core', 'preload.js');
+const pawPreloadPath = path.join(__dirname, 'frontend', 'core', 'paw-preload.js');
+
+// コピー先のパス
+const distPreloadPath = path.join(__dirname, 'dist', 'preload.js');
+const distPawPreloadPath = path.join(__dirname, 'dist', 'paw-preload.js');
+
+// preload.jsのコピー
+try {
+  fs.copyFileSync(preloadPath, distPreloadPath);
+  console.log('✅ preload.js をコピーしました');
+} catch (error) {
+  console.error('❌ preload.js のコピーに失敗しました:', error);
+}
+
+// paw-preload.jsのコピー
+try {
+  fs.copyFileSync(pawPreloadPath, distPawPreloadPath);
+  console.log('✅ paw-preload.js をコピーしました');
+} catch (error) {
+  console.error('❌ paw-preload.js のコピーに失敗しました:', error);
+}
+
+console.log('🎉 コピー完了！'); 

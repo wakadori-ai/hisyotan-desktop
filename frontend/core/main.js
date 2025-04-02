@@ -120,7 +120,9 @@ function createWindow() {
     fullscreen: true, // 全画面表示
     show: false, // 起動時は非表示に設定
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: process.env.VITE_DEV_SERVER_URL 
+        ? path.join(__dirname, 'preload.js') // 開発モード
+        : path.join(__dirname, '..', '..', 'dist', 'preload.js'), // 本番モード (distフォルダ内のコピー済みファイル)
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: false, // CORS制限を回避するため無効化 (開発環境向け)
@@ -176,10 +178,19 @@ function createWindow() {
 
   mainWindow.focus();
   // メインページ読み込み - 正しいパスを指定
-  const indexPath = path.join(__dirname, '..', 'ui', 'index.html');
+  const indexPath = process.env.VITE_DEV_SERVER_URL
+    ? path.join(__dirname, '..', 'ui', 'index.html') // 開発モード
+    : path.join(app.getAppPath(), 'dist', 'index.html'); // 本番モード (Viteのビルド出力先)
+  
   console.log('index.htmlのパス:', indexPath);
   console.log('アプリケーションのパス:', app.getAppPath());
-  mainWindow.loadFile(indexPath);
+  
+  // 開発モードではファイルをロード、本番モードではViteのビルドHTMLをロード
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else {
+    mainWindow.loadFile(indexPath);
+  }
   
   // ウィンドウが閉じられたときの処理
   mainWindow.on('closed', () => {
@@ -207,7 +218,9 @@ function createPawWindow() {
     skipTaskbar: true,
     resizable: false,
     webPreferences: {
-      preload: path.join(__dirname, 'paw-preload.js'),
+      preload: process.env.VITE_DEV_SERVER_URL 
+        ? path.join(__dirname, 'paw-preload.js') // 開発モード
+        : path.join(__dirname, '..', '..', 'dist', 'paw-preload.js'), // 本番モード (distフォルダ内のコピー済みファイル)
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -217,7 +230,10 @@ function createPawWindow() {
   pawWindow.setAlwaysOnTop(true, 'screen-saver'); // screen-saverは最も高い優先度
   
   // 肉球ボタンページの読み込み
-  const pawPath = path.join(__dirname, '..', 'ui', 'paw.html');
+  const pawPath = process.env.VITE_DEV_SERVER_URL
+    ? path.join(__dirname, '..', 'ui', 'paw.html') // 開発モード
+    : path.join(app.getAppPath(), 'dist', 'paw.html'); // 本番モード
+  
   pawWindow.loadFile(pawPath);
   
   // ウィンドウが閉じられたときの処理
@@ -491,6 +507,39 @@ ipcMain.handle('check-image-exists', (event, imagePath) => {
   } catch (err) {
     console.error(`画像ファイル確認エラー: ${err}`);
     return false;
+  }
+});
+
+// より堅牢な画像パス解決機能を追加
+ipcMain.handle('resolve-image-path', (event, imagePath) => {
+  try {
+    // 相対パスは様々なベースディレクトリから試す
+    const baseDirectories = [
+      app.getAppPath(),
+      process.cwd(),
+      path.join(app.getAppPath(), 'dist'),
+      path.join(app.getAppPath(), 'assets'),
+      path.join(process.cwd(), 'assets')
+    ];
+    
+    // パスの先頭に / や ./ がある場合は削除
+    const cleanPath = imagePath.replace(/^(\.\/|\/)/g, '');
+    
+    // すべてのベースディレクトリを試す
+    for (const baseDir of baseDirectories) {
+      const testPath = path.join(baseDir, cleanPath);
+      if (fs.existsSync(testPath)) {
+        console.log(`画像ファイルを見つけました: ${testPath}`);
+        return `file://${testPath.replace(/\\/g, '/')}`;
+      }
+    }
+    
+    // 画像が見つからない場合
+    console.warn(`画像が見つかりません: ${imagePath}`);
+    return null;
+  } catch (err) {
+    console.error(`画像パス解決エラー: ${err}`);
+    return null;
   }
 });
 
@@ -1117,4 +1166,14 @@ ipcMain.on('toggle-main-window', () => {
 ipcMain.handle('get-main-window-visibility', () => {
   if (!mainWindow) return false;
   return mainWindow.isVisible();
+});
+
+// ログ書き込みハンドラー
+ipcMain.handle('log-to-file', async (event, message) => {
+  const logFile = path.join(__dirname, 'debug-logs.txt');
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] ${message}\n`;
+  
+  fs.appendFileSync(logFile, logEntry);
+  return true;
 }); 
