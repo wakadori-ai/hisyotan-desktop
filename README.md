@@ -397,6 +397,10 @@ data/datasets/zombie_classifier/
 └── not_zombie/   # ゾンビではない画像（.png形式）
 ```
 
+## 処理フロー
+![](docs/system-flow.png)
+
+
 ## 📝 ライセンス
 
 MIT License
