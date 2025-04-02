@@ -16,7 +16,7 @@
 - **カスタマイズ可能**: 画像や音声キャラクターを自由に変更可能
 - **透明度・サイズ調整**: UI設定から簡単に見た目をカスタマイズ
 - **位置調整**: 画面上の好きな位置に配置可能（左上・右上・左下・右下）
-- **一発起動スクリプト**: 簡単な操作でアプリケーション全体を起動（v1.1.0）
+- **一発起動スクリプト**: 簡単な操作でアプリケーション全体を起動
 
 ## 📋 技術仕様
 
@@ -47,10 +47,10 @@
   - 感情に応じた自然な音声生成
   - リアルタイム音声合成
 
-- **プロジェクト構造**:
-  - Electron（フロントエンド）+ FastAPI（バックエンド）のハイブリッド構造
-  - 機械学習モジュールによる高精度検出
-  - PowerShellスクリプトによる簡単なセットアップと起動
+- **通信アーキテクチャ**:
+  - **HTTP API (REST)**: 設定取得、一時的なコマンド実行など
+  - **WebSocket**: リアルタイム通信（ゾンビ検出結果、状態変更通知など）
+  - **プロセス間通信**: ElectronのMain/Renderer間通信
 
 ## 🔧 インストールと設定
 
@@ -86,24 +86,9 @@ npm start
 
 アプリケーションの起動時に自動的にバックエンド（Python FastAPI）が起動します。通常は手動でバックエンドを起動する必要はありません。
 
-### コマンドラインオプション
-
-バックエンドサーバーは以下のオプションをサポートしています：
-
-```bash
-# ゾンビ監視を有効にして起動
-python backend/main.py --enable-monitoring
-
-# ゾンビ検出機能を有効にして起動
-python backend/main.py --zombie-detection
-
-# デバッグモードで起動
-python backend/main.py --debug
-```
-
 ### Windows向け便利な起動方法
 
-#### 簡単な起動方法（v1.1.0）
+#### 簡単な起動方法
 
 1. PowerShellを開きます
 2. 以下のコマンドを実行します：
@@ -124,6 +109,19 @@ python backend/main.py --debug
 .\start.ps1 -Help           ヘルプ表示
 ```
 
+バックエンドサーバーは以下のオプションもサポートしています：
+
+```bash
+# ゾンビ監視を有効にして起動
+python backend/main.py --enable-monitoring
+
+# ゾンビ検出機能を有効にして起動
+python backend/main.py --zombie-detection
+
+# デバッグモードで起動
+python backend/main.py --debug
+```
+
 #### 診断ツール
 
 システムの問題を診断するには、以下のコマンドを実行します：
@@ -132,33 +130,7 @@ python backend/main.py --debug
 .\diagnose.ps1
 ```
 
-このスクリプトは以下の項目を自動的にチェックします：
-- Node.jsとnpmのバージョン
-- Pythonのバージョンと仮想環境
-- VOICEVOXの実行状況
-- 必要なポートの利用可否
-- 必要なパッケージのインストール状況
-- 環境設定の正しさ
-
-問題が見つかった場合は、解決方法を提案します。
-
-#### タスクバーから起動する方法
-
-1. 管理者権限でPowerShellを開きます
-2. 以下のコマンドを実行します：
-   ```
-   .\create_shortcut.ps1
-   ```
-3. 作成されたショートカットをタスクバーにピン留めします
-
-#### スタートメニューのタイルとして登録する方法
-
-1. 以下のコマンドを実行してください：
-   ```
-   .\create_start_menu_tile.ps1
-   ```
-2. スタートメニューに「ふにゃ秘書たん」が追加されます
-3. スタートメニューで右クリックし、「スタート画面にピン留めする」を選択します
+このスクリプトは必要な環境やサービスを自動的にチェックし、問題が見つかった場合は解決方法を提案します。
 
 ### アプリケーションの制御
 
@@ -167,8 +139,6 @@ python backend/main.py --debug
 - **アプリの終了**: マウスカーソルをキャラクターに合わせると表示される×ボタンをクリック
 
 ## ⚙️ 設定ファイル
-
-主な設定ファイルは以下の2つです：
 
 ### フロントエンド設定 (`frontend/config/config.json`)
 
@@ -199,6 +169,21 @@ python backend/main.py --debug
 ### バックエンド設定 (`backend/app/config.py`)
 
 バックエンドの設定はPythonファイルで管理されており、音声合成や画像認識、WebSocket通信などの設定が含まれています。
+
+```python
+# VOICEVOXの設定
+VOICEVOX_HOST = "http://127.0.0.1:50021"  # ローカルホストに変更
+VOICEVOX_SPEAKER = 8  # 春日部つむぎ
+
+# 音声パラメータのプリセット
+VOICE_PRESETS = {
+    "にこにこ": {"pitch": 0.06, "intonation": 1.3, "speed": 1.05},   # 明るく元気な声
+    "警戒・心配": {"pitch": -0.03, "intonation": 0.9, "speed": 0.95}, # 少し不安げな声
+    "びっくり": {"pitch": 0.12, "intonation": 1.5, "speed": 1.2},     # テンパっている声
+    "やさしい": {"pitch": -0.06, "intonation": 1.1, "speed": 0.9},    # 落ち着いた声
+    "眠そう": {"pitch": -0.09, "intonation": 0.8, "speed": 0.8}       # ふにゃふにゃ声
+}
+```
 
 ## 🔨 開発とビルド
 
@@ -232,6 +217,29 @@ npm run dist -- --linux
 ```
 
 ビルド設定は`package.json`の`build`セクションで定義されています。
+
+### Vite導入について
+
+プロジェクトにViteを導入し、以下の機能が利用可能になりました：
+
+#### パスエイリアス
+相対パスの代わりに、以下のエイリアスが使用できます：
+
+```js
+// 変更前
+import { logger } from '../core/logger.js';
+
+// 変更後
+import { logger } from '@core/logger.js';
+```
+
+利用可能なエイリアス：
+- `@core` -> `frontend/core`
+- `@ui` -> `frontend/ui`
+- `@emotion` -> `frontend/emotion`
+- `@assets` -> `frontend/assets`
+- `@config` -> `frontend/config`
+- `@voice` -> `frontend/voice`
 
 ## 🎨 キャラクターのカスタマイズ
 
@@ -303,7 +311,7 @@ npm run dist -- --linux
 3. `notification.py`が検出結果に基づき適切な通知とセリフを生成
 4. WebSocketで結果をフロントエンドに送信し、秘書たんが適切に反応
 
-## 🧪 テスト機能
+### テスト機能
 
 音声合成や機能をテストするには、以下のスクリプトを実行します：
 
@@ -338,33 +346,16 @@ hisyotan-desktop/
 │   └── sounds/           # 効果音・音声ファイル
 ├── frontend/              # フロントエンドコード
 │   ├── core/             # コア機能
-│   │   ├── main.js       # メインプロセス
-│   │   ├── logger.js     # ログ管理
-│   │   └── preload.js    # プリロードスクリプト
 │   ├── ui/               # UI関連コード
-│   │   ├── renderer.js   # レンダラープロセス
-│   │   ├── uiHelper.js   # UI操作ヘルパー
 │   ├── emotion/          # 感情表現システム
-│   │   ├── expressionManager.js # 表情管理
-│   │   ├── emotionHandler.js # 感情状態管理
 │   ├── voice/            # 音声処理
-│   │   ├── speechManager.js # 音声・吹き出し管理
 │   ├── config/           # 設定関連
-│   │   ├── configLoader.js # 設定読み込み
-│   │   ├── config.js     # 設定管理
-│   │   └── config.json   # フロントエンド設定
 │   ├── index.html        # メインHTML
 │   └── styles.css        # スタイルシート
 ├── backend/               # バックエンドコード（Python）
 │   ├── app/              # アプリケーションモジュール
 │   │   ├── core/         # コア機能
-│   │   │   ├── app.py    # FastAPIアプリケーション
-│   │   │   └── init.py   # 初期化処理
 │   │   ├── zombie/       # ゾンビ検出関連
-│   │   │   ├── monitor.py # 監視モジュール
-│   │   │   ├── detector_core.py # YOLOv8検出器
-│   │   │   ├── notification.py # 通知生成
-│   │   │   └── callbacks.py # コールバック処理
 │   │   ├── voice/        # 音声合成関連
 │   │   ├── services/     # 各種サービス機能
 │   │   ├── ws/           # WebSocket処理
@@ -373,11 +364,6 @@ hisyotan-desktop/
 │   │   ├── events/       # イベント処理
 │   │   └── config/       # 設定
 │   ├── ml/               # 機械学習モジュール
-│   │   ├── models/       # トレーニング済みモデル
-│   │   ├── train.py      # モデルトレーニングスクリプト
-│   │   ├── infer.py      # 推論スクリプト
-│   │   ├── README.md     # MLモジュールの説明
-│   │   └── requirements.txt # ML固有の依存関係
 │   ├── data/             # データ保存・キャッシュ
 │   └── main.py           # バックエンドエントリーポイント
 ├── logs/                  # ログファイル格納ディレクトリ
@@ -386,8 +372,9 @@ hisyotan-desktop/
 ├── vite.config.js        # Vite設定ファイル
 ├── requirements.txt      # Pythonパッケージ依存
 ├── .python-version       # Pythonバージョン指定
-├── start.ps1             # 起動スクリプト (v1.1.0)
+├── start.ps1             # 起動スクリプト
 ├── diagnose.ps1          # 診断スクリプト
+├── copy-preload.js       # プリロードスクリプトコピー用
 └── README.md             # プロジェクト説明
 ```
 
@@ -396,15 +383,8 @@ hisyotan-desktop/
 `backend/ml` ディレクトリには、ゾンビ検出のためのモデルトレーニングと推論に関連するコードが含まれています：
 
 - **train.py**: YOLOv8ベースのカスタムモデルをトレーニングするためのスクリプト
-  - 転移学習を利用したゾンビ画像分類器
-  - データ拡張機能を搭載（回転、反転、明るさ調整など）
-  - 学習結果の可視化（混同行列、学習履歴）
 - **infer.py**: トレーニング済みモデルを使用して画像から対象物を検出するための推論スクリプト
-  - リアルタイム推論用に最適化
-  - バッチ処理と単一画像処理の両方に対応
 - **models/**: トレーニング済みの検出モデルが保存されるディレクトリ
-  - YOLOv8ベースのカスタムモデル
-  - 高精度なゾンビ検出を実現
 - **confusion_matrix.png**: モデルの性能評価のための混同行列
 - **training_history.png**: 学習過程の可視化グラフ
 - **sample_images.png**: 実際の検出例を示すサンプル画像
@@ -417,16 +397,6 @@ data/datasets/zombie_classifier/
 └── not_zombie/   # ゾンビではない画像（.png形式）
 ```
 
-このモジュールは、ゲーム「7 Days to Die」の画面からリアルタイムでゾンビを検出するための機械学習基盤を提供します。モデルトレーニングの詳細については、`backend/ml/README.md` を参照してください。
-
-## 🔄 通信アーキテクチャ
-
-システムは以下の通信チャネルを使用しています：
-
-1. **HTTP API (REST)**：設定取得、一時的なコマンド実行など
-2. **WebSocket**：リアルタイム通信（ゾンビ検出結果、状態変更通知など）
-3. **プロセス間通信**：ElectronのMain/Renderer間通信
-
 ## 📝 ライセンス
 
 MIT License
@@ -435,42 +405,6 @@ MIT License
 
 プルリクエストや機能提案は大歓迎です！バグ修正や新機能の提案は、Issue機能を使ってお気軽にお知らせください。
 
-## 🛠️ Vite導入について
+## 📅 最終更新日
 
-プロジェクトにViteを導入し、以下の機能が利用可能になりました：
-
-### パスエイリアス
-相対パスの代わりに、以下のエイリアスが使用できます：
-
-```js
-// 変更前
-import { logger } from '../core/logger.js';
-
-// 変更後
-import { logger } from '@core/logger.js';
-```
-
-利用可能なエイリアス：
-- `@core` -> `frontend/core`
-- `@ui` -> `frontend/ui`
-- `@emotion` -> `frontend/emotion`
-- `@assets` -> `frontend/assets`
-- `@config` -> `frontend/config`
-- `@voice` -> `frontend/voice`
-
-### 開発サーバーの起動
-
-```
-npm run dev        # Vite開発サーバーのみ起動
-npm run dev:electron # Vite + Electron同時起動（HMR対応）
-```
-
-### ビルド
-
-```
-npm run build      # フロントエンドのビルド
-npm run build:electron # Electronアプリのビルド
-```
-
-### 注意点
-- 開発中はViteサーバー経由でアプリを表示するため、アセットパスなどが変わる場合があります
+2023年4月2日
