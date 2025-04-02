@@ -12,7 +12,8 @@ from fastapi import APIRouter, Query, Request, HTTPException, Response
 from starlette.responses import JSONResponse
 from pydantic import BaseModel
 from ..config import Settings, get_settings
-from ..voice.engine import safe_play_voice, speak_with_emotion, synthesize_direct
+from ..voice.engine import safe_play_voice, speak_with_emotion, synthesize_direct, react_to_zombie, safe_speak_with_preset
+from ..models import VoiceSynthesisRequest
 
 # ロガー設定
 logger = logging.getLogger(__name__)
@@ -22,12 +23,6 @@ router = APIRouter()
 
 # 設定の取得
 settings = get_settings()
-
-# リクエストモデル
-class VoiceSynthesisRequest(BaseModel):
-    text: str
-    emotion: str = "normal"
-    speaker_id: int = 8
 
 @router.post("/api/voice/speaker")
 async def change_voice_speaker(speaker_id: int = Query(3, description="話者ID")):
@@ -383,4 +378,103 @@ async def speak_text(request: VoiceSynthesisRequest):
                 "status": "error", 
                 "message": f"音声再生リクエストに失敗しました: {str(e)}"
             }
+        )
+
+# 新しいエンドポイント: プリセット音声とVOICEVOX合成音声を組み合わせて再生
+@router.post("/api/voice/react_to_zombie")
+async def react_to_zombie_endpoint(
+    count: int = Query(..., description="検出されたゾンビの数"),
+    distance: float = Query(0.0, description="最も近いゾンビとの距離（m）"),
+    force: bool = Query(False, description="クールダウンを無視して強制的に再生するか")
+):
+    """
+    ゾンビ検出に対して即時反応するエンドポイント
+    まずプリセット音声を再生し、その後VOICEVOXで合成した音声を再生
+    
+    Args:
+        count: 検出されたゾンビの数
+        distance: 最も近いゾンビとの距離（m）
+        force: クールダウンを無視して強制的に再生するか
+    
+    Returns:
+        JSONResponse: 処理結果
+    """
+    try:
+        from ..voice.engine import react_to_zombie
+        
+        # ゾンビ検出に対する反応処理
+        react_to_zombie(count, distance)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success", 
+                "message": f"ゾンビ検出に対する音声反応を開始しました（{count}体）"
+            }
+        )
+    except Exception as e:
+        logger.error(f"ゾンビ音声反応処理エラー: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"ゾンビ音声反応処理エラー: {str(e)}"}
+        )
+
+# 新しいエンドポイント: プリセット音声とVOICEVOX合成音声を組み合わせて再生
+@router.post("/api/voice/speak_with_preset")
+async def speak_with_preset_endpoint(request: Request):
+    """
+    プリセット音声と合成音声を組み合わせて再生するエンドポイント
+    プリセットを即時再生し、その後にVOICEVOXで合成した音声を再生
+    
+    Request Body:
+        text: 発話するテキスト
+        preset_name: 使用するプリセット音声名
+        speaker_id: 話者ID (オプション)
+        emotion: 感情 (オプション)
+        force: 強制実行フラグ (オプション)
+    
+    Returns:
+        JSONResponse: 処理結果
+    """
+    try:
+        request_data = await request.json()
+        
+        # リクエストからパラメータを取得
+        text = request_data.get("text", "")
+        preset_name = request_data.get("preset_name", "")
+        speaker_id = request_data.get("speaker_id", None)
+        emotion = request_data.get("emotion", "normal")
+        force = request_data.get("force", False)
+        
+        if not text or not preset_name:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "テキストとプリセット名は必須です"}
+            )
+        
+        logger.info(f"プリセット音声＆合成音声リクエスト: text={text[:20]}..., preset={preset_name}, emotion={emotion}")
+        
+        # プリセットと合成音声を再生
+        from ..voice.engine import safe_speak_with_preset
+        
+        safe_speak_with_preset(
+            text=text,
+            preset_name=preset_name,
+            speaker_id=speaker_id,
+            emotion=emotion,
+            force=force
+        )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success", 
+                "message": f"プリセット'{preset_name}'と合成音声の再生を開始しました"
+            }
+        )
+    except Exception as e:
+        logger.error(f"プリセット＆合成音声処理エラー: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"音声処理エラー: {str(e)}"}
         ) 

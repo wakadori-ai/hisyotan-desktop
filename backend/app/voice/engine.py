@@ -11,7 +11,9 @@ import threading
 import requests
 import subprocess
 import json
+import hashlib
 from typing import Optional, Dict, Any, Tuple, Union, List, cast
+import concurrent.futures
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -27,6 +29,12 @@ voice_lock = threading.Lock()
 last_message_cache: Dict[str, Tuple[str, float]] = {}
 # 音声再生中フラグ
 audio_playing = False
+# 合成音声キャッシュのパス
+CACHED_VOICE_DIR = "assets/sounds/generated"
+# プリセット音声のパス
+PRESET_VOICE_DIR = "assets/sounds/presets"
+# ThreadPoolExecutor for background tasks
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 def reset_audio_playback():
     """
@@ -382,4 +390,283 @@ def play_voice(wav_path: str):
         
     except Exception as e:
         logger.error(f"音声再生エラー: {str(e)}")
-        reset_audio_playback() 
+        reset_audio_playback()
+
+def play_voice_async(wav_path: str) -> Optional[concurrent.futures.Future[int]]:
+    """
+    WAVファイルを非同期で再生し、Futureオブジェクトを返す
+    
+    Args:
+        wav_path: 再生するWAVファイルのパス
+        
+    Returns:
+        Future: 再生処理の完了を待機できるFutureオブジェクト
+    """
+    try:
+        # Windows環境での再生
+        command = f'powershell -c "(New-Object Media.SoundPlayer \'{wav_path}\').PlaySync();"'
+        return executor.submit(os.system, command)
+    except Exception as e:
+        logger.error(f"非同期音声再生エラー: {str(e)}")
+        return None
+
+def get_voice_cache_path(text: str, speaker_id: int = 0) -> str:
+    """
+    テキストと話者IDからキャッシュパスを生成
+    
+    Args:
+        text: テキスト
+        speaker_id: 話者ID
+        
+    Returns:
+        str: キャッシュファイルのパス
+    """
+    # テキストからハッシュ値を生成
+    text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
+    filename = f"voice_{speaker_id}_{text_hash}.wav"
+    return os.path.join(CACHED_VOICE_DIR, filename)
+
+def is_voice_cached(text: str, speaker_id: int = 0) -> bool:
+    """
+    テキストの音声がキャッシュされているかチェック
+    
+    Args:
+        text: チェックするテキスト
+        speaker_id: 話者ID
+        
+    Returns:
+        bool: キャッシュが存在すればTrue
+    """
+    cache_path = get_voice_cache_path(text, speaker_id)
+    return os.path.exists(cache_path)
+
+def play_preset_voice(preset_name: str) -> Optional[concurrent.futures.Future[int]]:
+    """
+    プリセット音声を即時に再生
+    
+    Args:
+        preset_name: プリセット名（ファイル名から.wavを除いたもの）
+        
+    Returns:
+        Future: 再生処理のFutureオブジェクト（失敗時はNone）
+    """
+    preset_path = os.path.join(PRESET_VOICE_DIR, f"{preset_name}.wav")
+    if not os.path.exists(preset_path):
+        logger.warning(f"プリセット音声が見つかりません: {preset_path}")
+        return None
+        
+    logger.debug(f"プリセット音声を再生: {preset_name}")
+    return play_voice_async(preset_path)
+
+def speak_with_preset(
+    text: str,
+    preset_name: str,
+    speaker_id: int = 0,
+    speed: float = 1.0,
+    pitch: float = 0.0,
+    intonation: float = 1.0,
+    volume: float = 1.0,
+    delay: float = 0.5
+) -> None:
+    """
+    プリセット音声を即時に再生した後、合成音声を再生
+    
+    Args:
+        text: 発話するテキスト
+        preset_name: 使用するプリセット音声名
+        speaker_id: 話者ID
+        speed: 話速（1.0が標準）
+        pitch: ピッチ（0.0が標準）
+        intonation: イントネーション（1.0が標準）
+        volume: 音量（1.0が標準）
+        delay: プリセット再生後、合成音声を再生するまでの遅延（秒）
+    """
+    # キャッシュパスをチェック
+    cache_path = get_voice_cache_path(text, speaker_id)
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    
+    # プリセット音声を即時再生
+    preset_future = play_preset_voice(preset_name)
+    if preset_future is None:
+        # プリセット失敗時は通常の音声合成のみ実行
+        speak(text, speaker_id, speed, pitch, intonation, volume)
+        return
+    
+    # キャッシュを確認
+    if is_voice_cached(text, speaker_id):
+        # キャッシュが存在する場合、遅延後に再生
+        def play_cached_after_delay():
+            try:
+                time.sleep(delay)  # 指定された遅延
+                play_voice(cache_path)
+            except Exception as e:
+                logger.error(f"キャッシュ音声再生エラー: {e}")
+        
+        # 別スレッドでキャッシュ音声再生
+        cache_thread = threading.Thread(target=play_cached_after_delay)
+        cache_thread.daemon = True
+        cache_thread.start()
+        return
+    
+    # キャッシュがない場合は合成して保存
+    def synthesize_and_play():
+        try:
+            from ..config import get_settings
+            settings = get_settings()
+            
+            # 音声合成リクエストを2段階で行う
+            # 1. 音声合成用のクエリを作成
+            params = {
+                "text": text,
+                "speaker": speaker_id
+            }
+            
+            # クエリ作成
+            query_response = requests.post(
+                f"{settings.VOICEVOX_HOST}/audio_query",
+                params=params
+            )
+            
+            if query_response.status_code != 200:
+                logger.error(f"音声合成クエリの作成に失敗: {query_response.text}")
+                return
+                
+            voice_params = query_response.json()
+            
+            # パラメータ調整
+            voice_params["speedScale"] = speed
+            voice_params["pitchScale"] = pitch
+            voice_params["intonationScale"] = intonation
+            voice_params["volumeScale"] = volume
+            
+            # 2. 音声合成の実行
+            synthesis_response = requests.post(
+                f"{settings.VOICEVOX_HOST}/synthesis",
+                headers={"Content-Type": "application/json"},
+                params={"speaker": speaker_id},
+                data=json.dumps(voice_params)
+            )
+            
+            if synthesis_response.status_code != 200:
+                logger.error(f"音声合成に失敗: {synthesis_response.text}")
+                return
+            
+            # キャッシュに保存
+            with open(cache_path, "wb") as f:
+                f.write(synthesis_response.content)
+                
+            logger.debug(f"合成音声をキャッシュに保存: {cache_path}")
+            
+            # 遅延後に再生
+            time.sleep(delay)
+            play_voice(cache_path)
+            
+        except Exception as e:
+            logger.error(f"音声合成・再生エラー: {e}")
+    
+    # 別スレッドで音声合成と再生を実行
+    synth_thread = threading.Thread(target=synthesize_and_play)
+    synth_thread.daemon = True
+    synth_thread.start()
+
+def safe_speak_with_preset(
+    text: str,
+    preset_name: str,
+    speaker_id: Optional[int] = None,
+    emotion: str = "normal",
+    force: bool = False
+) -> None:
+    """
+    プリセット音声と合成音声を安全に組み合わせて再生
+    
+    Args:
+        text: 発話するテキスト
+        preset_name: 使用するプリセット名
+        speaker_id: 話者ID（Noneの場合は設定から取得）
+        emotion: 感情ラベル
+        force: 強制再生フラグ
+    """
+    from ..config import get_settings
+    settings = get_settings()
+    
+    # speaker_idが指定されていなければ設定から取得
+    if speaker_id is None:
+        speaker_id = settings.VOICEVOX_SPEAKER
+    
+    # メッセージの重複チェック（プリセットは常に再生）
+    duplicate = False
+    with voice_lock:
+        current_time = time.time()
+        message_type = f"preset_{preset_name}"
+        
+        if not force and message_type in last_message_cache:
+            last_text, last_time = last_message_cache[message_type]
+            if last_text == text and current_time - last_time < 3.0:
+                duplicate = True
+        
+        # キャッシュを更新
+        last_message_cache[message_type] = (text, current_time)
+    
+    # 感情に応じた音声パラメータを取得
+    params = settings.VOICE_PRESETS.get(emotion, {})
+    speed = params.get("speed", 1.0)
+    pitch = params.get("pitch", 0.0)
+    intonation = params.get("intonation", 1.0)
+    volume = params.get("volume", 1.0)
+    
+    # 重複の場合はプリセットのみ再生
+    if duplicate:
+        play_preset_voice(preset_name)
+        return
+    
+    # プリセットと合成音声を再生
+    speak_with_preset(
+        text=text,
+        preset_name=preset_name,
+        speaker_id=speaker_id,
+        speed=speed,
+        pitch=pitch,
+        intonation=intonation,
+        volume=volume
+    )
+
+# ゾンビ検出用の便利関数
+def react_to_zombie(count: int, distance: float = 0.0) -> None:
+    """
+    ゾンビ検出に対して適切な音声で反応
+    
+    Args:
+        count: ゾンビの数
+        distance: 最も近いゾンビとの距離（m）
+    """
+    if count >= 5:
+        # 大量のゾンビを検出
+        safe_speak_with_preset(
+            text="危険です！大量のゾンビが接近中です！すぐに避難してください！",
+            preset_name="scream",
+            emotion="びっくり",
+            force=True
+        )
+    elif count >= 2:
+        # 複数のゾンビを検出
+        safe_speak_with_preset(
+            text=f"警告！{count}体のゾンビを検出しました。注意してください。",
+            preset_name="gasp",
+            emotion="警戒・心配"
+        )
+    elif count == 1:
+        # 1体のゾンビを検出
+        if distance < 5.0:
+            # 近距離
+            safe_speak_with_preset(
+                text="ゾンビが近くにいます！気をつけてください！",
+                preset_name="altu",
+                emotion="びっくり"
+            )
+        else:
+            # 遠距離
+            safe_speak_with_preset(
+                text="ゾンビを発見しました。",
+                preset_name="altu",
+                emotion="normal"
+            ) 

@@ -27,6 +27,7 @@ class ConnectionManager:
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info(f"WebSocket接続が確立されました。現在の接続数: {len(self.active_connections)}")
+        print(f"[BACKEND] WebSocket接続が確立されました。現在の接続数: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         """
@@ -34,21 +35,41 @@ class ConnectionManager:
         """
         self.active_connections.remove(websocket)
         logger.info(f"WebSocket接続が切断されました。現在の接続数: {len(self.active_connections)}")
+        print(f"[BACKEND] WebSocket接続が切断されました。現在の接続数: {len(self.active_connections)}")
 
     async def send_personal_message(self, message: Dict[str, Any], websocket: WebSocket):
         """
         特定のクライアントにメッセージを送信する
         """
-        await websocket.send_json(message)
-        logger.debug(f"個別メッセージを送信しました: {message}")
+        try:
+            await websocket.send_json(message)
+            logger.debug(f"個別メッセージを送信しました: {message}")
+            print(f"[BACKEND] 個別WebSocketメッセージを送信: {message.get('type', 'unknown')}")
+        except Exception as e:
+            logger.error(f"個別メッセージ送信エラー: {e}")
+            print(f"[BACKEND] 個別WebSocketメッセージ送信エラー: {str(e)}")
 
     async def broadcast(self, message: Dict[str, Any]):
         """
         接続中の全クライアントにメッセージをブロードキャストする
         """
+        print(f"[BACKEND] WebSocketブロードキャスト開始: {message.get('type', 'unknown')} - 接続数: {len(self.active_connections)}")
+        if len(self.active_connections) == 0:
+            print(f"[BACKEND] WebSocket接続がありません！ブロードキャストをスキップ: {message.get('type', 'unknown')}")
+            logger.warning(f"WebSocket接続がありません。ブロードキャストをスキップ: {message}")
+            return
+            
         for connection in self.active_connections:
-            await connection.send_json(message)
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error(f"ブロードキャスト送信エラー: {e}")
+                print(f"[BACKEND] WebSocketブロードキャスト送信エラー: {str(e)}")
+                # エラーがあっても続行
+                continue
+                
         logger.debug(f"ブロードキャストメッセージを送信しました: {message}")
+        print(f"[BACKEND] WebSocketブロードキャスト完了: {message.get('type', 'unknown')}")
 
 # シングルトンインスタンス
 manager = ConnectionManager()
@@ -85,5 +106,9 @@ async def send_notification(
         }
     }
     
+    # 送信前にデバッグ出力
+    print(f"[BACKEND] 通知送信開始: {message_type} - {message}")
+    
     await manager.broadcast(notification_data)
-    logger.info(f"通知を送信: {message_type} - {message}") 
+    logger.info(f"通知を送信: {message_type} - {message}")
+    print(f"[BACKEND] 通知送信完了: {message_type} - {message}") 
