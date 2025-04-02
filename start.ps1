@@ -120,6 +120,17 @@ function Show-Logo {
 
 Show-Logo
 
+## ========= 既存プロセス終了処理 =========
+
+Write-Log "既存の秘書たんプロセスを確認しています..." "Info"
+# stop_hisyotan.ps1を実行して既存プロセスを終了
+try {
+    & "$ScriptDir\tools\stop_hisyotan.ps1"
+    Write-Log "既存プロセスのクリーンアップが完了しました" "Success"
+} catch {
+    Write-Log "既存プロセスの終了中にエラーが発生しました: $_" "Warning"
+}
+
 ## ========= 通常・開発モード起動（バックグラウンド） =========
 
 Write-Log "秘書たんアプリを起動しています..." "Info"
