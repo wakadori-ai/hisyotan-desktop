@@ -7,7 +7,10 @@
 import logging
 import time
 import random
-from typing import Dict, Any, Optional, TypeVar, Callable, Coroutine, Union
+import threading
+from typing import Dict, Any, Optional, TypeVar, Callable, Coroutine, Union, List, Set, Tuple
+import asyncio
+from datetime import datetime, timedelta
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -15,41 +18,44 @@ logger = logging.getLogger(__name__)
 # 型変数の定義（リンターエラー修正用）
 T = TypeVar('T')
 
-# デバウンス用のタイマー
-last_callback_time: Dict[str, float] = {
-    "zombie_alert": 0,
-    "zombie_few_alert": 0,
-    "zombie_warning": 0
+# 最後のコールバック実行時刻を記録する辞書
+last_callback_times: Dict[str, float] = {
+    "zombie_alert": 0.0,  # 大量ゾンビアラート
+    "zombie_few": 0.0,    # 少数ゾンビアラート
+    "zombie_warning": 0.0  # 警戒レベルゾンビアラート
 }
 
-# コールバックデバウンスチェッカー
+# コールバックのデバウンス時間（秒）
+DEBOUNCE_TIMES: Dict[str, float] = {
+    "zombie_alert": 60.0,   # 大量ゾンビアラートは60秒間隔
+    "zombie_few": 30.0,     # 少数ゾンビアラートは30秒間隔
+    "zombie_warning": 30.0  # 警戒レベルゾンビアラートは30秒間隔
+}
+
+# ③ 閾値（confidence threshold）のデバッグ用変数
+# この値を調整することでモデルの検出感度を変更できる
+DEBUG_CONFIDENCE_THRESHOLD = 0.45  # デフォルト値
+
 def is_callback_throttled(callback_type: str) -> bool:
     """
-    コールバックのデバウンス状態をチェック。
-    短時間での重複呼び出しを防止するためにスロットリングを行う。
+    コールバックがデバウンス期間中かどうかを確認する
     
     Args:
-        callback_type: コールバックの種類
+        callback_type: コールバックタイプ
         
     Returns:
         bool: デバウンス中の場合はTrue
     """
-    from ..config.settings import Settings
-    
     current_time = time.time()
-    settings = Settings()
+    last_time = last_callback_times.get(callback_type, 0)
+    debounce_time = DEBOUNCE_TIMES.get(callback_type, 30.0)
     
-    if callback_type in last_callback_time:
-        last_time = last_callback_time[callback_type]
-        cooldown = settings.CALLBACK_COOLDOWN.get(callback_type, 5.0)
-        
-        # クールダウン中かチェック
-        if current_time - last_time < cooldown:
-            logger.debug(f"コールバック {callback_type} はデバウンス中 ({current_time - last_time:.1f}秒 < {cooldown}秒)")
-            return True
+    # デバウンス期間中かチェック
+    if current_time - last_time < debounce_time:
+        return True
     
-    # 最終呼び出し時刻を更新
-    last_callback_time[callback_type] = current_time
+    # 最終実行時刻を更新
+    last_callback_times[callback_type] = current_time
     return False
 
 def _zombie_alert_callback(count: int, frame_data: Optional[Any] = None, additional_data: Optional[Dict[str, Any]] = None) -> None:
@@ -190,6 +196,7 @@ def _zombie_alert_callback(count: int, frame_data: Optional[Any] = None, additio
         logger.error(f"ゾンビアラートコールバック実行中にエラーが発生しました: {str(e)}")
         logger.exception("詳細:")
 
+# ゾンビ検出時の音声反応の呼び出しを追加
 async def zombie_few_alert(count: int, frame_data: Optional[Any] = None, additional_data: Optional[Dict[str, Any]] = None, play_audio: bool = True, force: bool = False):
     """
     少数のゾンビが検出された時のAPIハンドラー
@@ -202,7 +209,7 @@ async def zombie_few_alert(count: int, frame_data: Optional[Any] = None, additio
         force: 強制的に実行するかどうか
     """
     from ..ws.manager import send_notification
-    from ..voice.engine import safe_play_voice
+    from ..voice.engine import react_to_zombie
     from ..config.settings import Settings
     
     # 設定を取得
@@ -217,111 +224,67 @@ async def zombie_few_alert(count: int, frame_data: Optional[Any] = None, additio
         resnet_prob = additional_data.get("resnet_probability", 0.0)
     
     logger.info(f"🟠 少数のゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
+    print(f"[BACKEND] 少数のゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
     
     # デバウンスチェック（強制フラグがない場合）
-    if not force and is_callback_throttled("zombie_few_alert"):
+    if not force and is_callback_throttled("zombie_few"):
         logger.debug("少数ゾンビアラートはデバウンス中のためスキップ")
+        print("[BACKEND] 少数ゾンビアラートはデバウンス中のためスキップ")
         return {"status": "throttled", "message": "デバウンス中のためスキップされました"}
+    
+    # 距離情報を取得（ない場合はデフォルト値）
+    distance = 0.0
+    if additional_data and "closest_distance" in additional_data:
+        distance = additional_data.get("closest_distance", 0.0)
+    
+    # 新しいプリセット音声と合成音声を組み合わせた反応（より即時的）
+    if play_audio:
+        react_to_zombie(count, distance)
     
     # 通知メッセージの作成
     message_suffix = ""
-    if count == 0 and resnet_result:
-        message = "ゾンビの気配を感じます..."
-        title = "👀 ゾンビの気配"
-        message_type = "zombiePresence"
-    else:
-        message = f"少数のゾンビを検出しました ({count}体)"
-        title = "⚠️ ゾンビ少数検出"
-        message_type = "fewZombiesAlert"
-        
-        # ResNetの結果に基づく補足情報
-        if count > 0 and not resnet_result and resnet_prob < 0.3:
-            message_suffix = "（誤検出の可能性あり）"
+    if not resnet_result and resnet_prob < 0.3:
+        message_suffix = "（誤検出の可能性あり）"
     
-    # 通知を送信
-    try:
-        await send_notification(
-            message + message_suffix,
-            message_type=message_type,
-            title=title,
-            importance="normal",
-            skipAudio=not play_audio
-        )
-        
-        # 音声再生が有効な場合
-        if play_audio:
-            # YOLOとResNetの結果に基づいてセリフを選択
-            if count == 0 and resnet_result:
-                # ゾンビの気配のみを検出
-                messages = [
-                    "……気配がするの。見えないけど…何か来る…っ",
-                    "何かいる気がする…目には見えないけど…",
-                    "変な感じがする…周りを警戒して…",
-                    "この感覚…ゾンビがどこかにいるかも…"
-                ]
-            elif count > 0 and resnet_result:
-                # YOLOとResNetが一致して検出
-                if count >= 3:
-                    messages = [
-                        "数匹のゾンビが見えるわ。気をつけて！",
-                        "ゾンビを何体か確認したわ。注意して！",
-                        "ゾンビが少し集まってる…警戒して！",
-                        "ゾンビが数体いるわ！気をつけて！"
-                    ]
-                else:
-                    messages = [
-                        "ゾンビを見つけたわ。注意して！",
-                        "ゾンビがいるわ！気をつけて！",
-                        "ちょっと、ゾンビが近くにいるわよ！",
-                        "あっ、ゾンビよ！気をつけて！"
-                    ]
-            elif count > 0 and not resnet_result and resnet_prob < 0.3:
-                # YOLOが検出したがResNetが確信していない（誤検出の可能性）
-                messages = [
-                    "……うーん、ちょっと見間違いだったかも？",
-                    "何か動いたと思ったけど…気のせいかな？",
-                    "ちょっと不確かだけど…念のため警戒しておこう",
-                    "はっきりとは言えないけど…何か見えたような…"
-                ]
-            else:
-                # デフォルトのメッセージ
-                messages = [
-                    "ゾンビがいるみたい。注意して！",
-                    "ゾンビを見つけたわ。気をつけて！",
-                    "近くにゾンビがいるわ。警戒して！",
-                    "ゾンビよ！気をつけてね！"
-                ]
-            
-            message = random.choice(messages)
-            
-            # 音声合成・再生（状況に応じたプリセットを選択）
-            voice_preset = None
-            
-            if count == 0 and resnet_result:
-                # 気配感知時は「不安」プリセット
-                voice_preset = settings.VOICE_PRESETS.get("不安・怯え", settings.VOICE_PRESETS["警戒・心配"])
-            elif count > 0 and not resnet_result and resnet_prob < 0.3:
-                # 誤検出の可能性がある場合は「疑問」プリセット
-                voice_preset = settings.VOICE_PRESETS.get("疑問・思案", settings.VOICE_PRESETS["通常"])
-            else:
-                # 通常の検出は「警戒」プリセット
-                voice_preset = settings.VOICE_PRESETS["警戒・心配"]
-            
-            safe_play_voice(
-                message,
-                speaker_id=settings.VOICEVOX_SPEAKER,
-                speed=voice_preset["speed"],
-                pitch=voice_preset["pitch"],
-                intonation=voice_preset["intonation"],
-                force=force,
-                message_type="zombie_few_alert"
-            )
-            
-        return {"status": "success", "message": "少数ゾンビアラートが送信されました", "count": count, "resnet": resnet_result}
-        
-    except Exception as e:
-        logger.error(f"少数ゾンビアラートエラー: {e}")
-        return {"status": "error", "message": f"エラーが発生しました: {str(e)}"}
+    # WebSocketで送信するデータを作成
+    positions = []
+    
+    # 🆕 通知のタイプを設定
+    alert_type = "warning" if count >= 3 else "info"
+    
+    # 位置情報がある場合
+    if additional_data and "boxes" in additional_data:
+        boxes = additional_data["boxes"]
+        for box in boxes:
+            if "bbox" in box:
+                x1, y1, x2, y2 = box["bbox"]
+                conf = box.get("confidence", 0.0)
+                positions.append({
+                    "x": (x1 + x2) // 2,
+                    "y": (y1 + y2) // 2,
+                    "w": x2 - x1,
+                    "h": y2 - y1,
+                    "confidence": conf
+                })
+    
+    # 通知送信
+    await send_notification(
+        f"ゾンビ {count}体を検出しました{message_suffix}",
+        message_type=alert_type,
+        title="ゾンビ検出",
+        importance="high",
+        data={
+            "count": count,
+            "positions": positions,
+            "resnet_result": resnet_result,
+            "resnet_probability": resnet_prob
+        }
+    )
+    
+    return {
+        "status": "success",
+        "message": f"少数ゾンビアラートを送信しました ({count}体)"
+    }
 
 async def zombie_warning(count: int, frame_data: Optional[Any] = None, additional_data: Optional[Dict[str, Any]] = None, play_audio: bool = True, force: bool = False):
     """
@@ -334,8 +297,8 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
         play_audio: 音声を再生するかどうか
         force: 強制的に実行するかどうか
     """
-    from ..ws.manager import send_notification
-    from ..voice.engine import safe_play_voice
+    from ..ws.manager import send_notification, manager
+    from ..voice.engine import react_to_zombie
     from ..config.settings import Settings
     
     # 設定を取得
@@ -350,19 +313,63 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
         resnet_prob = additional_data.get("resnet_probability", 0.0)
     
     logger.info(f"🟡 警戒レベルのゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
+    print(f"[BACKEND] 警戒レベルのゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
     
     # デバウンスチェック（強制フラグがない場合）
     if not force and is_callback_throttled("zombie_warning"):
         logger.debug("警戒ゾンビアラートはデバウンス中のためスキップ")
+        print("[BACKEND] 警戒ゾンビアラートはデバウンス中のためスキップ")
         return {"status": "throttled", "message": "デバウンス中のためスキップされました"}
+    
+    # 距離情報を取得（ない場合はデフォルト値）
+    distance = 0.0
+    if additional_data and "closest_distance" in additional_data:
+        distance = additional_data.get("closest_distance", 0.0)
+    
+    # 新しいプリセット音声と合成音声を組み合わせた反応（より即時的）
+    if play_audio:
+        react_to_zombie(count, distance)
     
     # 通知メッセージの作成
     message_suffix = ""
     if not resnet_result and resnet_prob < 0.3:
         message_suffix = "（誤検出の可能性あり）"
     
+    # WebSocketで送信するデータを作成
+    positions = []
+    if additional_data and "boxes" in additional_data:
+        positions = additional_data["boxes"]
+    
+    # ② WebSocket送信前にログを追加
+    zombie_warning_data = {
+        "type": "zombie_warning",
+        "data": {
+            "count": count,
+            "positions": positions
+        }
+    }
+    print(f"[BACKEND] WebSocket送信予定: {zombie_warning_data}")
+    
+    # WebSocketで直接送信（zombie_warning型のメッセージ）
+    try:
+        # まず直接zombie_warningメッセージを送信
+        await manager.broadcast(zombie_warning_data)
+        print(f"[BACKEND] WebSocket送信完了: zombie_warning {count}体")
+    except Exception as e:
+        print(f"[BACKEND] WebSocket zombie_warning送信エラー: {str(e)}")
+        logger.error(f"WebSocket zombie_warning送信エラー: {e}")
+    
     # 通知を送信
     try:
+        notification_data = {
+            "message": f"警戒レベルのゾンビが周辺にいます ({count}体){message_suffix}",
+            "message_type": "zombieWarning",
+            "title": "⚠️ ゾンビ警戒情報",
+            "importance": "normal",
+            "skipAudio": not play_audio
+        }
+        print(f"[BACKEND] 通知送信: {notification_data}")
+        
         await send_notification(
             f"警戒レベルのゾンビが周辺にいます ({count}体){message_suffix}",
             message_type="zombieWarning",
@@ -370,6 +377,8 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
             importance="normal",
             skipAudio=not play_audio
         )
+        
+        print(f"[BACKEND] 通知送信完了: zombieWarning {count}体")
         
         # 音声再生が有効な場合
         if play_audio:
@@ -429,6 +438,7 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
         
     except Exception as e:
         logger.error(f"ゾンビ警戒アラートエラー: {e}")
+        print(f"[BACKEND] ゾンビ警戒アラートエラー: {str(e)}")
         return {"status": "error", "message": f"エラーが発生しました: {str(e)}"}
 
 def zombie_few_alert_callback(count: int, frame_data: Optional[Any] = None, additional_data: Optional[Dict[str, Any]] = None) -> None:

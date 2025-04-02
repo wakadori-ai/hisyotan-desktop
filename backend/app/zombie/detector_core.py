@@ -327,103 +327,253 @@ class ZombieDetector:
         スクリーンショットからゾンビを検出する
         
         Args:
-            screenshot: 検出対象のスクリーンショット
+            screenshot: スクリーンショット画像
             
         Returns:
-            検出結果のディクショナリ
+            dict: 検出結果
         """
-        if self.model is None:
-            logger.warning("モデルがロードされていないため検出をスキップ")
-            return None
-        
         try:
-            # 画像のリサイズ（パフォーマンス向上のため）
+            # time変数の名前衝突を回避するために別名でインポート
+            import time as time_module
+            
+            # 処理開始時刻
+            start_time = time_module.time()
+            
+            # ResNetの結果を初期化
+            resnet_result = {
+                "is_zombie_scene": False,
+                "probability": 0.0
+            }
+            
+            # スクリーンショットをリサイズして処理速度を向上
             if self.resize_factor < 1.0:
                 h, w = screenshot.shape[:2]
                 new_h, new_w = int(h * self.resize_factor), int(w * self.resize_factor)
-                screenshot = cv2.resize(screenshot, (new_w, new_h))
+                screenshot_resized = cv2.resize(screenshot, (new_w, new_h))
+            else:
+                screenshot_resized = screenshot
             
-            # 一時ファイルに保存して検出処理
-            temp_img_path = os.path.join(DEBUG_DIR, f"temp_screenshot_{int(time.time())}.jpg")
-            cv2.imwrite(temp_img_path, screenshot)
+            # サイズ情報をログに記録
+            h, w = screenshot_resized.shape[:2]
+            logger.debug(f"ゾンビ検出を実行: 画像サイズ={w}x{h}")
             
-            # YOLOでの検出
-            start_time = time.time()
+            # 環境変数からデバッグモードと閾値を取得
+            import os
+            debug_mode = os.environ.get("DEBUG_ZOMBIE_DETECTION", "0") == "1"
+            verbose_mode = os.environ.get("ZOMBIE_DETECTION_VERBOSE", "0") == "1"
+            
+            # 閾値の設定（環境変数で上書き可能）
+            effective_threshold = self.confidence
+            if debug_mode:
+                try:
+                    threshold_env = os.environ.get("ZOMBIE_DETECTION_THRESHOLD")
+                    if threshold_env:
+                        effective_threshold = float(threshold_env)
+                        if verbose_mode:
+                            print(f"[BACKEND] 環境変数から検出閾値を設定: {effective_threshold}")
+                except (ValueError, TypeError) as e:
+                    print(f"[BACKEND] 閾値設定エラー: {e}")
+            
+            if verbose_mode:
+                print(f"[BACKEND] ゾンビ検出 - 閾値: {effective_threshold}, デバッグモード: {debug_mode}")
+            
+            # 非同期で画像処理を実行
             loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
+            
+            # 実際の検出処理はバックグラウンドスレッドで実行
+            result = await loop.run_in_executor(
                 None, 
                 lambda: self.model.predict(
-                    source=temp_img_path, 
-                    conf=self.confidence, 
+                    source=screenshot_resized,
+                    conf=effective_threshold,  # 環境変数から設定された閾値を使用
                     verbose=False
                 )
             )
-            yolo_time = time.time() - start_time
             
-            # ResNet分類による画面全体の分析
-            resnet_result = False
-            resnet_prob = 0.0
-            resnet_time = 0.0
-            
-            if self.resnet_enabled and self.resnet_classifier is not None:
-                try:
-                    start_time = time.time()
-                    # ResNet分類器で画像全体を分析
-                    pred_class, prob = await loop.run_in_executor(
-                        None,
-                        lambda: self.resnet_classifier.predict_image(temp_img_path)
-                    )
-                    resnet_time = time.time() - start_time
-                    
-                    if pred_class is not None:
-                        resnet_result = (pred_class == "zombie")
-                        resnet_prob = prob or 0.0
-                        
-                        logger.debug(f"ResNet分類結果: {pred_class}, 確率: {resnet_prob:.2f}, 処理時間: {resnet_time:.2f}秒")
-                except Exception as e:
-                    logger.error(f"ResNet分類中にエラーが発生: {e}")
-            
-            # 一時ファイルを削除（debug_modeに関わらず削除）
-            if os.path.exists(temp_img_path):
-                os.remove(temp_img_path)
-            
-            # 結果から対象のバウンディングボックスを抽出
+            # 結果から人物クラス（ID=0）の検出結果を抽出
+            detection_count = 0
             boxes = []
-            for r in results:
-                for box_idx, box in enumerate(r.boxes):
+            
+            # 検出情報を準備
+            for r in result:
+                for box in r.boxes:
+                    # クラスIDを取得
                     cls_id = int(box.cls.item())
                     
-                    # 対象クラスの場合のみ処理
+                    # 対象のクラスかチェック
                     if cls_id in self.target_classes:
-                        x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                        # 信頼度を取得
                         conf = float(box.conf.item())
                         
-                        boxes.append({
-                            "class_id": cls_id,
-                            "bbox": [x1, y1, x2, y2],
-                            "confidence": conf
-                        })
+                        # ③ 閾値判定は環境変数で設定済みのeffective_thresholdを使用
+                        if conf > effective_threshold:
+                            # 座標を取得
+                            x1, y1, x2, y2 = map(int, box.xyxy.tolist()[0])
+                            
+                            boxes.append({
+                                "bbox": [x1, y1, x2, y2],
+                                "confidence": conf,
+                                "class_id": cls_id
+                            })
+                            
+                            # カウント増加
+                            detection_count += 1
+                            
+                            if verbose_mode:
+                                print(f"[BACKEND] 検出: クラス={cls_id}, 信頼度={conf:.4f}, 座標=({x1},{y1})-({x2},{y2})")
             
-            # 検出結果をまとめる
-            detection_result = {
-                "timestamp": time.time(),
-                "detection_count": len(boxes),
+            # 終了時刻を記録
+            end_time = time_module.time()
+            process_time = (end_time - start_time) * 1000  # ミリ秒単位
+            
+            # 詳細ログ出力
+            if verbose_mode:
+                print(f"[BACKEND] YOLO検出完了: {detection_count}体 (処理時間: {process_time:.1f}ms)")
+            
+            # ResNet分類器による判定（有効な場合のみ）
+            if self.resnet_enabled and self.resnet_classifier:
+                try:
+                    # 1. ファイルを介さない方法を試みる
+                    # 画像をメモリ上でエンコード
+                    try:
+                        if verbose_mode:
+                            print(f"[BACKEND] ResNet分類 - メモリ内処理開始")
+                        is_success, img_encoded = cv2.imencode('.jpg', screenshot)
+                        if is_success:
+                            # メモリ上での分類を試みる（ファイルI/Oを回避）
+                            from io import BytesIO
+                            img_bytes = BytesIO(img_encoded.tobytes())
+                            
+                            # バイナリデータから直接分類できるメソッドがあれば使用
+                            if hasattr(self.resnet_classifier, 'predict_bytes'):
+                                result_class, prob = await loop.run_in_executor(
+                                    None,
+                                    lambda: self.resnet_classifier.predict_bytes(img_bytes.getvalue())
+                                )
+                                
+                                # 結果を格納して処理終了
+                                resnet_result = {
+                                    "is_zombie_scene": result_class == "zombie",
+                                    "probability": float(prob)
+                                }
+                                if verbose_mode:
+                                    print(f"[BACKEND] ResNet分類 - メモリ内処理成功: {result_class}, {prob}")
+                                
+                                # メモリ処理が成功したら以降のファイル処理はスキップ
+                                return {
+                                    "timestamp": time_module.time(),
+                                    "detection_count": detection_count,
+                                    "boxes": boxes,
+                                    "resnet_result": resnet_result,
+                                    "process_time_ms": process_time
+                                }
+                    except Exception as e:
+                        print(f"[BACKEND] ResNet分類 - メモリ内処理失敗: {e}")
+                        # エラーが発生した場合は従来のファイルベース処理にフォールバック
+                        pass
+                    
+                    # 2. 従来のファイルベース処理（リトライ処理付き）
+                    import os
+                    import tempfile
+                    
+                    # 一時ファイルパスを生成
+                    temp_file = None
+                    temp_filename = ""
+                    
+                    try:
+                        if verbose_mode:
+                            print(f"[BACKEND] ResNet分類 - 一時ファイル処理開始")
+                        # NamedTemporaryFile を使用
+                        temp_file = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+                        temp_filename = temp_file.name
+                        temp_file.close()  # 明示的にファイルを閉じる
+                        
+                        # 画像をファイルに書き込み
+                        cv2.imwrite(temp_filename, screenshot)
+                        
+                        # ファイルアクセス可能か確認（最大5回リトライ）
+                        file_accessible = False
+                        for retry in range(5):
+                            if os.path.exists(temp_filename):
+                                try:
+                                    with open(temp_filename, 'rb') as f:
+                                        # ファイルが読み込めることを確認
+                                        f.read(1)
+                                        file_accessible = True
+                                        break
+                                except (PermissionError, IOError) as e:
+                                    if verbose_mode:
+                                        print(f"[BACKEND] ファイルアクセス待機中... リトライ {retry+1}/5: {e}")
+                                    time_module.sleep(0.2)  # 少し待機
+                        
+                        if not file_accessible:
+                            print(f"[BACKEND] ファイルアクセス失敗: {temp_filename}")
+                            raise IOError(f"ファイルにアクセスできません: {temp_filename}")
+                        
+                        # 分類実行（バックグラウンドスレッドで）
+                        if verbose_mode:
+                            print(f"[BACKEND] ResNet分類実行中: {temp_filename}")
+                        result_class, prob = await loop.run_in_executor(
+                            None, 
+                            lambda: self.resnet_classifier.predict_image(temp_filename)
+                        )
+                        
+                        # 結果を格納
+                        resnet_result = {
+                            "is_zombie_scene": result_class == "zombie",
+                            "probability": float(prob)
+                        }
+                        
+                        if verbose_mode:
+                            print(f"[BACKEND] ResNet分類結果: {result_class}, {prob}")
+                        
+                    except Exception as e:
+                        print(f"[BACKEND] ResNet分類エラー: {e}")
+                        import traceback
+                        traceback.print_exc()  # フルスタックトレースを出力
+                        logger.error(f"ResNet分類器の実行中にエラー: {e}")
+                        logger.error(traceback.format_exc())
+                    
+                    finally:
+                        # 一時ファイルを削除（リトライ処理付き）
+                        if temp_filename and os.path.exists(temp_filename):
+                            for retry in range(5):
+                                try:
+                                    os.unlink(temp_filename)
+                                    if verbose_mode:
+                                        print(f"[BACKEND] 一時ファイル削除成功: {temp_filename}")
+                                    break
+                                except (PermissionError, IOError) as e:
+                                    if verbose_mode:
+                                        print(f"[BACKEND] 一時ファイル削除リトライ {retry+1}/5: {e}")
+                                    time_module.sleep(0.2)  # 少し待機
+                        
+                except Exception as e:
+                    print(f"[BACKEND] ResNet全体処理エラー: {e}")
+                    import traceback
+                    traceback.print_exc()  # フルスタックトレースを出力
+                    logger.error(f"ResNet分類器の実行中にエラー: {e}")
+                    logger.error(traceback.format_exc())
+            
+            # デバッグ情報（一度に含まれる情報量を減らす）
+            if detection_count > 0:
+                logger.debug(f"ゾンビ検出結果: {detection_count}体 (処理時間: {process_time:.1f}ms) - 現在のしきい値: {effective_threshold}")
+            
+            # 検出結果をマップに格納
+            return {
+                "timestamp": time_module.time(),
+                "detection_count": detection_count,
                 "boxes": boxes,
-                "processing_time": yolo_time,
-                "resnet_result": {
-                    "is_zombie_scene": resnet_result,
-                    "probability": resnet_prob,
-                    "processing_time": resnet_time
-                }
+                "resnet_result": resnet_result,
+                "process_time_ms": process_time
             }
             
-            if len(boxes) > 0:
-                logger.info(f"ゾンビ検出: {len(boxes)}体, YOLO処理時間: {yolo_time:.2f}秒, ResNet: {resnet_result}({resnet_prob:.2f})")
-            
-            return detection_result
-            
         except Exception as e:
+            print(f"[BACKEND] ゾンビ検出中にエラー: {e}")
+            import traceback
+            traceback.print_exc()  # フルスタックトレースを出力
             logger.error(f"ゾンビ検出中にエラーが発生: {e}")
+            logger.error(traceback.format_exc())
             return None
     
     async def _process_detection_results(self, 
@@ -449,6 +599,16 @@ class ZombieDetector:
         resnet_info = results.get("resnet_result", {"is_zombie_scene": False, "probability": 0.0})
         resnet_result = resnet_info.get("is_zombie_scene", False)
         resnet_prob = resnet_info.get("probability", 0.0)
+        
+        # ① ゾンビ検出直後にログ出力を追加
+        print(f"[BACKEND] ゾンビ検出数: {count}")
+        if "boxes" in results:
+            print(f"[BACKEND] 検出内容: {results['boxes']}")
+        else:
+            print(f"[BACKEND] 検出内容: 詳細なし")
+        
+        # ③ 閾値（confidence threshold）の確認
+        print(f"[BACKEND] 現在の信頼度しきい値: {self.confidence}")
         
         # 検出数に応じた処理
         try:
@@ -476,6 +636,7 @@ class ZombieDetector:
                 if count >= 10:
                     if current_time - self.cooldown_timestamps["many"] > self.cooldown_periods["many"]:
                         if zombie_callback:
+                            print(f"[BACKEND] 多数のゾンビ検出コールバック呼び出し: {count}体")
                             await self._call_callback(zombie_callback, count, screenshot, callback_data)
                         self.cooldown_timestamps["many"] = current_time
                 
@@ -483,6 +644,7 @@ class ZombieDetector:
                 elif count >= 5:
                     if current_time - self.cooldown_timestamps["warning"] > self.cooldown_periods["warning"]:
                         if warning_zombies_callback:
+                            print(f"[BACKEND] 警戒レベルゾンビ検出コールバック呼び出し: {count}体")
                             await self._call_callback(warning_zombies_callback, count, screenshot, callback_data)
                         self.cooldown_timestamps["warning"] = current_time
                 
@@ -490,6 +652,7 @@ class ZombieDetector:
                 elif count > 0:
                     if current_time - self.cooldown_timestamps["few"] > self.cooldown_periods["few"]:
                         if few_zombies_callback:
+                            print(f"[BACKEND] 少数ゾンビ検出コールバック呼び出し: {count}体")
                             await self._call_callback(few_zombies_callback, count, screenshot, callback_data)
                         self.cooldown_timestamps["few"] = current_time
                 
@@ -498,6 +661,7 @@ class ZombieDetector:
                     if current_time - self.cooldown_timestamps["few"] > self.cooldown_periods["few"]:
                         # 「気配」として少数ゾンビコールバックを使用
                         if few_zombies_callback:
+                            print(f"[BACKEND] ゾンビの気配検出コールバック呼び出し: ResNet確率={resnet_prob:.2f}")
                             await self._call_callback(few_zombies_callback, 0, screenshot, callback_data)
                         self.cooldown_timestamps["few"] = current_time
                         logger.info(f"ゾンビの気配を検出: ResNet確率={resnet_prob:.2f}")

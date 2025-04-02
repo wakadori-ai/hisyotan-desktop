@@ -374,6 +374,81 @@ class ZombieClassifier:
         except Exception as e:
             print(f"エラー: 画像の予測中にエラーが発生しました: {e}")
             return None, 0.0
+            
+    def predict_bytes(self, img_bytes):
+        """バイトデータからの画像予測（ファイルI/Oを回避）
+        
+        Args:
+            img_bytes: 画像のバイトデータ
+            
+        Returns:
+            予測クラス, 信頼度
+        """
+        if self.model is None:
+            try:
+                # モデルの読み込み
+                model_path = self.model_path/'zombie_classifier.pth'
+                print(f"[メモリ処理] モデルパス: {model_path} (存在: {model_path.exists()})")
+                
+                if not model_path.exists():
+                    print(f"[メモリ処理] エラー: モデルファイルが見つかりません: {model_path}")
+                    print(f"現在の作業ディレクトリ: {os.getcwd()}")
+                    print(f"フルパス: {os.path.abspath(str(model_path))}")
+                    return None, 0.0
+                
+                # モデル読み込み
+                try:
+                    checkpoint = torch.load(str(model_path), map_location=self.device)
+                except Exception as e:
+                    print(f"[メモリ処理] モデル読み込みエラー: {e}")
+                    return None, 0.0
+                
+                # ResNet18モデルの作成
+                self.model = models.resnet18(weights=None)
+                num_ftrs = self.model.fc.in_features
+                self.model.fc = nn.Linear(num_ftrs, len(self.classes))
+                
+                # 保存されたパラメータを読み込み
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                self.model.to(self.device)
+                self.model.eval()
+                
+                print(f"[メモリ処理] モデルを読み込みました: {model_path}")
+            except Exception as e:
+                print(f"[メモリ処理] エラー: モデルの読み込みに失敗しました: {e}")
+                import traceback
+                traceback.print_exc()
+                return None, 0.0
+        
+        try:
+            # バイトデータから画像オブジェクトを作成
+            from io import BytesIO
+            from PIL import Image
+            
+            print(f"[メモリ処理] バイトデータから画像を読み込み中 (データサイズ: {len(img_bytes)} bytes)")
+            img = Image.open(BytesIO(img_bytes)).convert('RGB')
+            
+            # 画像の前処理
+            image_tensor = self.valid_transform(img).unsqueeze(0).to(self.device)
+            
+            # 予測の実行
+            with torch.no_grad():
+                outputs = self.model(image_tensor)
+                probabilities = torch.nn.functional.softmax(outputs, dim=1)
+                confidence, predicted = torch.max(probabilities, 1)
+                
+            # 結果の返却
+            predicted_class = self.classes[predicted[0].item()]
+            confidence_value = confidence[0].item()
+            
+            print(f"[メモリ処理] 予測結果: {predicted_class}, 確度: {confidence_value:.4f}")
+            return predicted_class, confidence_value
+        
+        except Exception as e:
+            print(f"[メモリ処理] エラー: バイトデータからの予測中にエラーが発生しました: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, 0.0
 
 def plot_training_history(history):
     """学習履歴をプロット"""
