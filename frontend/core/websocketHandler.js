@@ -21,10 +21,26 @@ import zombieOverlayManager from '../ui/overlayManager.js';
 let websocket = null; // WebSocketオブジェクト
 let isConnected = false; // 接続状態
 let reconnectAttempts = 0; // 再接続試行回数
-const MAX_RECONNECT_ATTEMPTS = 5; // 最大再接続試行回数
-const RECONNECT_INTERVAL = 3000; // 再接続間隔（ミリ秒）
+const MAX_RECONNECT_ATTEMPTS = 10; // 最大再接続試行回数
+const RECONNECT_INTERVAL = 5000; // 再接続間隔（ミリ秒）
 let config = null; // 設定データ
 let connectionErrorShown = false; // エラーメッセージが表示されたかどうか
+let wsUrl = ''; // WebSocketのURL
+let wsUrlAlt = ''; // 代替WebSocketのURL
+let connectionTimeoutId = null; // 接続タイムアウトID
+const CONNECTION_TIMEOUT = 10000; // 接続タイムアウト（ミリ秒）
+let isReconnecting = false; // 再接続中フラグ
+let useAltUrl = true; // 代替URL（localhost）を優先的に使用するフラグ
+
+// 🆕 WebSocketデバッグモード
+let wsDebugMode = true; // デフォルトで有効
+
+// 🆕 WebSocketデバッグモード切替関数
+export function toggleWsDebugMode() {
+  wsDebugMode = !wsDebugMode;
+  console.log(`[WebSocket] デバッグモードを${wsDebugMode ? '有効' : '無効'}にしました`);
+  return wsDebugMode;
+}
 
 /**
  * 設定をセットする
@@ -32,25 +48,79 @@ let connectionErrorShown = false; // エラーメッセージが表示された�
  */
 export function setConfig(configData) {
   config = configData;
-  logDebug('WebSocket設定をセットしました');
+  wsUrl = config?.backend?.ws_url || 'ws://127.0.0.1:8000/ws';
+  wsUrlAlt = config?.backend?.ws_url_alt || 'ws://localhost:8000/ws';
+  logDebug(`WebSocket設定をセットしました: 
+  - 主URL: ${wsUrl}
+  - 代替URL: ${wsUrlAlt}
+  - 最初の接続は ${useAltUrl ? '代替URL (localhost)' : '主URL (127.0.0.1)'} を使用します`);
 }
 
 /**
  * WebSocketを初期化する
  */
 export function initWebSocket() {
+  // バックエンドの起動を待つために少し遅延を入れる
+  logDebug('バックエンドの起動を待つため5秒間待機します...');
+  setTimeout(() => {
+    connectWebSocket();
+  }, 5000);
+}
+
+/**
+ * WebSocketに接続する
+ */
+function connectWebSocket() {
   try {
-    const wsUrl = config?.backend?.ws_url || 'ws://127.0.0.1:8000/ws';
-    logDebug(`WebSocket接続を開始します: ${wsUrl}`);
+    // 接続中フラグをクリア
+    isReconnecting = false;
     
-    websocket = new WebSocket(wsUrl);
+    // 既存の接続があれば閉じる
+    if (websocket) {
+      try {
+        websocket.close();
+      } catch (err) {
+        // エラーは無視
+      }
+      websocket = null;
+    }
+    
+    // 使用するURLを決定
+    const currentUrl = useAltUrl ? wsUrlAlt : wsUrl;
+    logDebug(`WebSocket接続を開始します: ${currentUrl} (${useAltUrl ? 'localhost' : '127.0.0.1'})`);
+    updateConnectionStatus('connecting');
+    
+    // WebSocket接続を作成
+    websocket = new WebSocket(currentUrl);
+    
+    // 接続タイムアウトを設定
+    connectionTimeoutId = setTimeout(() => {
+      logError(`WebSocket接続タイムアウト: ${currentUrl}`);
+      
+      if (websocket) {
+        websocket.close();
+      }
+      
+      // タイムアウト時は次回別のURLを試す
+      useAltUrl = !useAltUrl;
+      logDebug(`次回は ${useAltUrl ? 'localhost' : '127.0.0.1'} URLを試します`);
+    }, CONNECTION_TIMEOUT);
     
     websocket.onopen = () => {
-      logDebug('WebSocket接続が確立されました');
+      // タイムアウトをクリア
+      if (connectionTimeoutId) {
+        clearTimeout(connectionTimeoutId);
+        connectionTimeoutId = null;
+      }
+      
+      logDebug(`WebSocket接続が確立されました: ${currentUrl}`);
       isConnected = true;
       reconnectAttempts = 0;
       connectionErrorShown = false;
       updateConnectionStatus('connected');
+      
+      // 🆕 接続成功をコンソールに表示（常に表示）
+      console.log(`[WebSocket] 接続成功: ${currentUrl}`);
       
       // 接続確立時にハローメッセージを送信
       const helloMessage = {
@@ -83,9 +153,25 @@ export function initWebSocket() {
     
     websocket.onmessage = (event) => {
       try {
+        // 🆕 デバッグモードが有効なら詳細なログを出力
+        if (wsDebugMode) {
+          console.log('[WS受信]', event.data);
+        }
+        
+        // JSONパース
         const message = JSON.parse(event.data);
+        
+        // デバッグモードが有効ならパース後のメッセージも出力
+        if (wsDebugMode) {
+          console.log('[WSパース後]', message);
+        }
+        
+        // 既存のログも保持
+        logDebug(`WebSocketメッセージを受信: ${JSON.stringify(message)}`);
+        
         handleWebSocketMessage(message);
       } catch (error) {
+        console.error('[WSパース失敗]', error);
         logError(`WebSocketメッセージのパース失敗: ${error.message}`, error);
         // エラー表示は起動猶予期間後のみ
         if (shouldShowError()) {
@@ -95,17 +181,31 @@ export function initWebSocket() {
     };
     
     websocket.onclose = (event) => {
+      // タイムアウトをクリア
+      if (connectionTimeoutId) {
+        clearTimeout(connectionTimeoutId);
+        connectionTimeoutId = null;
+      }
+      
       logDebug(`WebSocket接続が閉じられました。コード: ${event.code}, 理由: ${event.reason}`);
       isConnected = false;
       updateConnectionStatus('disconnected');
       
+      // 次回別のURLを試す
+      useAltUrl = !useAltUrl;
+      logDebug(`次回は ${useAltUrl ? 'localhost' : '127.0.0.1'} URLを試します`);
+      
       // 再接続
-      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      if (!isReconnecting && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        isReconnecting = true;
         reconnectAttempts++;
         updateConnectionStatus('reconnecting', reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
-        logDebug(`WebSocket再接続を試みます (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-        setTimeout(initWebSocket, RECONNECT_INTERVAL);
-      } else {
+        logDebug(`WebSocket再接続を試みます (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}), ${RECONNECT_INTERVAL}ms後`);
+        
+        setTimeout(() => {
+          connectWebSocket();
+        }, RECONNECT_INTERVAL);
+      } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         updateConnectionStatus('failed');
         logError('WebSocket再接続の最大試行回数に達しました', new Error('再接続失敗'));
         
@@ -114,12 +214,24 @@ export function initWebSocket() {
           showError('バックエンドサーバーに接続できません。サーバーが起動しているか確認してください。');
           connectionErrorShown = true;
         }
+        
+        // 最大試行回数に達した場合でも、完全にあきらめる前に20秒後に再度試す
+        setTimeout(() => {
+          logDebug('最終リトライ: WebSocket接続をもう一度試みます');
+          reconnectAttempts = 0;
+          isReconnecting = false;
+          connectWebSocket();
+        }, 20000);
       }
     };
     
     websocket.onerror = (error) => {
-      logError(`WebSocketエラー発生`, error);
+      logError(`WebSocketエラー発生 (${currentUrl})`, error);
       updateConnectionStatus('error');
+      
+      // 次回別のURLを試す
+      useAltUrl = !useAltUrl;
+      logDebug(`エラーが発生したため、次回は ${useAltUrl ? 'localhost' : '127.0.0.1'} URLを試します`);
       
       // 起動猶予期間後かつ未表示の場合のみエラー表示
       if (shouldShowError() && !connectionErrorShown) {
@@ -128,8 +240,18 @@ export function initWebSocket() {
       }
     };
   } catch (error) {
+    // タイムアウトをクリア
+    if (connectionTimeoutId) {
+      clearTimeout(connectionTimeoutId);
+      connectionTimeoutId = null;
+    }
+    
     logError(`WebSocket初期化エラー: ${error.message}`, error);
     updateConnectionStatus('error');
+    
+    // 次回別のURLを試す
+    useAltUrl = !useAltUrl;
+    logDebug(`エラーが発生したため、次回は ${useAltUrl ? 'localhost' : '127.0.0.1'} URLを試します`);
     
     // 起動猶予期間後かつ未表示の場合のみエラー表示
     if (shouldShowError() && !connectionErrorShown) {
@@ -138,9 +260,14 @@ export function initWebSocket() {
     }
     
     // エラー発生時も再接続を試みる
-    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    if (!isReconnecting && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      isReconnecting = true;
       reconnectAttempts++;
-      setTimeout(initWebSocket, RECONNECT_INTERVAL);
+      
+      logDebug(`WebSocket再接続を試みます (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}), ${RECONNECT_INTERVAL}ms後`);
+      setTimeout(() => {
+        connectWebSocket();
+      }, RECONNECT_INTERVAL);
     }
   }
 }
@@ -150,221 +277,263 @@ export function initWebSocket() {
  * @param {Object} message - 受信したメッセージ
  */
 function handleWebSocketMessage(message) {
-  logDebug(`WebSocketメッセージを受信: ${JSON.stringify(message)}`);
+  // 🆕 メッセージタイプを明示的に表示
+  console.log('[ハンドラ] メッセージタイプ:', message.type);
   
-  // 通知タイプのイベント処理を追加
-  if (message.type === 'notification') {
-    logZombieWarning(`💬 WebSocket通知受信: type=${message.type}, messageType=${message.data?.messageType}`);
-    
-    // データチェック
-    if (!message.data) {
-      logError('通知データが存在しません');
-      return;
-    }
-    
-    // 新しい通知フォーマットの処理（presetSound, speakText, emotion）
-    if (message.data.presetSound || message.data.speakText) {
-      logDebug(`新しい通知フォーマットを検出: presetSound=${message.data.presetSound}, emotion=${message.data.emotion}`);
+  // タイプごとにデバッグ表示を追加
+  switch (message.type) {
+    case 'notification':
+      logZombieWarning(`💬 WebSocket通知受信: type=${message.type}, messageType=${message.data?.messageType}`);
       
-      const presetSound = message.data.presetSound;
-      const speakText = message.data.speakText;
-      const emotion = message.data.emotion || 'normal';
-      
-      // プリセット音声と合成音声の両方が指定されている場合
-      if (presetSound && speakText) {
-        // 統合関数を使用
-        speakWithPreset(presetSound, speakText, emotion, 5000, 'notification');
+      // データチェック
+      if (!message.data) {
+        logError('通知データが存在しません');
         return;
       }
       
-      // プリセット音声のみの場合
-      if (presetSound && !speakText) {
+      // 新しい通知フォーマットの処理（presetSound, speakText, emotion）
+      if (message.data.presetSound || message.data.speakText) {
+        logDebug(`新しい通知フォーマットを検出: presetSound=${message.data.presetSound}, emotion=${message.data.emotion}`);
+        
+        const presetSound = message.data.presetSound;
+        const speakText = message.data.speakText;
+        const emotion = message.data.emotion || 'normal';
+        
+        // プリセット音声と合成音声の両方が指定されている場合
+        if (presetSound && speakText) {
+          // 統合関数を使用
+          speakWithPreset(presetSound, speakText, emotion, 5000, 'notification');
+          return;
+        }
+        
+        // プリセット音声のみの場合
+        if (presetSound && !speakText) {
+          // 表情を即座に変更
+          if (emotion) {
+            setExpression(emotion);
+          }
+          
+          // プリセット音声を再生
+          playPresetSound(presetSound)
+            .then(success => {
+              logDebug(`プリセット音声のみ再生結果: ${success ? '成功' : '失敗'}`);
+            })
+            .catch(err => {
+              logError(`プリセット音声再生中にエラー: ${err}`);
+            });
+          return;
+        }
+        
+        // 合成音声のみの場合
+        if (speakText && !presetSound) {
+          // ディスプレイ時間はデフォルトの5000ms
+          const displayTime = 5000;
+          
+          // アニメーション指定
+          let animation = null;
+          if (emotion === 'surprised' || emotion === 'fearful') {
+            animation = 'nervous_shake';
+          } else if (emotion === 'serious') {
+            animation = 'trembling';
+          }
+          
+          // 発話を実行
+          logDebug(`合成音声のみの発話リクエスト: "${speakText}", 感情=${emotion}`);
+          speak(speakText, emotion, displayTime, animation, 'notification');
+          return;
+        }
+        
+        return;
+      }
+      
+      const messageType = message.data.messageType;
+      
+      // messageTypeに基づいてハンドラを呼び出す
+      if (messageType === 'fewZombiesAlert') {
+        logZombieWarning('🧟 fewZombiesAlert を検知しました → handleZombieWarning を実行します');
+        handleZombieWarning(message.data);
+      } else if (messageType === 'zombieOverload') {
+        logZombieWarning('🧟‍♀️ zombieOverload を検知しました → handleZombieOverload を実行します');
+        handleZombieOverload(message.data);
+      } else if (messageType === 'zombieFew') {
+        logZombieWarning('🧟‍♂️ zombieFew を検知しました → handleZombieFew を実行します');
+        handleZombieFew(message.data);
+      } else {
+        logDebug(`未知の通知タイプです: ${messageType}`);
+      }
+      break;
+      
+    case 'voicevox_status':
+      if (message.status === 'available') {
+        logDebug('VOICEVOX利用可能');
+      } else {
+        showError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
+      }
+      break;
+      
+    case 'speak':
+      // デバッグ情報を追加
+      logDebug(`発話メッセージを受信: ${message.text}, 感情: ${message.emotion}, 表示時間: ${message.display_time}`);
+      
+      // プリセット音声と合成音声の両方がある場合は統合関数を使用
+      if (message.presetSound && message.text) {
+        speakWithPreset(
+          message.presetSound,
+          message.text,
+          message.emotion || 'normal',
+          message.display_time || 5000,
+          'speak'
+        );
+        return;
+      }
+      
+      // プリセット音声の指定がある場合は先に再生
+      if (message.presetSound) {
+        logDebug(`発話メッセージにプリセット音声指定あり: ${message.presetSound}`);
+        
         // 表情を即座に変更
-        if (emotion) {
-          setExpression(emotion);
+        if (message.emotion) {
+          setExpression(message.emotion);
         }
         
         // プリセット音声を再生
-        playPresetSound(presetSound)
+        playPresetSound(message.presetSound)
           .then(success => {
-            logDebug(`プリセット音声のみ再生結果: ${success ? '成功' : '失敗'}`);
+            logDebug(`プリセット音声再生結果: ${success ? '成功' : '失敗'}`);
           })
           .catch(err => {
             logError(`プリセット音声再生中にエラー: ${err}`);
           });
-        return;
       }
       
-      // 合成音声のみの場合
-      if (speakText && !presetSound) {
-        // ディスプレイ時間はデフォルトの5000ms
-        const displayTime = 5000;
+      // アニメーション指定がある場合
+      if (message.animation) {
+        logDebug(`アニメーション指定あり: ${message.animation}`);
         
-        // アニメーション指定
-        let animation = null;
-        if (emotion === 'surprised' || emotion === 'fearful') {
-          animation = 'nervous_shake';
-        } else if (emotion === 'serious') {
-          animation = 'trembling';
+        if (message.animation === 'bounce_light') {
+          startLightBounce();
+          
+          // 2秒後にアニメーション停止
+          setTimeout(() => {
+            stopLightBounce();
+          }, 2000);
+        } else if (message.animation === 'nervous_shake') {
+          // 不安時の軽い震え
+          startNervousShake();
+          
+          // 2秒後にアニメーション停止
+          setTimeout(() => {
+            stopNervousShake();
+          }, 2000);
         }
-        
-        // 発話を実行
-        logDebug(`合成音声のみの発話リクエスト: "${speakText}", 感情=${emotion}`);
-        speak(speakText, emotion, displayTime, animation, 'notification');
+      }
+      
+      // プリセット音声と統合処理済みの場合はここでリターン
+      if (message.presetSound && message.text) {
         return;
       }
       
-      return;
-    }
-    
-    const messageType = message.data.messageType;
-    
-    // messageTypeに基づいてハンドラを呼び出す
-    if (messageType === 'fewZombiesAlert') {
-      logZombieWarning('🧟 fewZombiesAlert を検知しました → handleZombieWarning を実行します');
-      handleZombieWarning(message.data);
-    } else if (messageType === 'zombieOverload') {
-      logZombieWarning('🧟‍♀️ zombieOverload を検知しました → handleZombieOverload を実行します');
+      speak(message.text, message.emotion, message.display_time, message.animation);
+      break;
+      
+    case 'status_update':
+      // ステータス更新の処理
+      if (message.status === 'error') {
+        showError(message.message);
+      }
+      break;
+      
+    case 'zombie_overload':
+      // デバッグ情報を追加
+      console.log('[ゾンビ過多]', message.data);
+      logDebug(`ゾンビ過多イベントを受信: ${JSON.stringify(message.data)}`);
       handleZombieOverload(message.data);
-    } else if (messageType === 'zombieFew') {
-      logZombieWarning('🧟‍♂️ zombieFew を検知しました → handleZombieFew を実行します');
+      break;
+      
+    case 'zombie_few':
+      // デバッグ情報を追加
+      console.log('[少数ゾンビ]', message.data);
+      logDebug(`少数ゾンビイベントを受信: ${JSON.stringify(message.data)}`);
       handleZombieFew(message.data);
-    } else {
-      logDebug(`未知の通知タイプです: ${messageType}`);
-    }
-  } else if (message.type === 'voicevox_status') {
-    if (message.status === 'available') {
-      logDebug('VOICEVOX利用可能');
-    } else {
-      showError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
-    }
-  } else if (message.type === 'speak') {
-    // デバッグ情報を追加
-    logDebug(`発話メッセージを受信: ${message.text}, 感情: ${message.emotion}, 表示時間: ${message.display_time}`);
-    
-    // プリセット音声と合成音声の両方がある場合は統合関数を使用
-    if (message.presetSound && message.text) {
-      speakWithPreset(
-        message.presetSound,
-        message.text,
-        message.emotion || 'normal',
-        message.display_time || 5000,
-        'speak'
-      );
-      return;
-    }
-    
-    // プリセット音声の指定がある場合は先に再生
-    if (message.presetSound) {
-      logDebug(`発話メッセージにプリセット音声指定あり: ${message.presetSound}`);
+      break;
       
-      // 表情を即座に変更
-      if (message.emotion) {
-        setExpression(message.emotion);
+    case 'zombie_warning':
+      // 特別なログ関数を使用
+      console.log('[ゾンビ警告]', message.data);
+      logZombieWarning(`ゾンビ警告イベントを受信: ${JSON.stringify(message.data)}`);
+      
+      // ★★★ データ構造確認のための追加デバッグ
+      logZombieWarning(`ゾンビ警告データの構造: ${typeof message.data}, isArray: ${Array.isArray(message.data)}`);
+      
+      // データが存在しない場合にデフォルト値を使用
+      if (!message.data) {
+        message.data = { count: 3 };
+        logZombieWarning(`データが存在しないため、デフォルト値を設定: ${JSON.stringify(message.data)}`);
       }
       
-      // プリセット音声を再生
-      playPresetSound(message.presetSound)
-        .then(success => {
-          logDebug(`プリセット音声再生結果: ${success ? '成功' : '失敗'}`);
-        })
-        .catch(err => {
-          logError(`プリセット音声再生中にエラー: ${err}`);
-        });
-    }
-    
-    // アニメーション指定がある場合
-    if (message.animation) {
-      logDebug(`アニメーション指定あり: ${message.animation}`);
-      
-      if (message.animation === 'bounce_light') {
-        startLightBounce();
-        
-        // 2秒後にアニメーション停止
-        setTimeout(() => {
-          stopLightBounce();
-        }, 2000);
-      } else if (message.animation === 'nervous_shake') {
-        // 不安時の軽い震え
-        startNervousShake();
-        
-        // 2秒後にアニメーション停止
-        setTimeout(() => {
-          stopNervousShake();
-        }, 2000);
+      // 🆕 文字列形式のデータを検出した場合の処理を追加（2重JSONエンコードの対策）
+      if (typeof message.data === 'string') {
+        try {
+          console.log('[ゾンビ警告] データが文字列形式です。JSON解析を試みます', message.data);
+          const parsedData = JSON.parse(message.data);
+          console.log('[ゾンビ警告] 文字列データをJSON解析しました', parsedData);
+          message.data = parsedData;
+        } catch (error) {
+          console.error('[ゾンビ警告] 文字列データのJSON解析に失敗しました', error);
+          // 文字列のままでもデフォルト値を設定
+          message.data = { count: 3, source: message.data };
+        }
       }
-    }
-    
-    // プリセット音声と統合処理済みの場合はここでリターン
-    if (message.presetSound && message.text) {
-      return;
-    }
-    
-    speak(message.text, message.emotion, message.display_time, message.animation);
-  } else if (message.type === 'status_update') {
-    // ステータス更新の処理
-    if (message.status === 'error') {
-      showError(message.message);
-    }
-  } else if (message.type === 'zombie_overload') {
-    // デバッグ情報を追加
-    logDebug(`ゾンビ過多イベントを受信: ${JSON.stringify(message.data)}`);
-    handleZombieOverload(message.data);
-  } else if (message.type === 'zombie_few') {
-    // デバッグ情報を追加
-    logDebug(`少数ゾンビイベントを受信: ${JSON.stringify(message.data)}`);
-    handleZombieFew(message.data);
-  } else if (message.type === 'zombie_warning') {
-    // 特別なログ関数を使用
-    logZombieWarning(`ゾンビ警告イベントを受信: ${JSON.stringify(message.data)}`);
-    
-    // ★★★ データ構造確認のための追加デバッグ
-    logZombieWarning(`ゾンビ警告データの構造: ${typeof message.data}, isArray: ${Array.isArray(message.data)}`);
-    
-    // データが存在しない場合にデフォルト値を使用
-    if (!message.data) {
-      message.data = { count: 3 };
-      logZombieWarning(`データが存在しないため、デフォルト値を設定: ${JSON.stringify(message.data)}`);
-    }
-    
-    // handleZombieWarning関数を呼び出す
-    handleZombieWarning(message.data);
-  } else if (message.type === 'detection') {
-    logDebug(`検出データを受信: ${JSON.stringify(message.data)}`);
-    
-    // データ検証
-    if (!message.data) {
-      logError('検出データが存在しません');
-      return;
-    }
-    
-    // YOLOとResNetのデータを取得
-    const yoloData = message.data.yolo || [];
-    const resnetAlive = message.data.resnet_alive || false;
-    
-    // オーバーレイマネージャーを呼び出してデータを表示
-    zombieOverlayManager.showDetection(yoloData, resnetAlive);
-    
-    logDebug(`ゾンビ検出データを表示: YOLO=${yoloData.length}個, ResNet=${resnetAlive}`);
-  } else if (message.type === 'test_detection') {
-    logDebug('テスト検出データを受信しました');
-    
-    // テストデータを取得
-    const testData = message.data || {
-      yolo: [
-        {x1: 100, y1: 200, x2: 200, y2: 300, confidence: 0.92},
-        {x1: 400, y1: 100, x2: 480, y2: 220, confidence: 0.55}
-      ],
-      resnet_alive: true
-    };
-    
-    // オーバーレイマネージャーを呼び出してテストデータを表示
-    zombieOverlayManager.showDetection(testData.yolo, testData.resnet_alive);
-    
-    logDebug('テスト検出データを表示しました');
-  } else {
-    // 未知のメッセージタイプ
-    logDebug(`未知のメッセージタイプです: ${message.type}`);
+      
+      // handleZombieWarning関数を呼び出す
+      console.log('[ゾンビ警告ハンドラ呼び出し]', message.data);
+      handleZombieWarning(message.data);
+      break;
+      
+    case 'detection':
+      console.log('[検出データ]', message.data);
+      logDebug(`検出データを受信: ${JSON.stringify(message.data)}`);
+      
+      // データ検証
+      if (!message.data) {
+        logError('検出データが存在しません');
+        return;
+      }
+      
+      // YOLOとResNetのデータを取得
+      const yoloData = message.data.yolo || [];
+      const resnetAlive = message.data.resnet_alive || false;
+      
+      // オーバーレイマネージャーを呼び出してデータを表示
+      zombieOverlayManager.showDetection(yoloData, resnetAlive);
+      
+      logDebug(`ゾンビ検出データを表示: YOLO=${yoloData.length}個, ResNet=${resnetAlive}`);
+      break;
+      
+    case 'test_detection':
+      console.log('[テスト検出]', message.data);
+      logDebug('テスト検出データを受信しました');
+      
+      // テストデータを取得
+      const testData = message.data || {
+        yolo: [
+          {x1: 100, y1: 200, x2: 200, y2: 300, confidence: 0.92},
+          {x1: 400, y1: 100, x2: 480, y2: 220, confidence: 0.55}
+        ],
+        resnet_alive: true
+      };
+      
+      // オーバーレイマネージャーを呼び出してテストデータを表示
+      zombieOverlayManager.showDetection(testData.yolo, testData.resnet_alive);
+      
+      logDebug('テスト検出データを表示しました');
+      break;
+      
+    default:
+      // 未知のメッセージタイプ
+      console.warn('未対応のメッセージタイプ:', message.type);
+      logDebug(`未知のメッセージタイプです: ${message.type}`);
+      break;
   }
 }
 
@@ -499,6 +668,7 @@ function handleZombieFew(data) {
 function handleZombieWarning(data) {
   // デバッグに役立つ情報を詳細にログ出力
   const timestamp = new Date().toISOString();
+  console.log('[ゾンビ警告ハンドラ] 開始', { timestamp, data });
   logZombieWarning(`🔍 handleZombieWarning が呼び出されました [時刻: ${timestamp}]`);
   logZombieWarning(`🔍 データ内容: ${JSON.stringify(data)}`);
   
@@ -706,10 +876,70 @@ export function sendMessage(message) {
   }
 }
 
+/**
+ * テスト用のゾンビ警告メッセージを送信する
+ * デバッグ用の関数
+ */
+export function sendTestZombieWarning() {
+  console.log('[テスト] ゾンビ警告テストメッセージを送信します');
+  
+  const testMessage = {
+    type: 'zombie_warning',
+    data: {
+      count: 3,
+      positions: [{ x: 100, y: 200 }]
+    }
+  };
+  
+  if (isConnected && websocket) {
+    console.log('[テスト] WebSocketでゾンビ警告テストメッセージを送信');
+    websocket.send(JSON.stringify(testMessage));
+    return true;
+  } else {
+    console.warn('[テスト] WebSocketが接続されていないためテストメッセージを送信できません');
+    
+    // 接続されていない場合は直接ハンドラを呼び出してテスト
+    console.log('[テスト] 直接ハンドラを呼び出してテスト');
+    handleZombieWarning(testMessage.data);
+    return false;
+  }
+}
+
+/**
+ * テスト用のゾンビ検出メッセージを送信する
+ * デバッグ用の関数
+ */
+export function sendTestDetection() {
+  console.log('[テスト] ゾンビ検出テストメッセージを送信します');
+  
+  const testMessage = {
+    type: 'detection',
+    data: {
+      yolo: [
+        {x1: 100, y1: 200, x2: 200, y2: 300, confidence: 0.92},
+        {x1: 400, y1: 100, x2: 480, y2: 220, confidence: 0.55}
+      ],
+      resnet_alive: true
+    }
+  };
+  
+  if (isConnected && websocket) {
+    console.log('[テスト] WebSocketでゾンビ検出テストメッセージを送信');
+    websocket.send(JSON.stringify(testMessage));
+    return true;
+  } else {
+    console.warn('[テスト] WebSocketが接続されていないためテストメッセージを送信できません');
+    return false;
+  }
+}
+
 // グローバルに公開（デバッグ用）
 if (typeof window !== 'undefined') {
   window.sendMessage = sendMessage;
-  logDebug('sendMessage関数をwindowオブジェクトに公開しました（デバッグ用）');
+  window.sendTestZombieWarning = sendTestZombieWarning;
+  window.sendTestDetection = sendTestDetection;
+  window.toggleWsDebugMode = toggleWsDebugMode;
+  logDebug('デバッグ用関数をwindowオブジェクトに公開しました（テスト用）');
 }
 
 /**

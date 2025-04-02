@@ -8,7 +8,7 @@ import { logDebug, logError, saveErrorLog } from '@core/logger.js';
 import { loadConfig } from '@config/configLoader.js';
 import { initUIElements, showError, shouldShowError } from '@ui/uiHelper.js';
 import { initExpressionElements, setExpression } from '@emotion/expressionManager.js';
-import { setConfig as setWebSocketConfig, initWebSocket } from '@core/websocketHandler.js';
+import { setConfig as setWebSocketConfig, initWebSocket, sendTestZombieWarning, sendTestDetection } from '@core/websocketHandler.js';
 import { setConfig as setSpeechConfig, checkVoicevoxConnection } from '@emotion/speechManager.js';
 import { initRandomLines } from '@emotion/emotionHandler.js';
 import zombieOverlayManager from '@ui/overlayManager.js';
@@ -483,66 +483,121 @@ function setupAssistantImage() {
   }
 }
 
+/**
+ * デバッグパネルの初期化
+ */
 function setupDebugPanel() {
-  // 既存のdebug-panelがあれば削除
-  const oldPanel = document.getElementById('floating-debug');
-  if (oldPanel) oldPanel.remove();
-
-  // 新しいデバッグパネルを作成
-  const panel = document.createElement('div');
-  panel.id = 'floating-debug';
-  panel.style.cssText = `
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    background: rgba(0,0,0,0.7);
-    color: white;
-    padding: 10px;
-    border-radius: 5px;
-    z-index: 999999;
-    max-width: 300px;
-    max-height: 400px;
-    overflow: auto;
-    font-size: 12px;
-    font-family: monospace;
-    pointer-events: auto;
-  `;
-  
-  // ログエリア
-  const logArea = document.createElement('div');
-  logArea.id = 'debug-log';
-  panel.appendChild(logArea);
-  
-  // テスト用ボタン
-  const testButton = document.createElement('button');
-  testButton.textContent = '画像サイズ確認';
-  testButton.onclick = () => {
-    const img = document.getElementById('assistantImage');
-    logDebugToPanel(`画像サイズ: ${img.width}x${img.height}, style: ${img.style.cssText}`);
-  };
-  panel.appendChild(testButton);
-  
-  document.body.appendChild(panel);
-  
-  // デバッグ関数
-  window.logDebugToPanel = function(message) {
-    const logArea = document.getElementById('debug-log');
-    if (logArea) {
-      const entry = document.createElement('div');
-      entry.textContent = message;
-      logArea.appendChild(entry);
-      
-      // ファイルにも記録
-      if (window.electronLogger && window.electronLogger.logToFile) {
-        window.electronLogger.logToFile(message);
-      }
-      
-      // 10行を超えたら古いものを削除
-      while (logArea.children.length > 10) {
-        logArea.removeChild(logArea.firstChild);
-      }
+  try {
+    logDebug('デバッグパネルのセットアップを開始');
+    
+    // デバッグパネル要素の追加
+    const debugPanelExists = document.getElementById('debug-panel');
+    if (debugPanelExists) {
+      logDebug('デバッグパネルは既に存在します');
+      return;
     }
-  };
+    
+    // デバッグパネル要素の作成
+    const debugPanel = document.createElement('div');
+    debugPanel.id = 'debug-panel';
+    debugPanel.className = 'debug-panel';
+    debugPanel.style.cssText = `
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-width: 150px;
+    `;
+    
+    // タイトル追加
+    const debugTitle = document.createElement('div');
+    debugTitle.textContent = 'デバッグパネル';
+    debugTitle.style.cssText = `
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 5px;
+      font-size: 14px;
+    `;
+    debugPanel.appendChild(debugTitle);
+    
+    // ゾンビ警告テストボタン
+    const zombieWarningBtn = document.createElement('button');
+    zombieWarningBtn.textContent = 'ゾンビ警告テスト';
+    zombieWarningBtn.className = 'debug-btn';
+    zombieWarningBtn.style.cssText = `
+      background: #ff4500;
+      border: none;
+      color: white;
+      padding: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    `;
+    zombieWarningBtn.onclick = () => {
+      console.log('ゾンビ警告テストボタンがクリックされました');
+      sendTestZombieWarning();
+    };
+    debugPanel.appendChild(zombieWarningBtn);
+    
+    // ゾンビ検出テストボタン
+    const zombieDetectionBtn = document.createElement('button');
+    zombieDetectionBtn.textContent = 'ゾンビ検出テスト';
+    zombieDetectionBtn.className = 'debug-btn';
+    zombieDetectionBtn.style.cssText = `
+      background: #3498db;
+      border: none;
+      color: white;
+      padding: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-top: 5px;
+    `;
+    zombieDetectionBtn.onclick = () => {
+      console.log('ゾンビ検出テストボタンがクリックされました');
+      sendTestDetection();
+    };
+    debugPanel.appendChild(zombieDetectionBtn);
+    
+    // WSメッセージログ表示切替ボタン
+    const toggleWsLogBtn = document.createElement('button');
+    toggleWsLogBtn.textContent = 'WSログ表示切替';
+    toggleWsLogBtn.className = 'debug-btn';
+    toggleWsLogBtn.style.cssText = `
+      background: #2ecc71;
+      border: none;
+      color: white;
+      padding: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-top: 5px;
+    `;
+    toggleWsLogBtn.onclick = () => {
+      // wsDebugMode変数がwebsocketHandler.jsにあると仮定
+      if (typeof window.toggleWsDebugMode === 'function') {
+        window.toggleWsDebugMode();
+      } else {
+        console.log('WebSocketデバッグモード切替機能が利用できません');
+      }
+    };
+    debugPanel.appendChild(toggleWsLogBtn);
+    
+    // デバッグパネルをボディに追加
+    document.body.appendChild(debugPanel);
+    
+    logDebug('デバッグパネルのセットアップが完了しました');
+  } catch (error) {
+    logError('デバッグパネルのセットアップに失敗しました', error);
+  }
 }
 
 // 表示・非表示アニメーションのセットアップ

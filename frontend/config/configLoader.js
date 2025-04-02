@@ -22,7 +22,8 @@ const defaultConfig = {
   },
   backend: {
     host: 'http://127.0.0.1:8000',
-    ws_url: 'ws://127.0.0.1:8000/ws'
+    ws_url: 'ws://127.0.0.1:8000/ws',
+    ws_url_alt: 'ws://localhost:8000/ws'  // 代替WebSocket URL（localhost版）
   },
   api: {
     baseUrl: 'http://127.0.0.1:8000'
@@ -42,7 +43,7 @@ const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
 export function loadConfig(configData) {
   if (!configData) {
     logDebug('設定データがnullのため、デフォルト設定を使用します');
-    return;
+    return { ...defaultConfig };
   }
   
   // デフォルト設定をベースに、渡された設定で上書き
@@ -55,6 +56,18 @@ export function loadConfig(configData) {
   } else if (!config.api.baseUrl) {
     config.api.baseUrl = DEFAULT_API_BASE_URL;
   }
+  
+  // バックエンド設定がなければデフォルト値を設定
+  if (!config.backend) {
+    config.backend = { ...defaultConfig.backend };
+  }
+  
+  // WebSocket URLの代替値がなければデフォルト値を設定
+  if (!config.backend.ws_url_alt) {
+    config.backend.ws_url_alt = defaultConfig.backend.ws_url_alt;
+  }
+  
+  return config;
 }
 
 /**
