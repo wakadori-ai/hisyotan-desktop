@@ -14,6 +14,7 @@ import json
 import hashlib
 from typing import Optional, Dict, Any, Tuple, Union, List, cast
 import concurrent.futures
+import random
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -631,9 +632,160 @@ def safe_speak_with_preset(
     )
 
 # ゾンビ検出用の便利関数
-def react_to_zombie(count: int, distance: float = 0.0) -> None:
+def react_to_zombie(count: int, distance: float = 0.0, reaction_type: str = "confirm", resnet_result: bool = False, resnet_prob: float = 0.0) -> None:
     """
-    ゾンビ検出に対して適切な音声で反応
+    ゾンビ検出に対して適切な音声で反応（3段階リアクション対応）
+    
+    Args:
+        count: ゾンビの数
+        distance: 最も近いゾンビとの距離（m）
+        reaction_type: リアクション種別（"immediate"=即時/YOLO, "followup"=補足/ResNet, "confirm"=確定）
+        resnet_result: ResNetの結果（Trueならゾンビシーン）
+        resnet_prob: ResNetの確率
+    """
+    # 即時プリセット（YOLO検出時）
+    if reaction_type == "immediate":
+        if count >= 10:
+            # 多数のゾンビ（即時反応）
+            play_preset_voice("gasp")
+        elif count >= 5:
+            # 警戒レベル（即時反応）
+            play_preset_voice("altu")
+        elif count > 0:
+            # 少数ゾンビ（即時反応）
+            play_preset_voice("hmm")
+    
+    # 補足リアクション（ResNet補正後）
+    elif reaction_type == "followup":
+        if count >= 10:
+            # 多数のゾンビ（補足）
+            texts = [
+                "あっ、ごめん。もっといるかも…！",
+                "ち、違った…こんなにいるっ…！",
+                "うそっ…こんなに多いの…！？",
+            ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="gasp",
+                emotion="焦り",
+                force=True
+            )
+        elif count >= 5:
+            # 警戒レベル（補足）
+            texts = [
+                f"注意して…{count}体いるよ…！",
+                f"危ない、{count}体に増えてる…",
+                f"やっぱり…{count}体もいるの…"
+            ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="altu",
+                emotion="警戒・心配",
+                force=True
+            )
+        elif count > 0:
+            # 少数ゾンビ（補足）
+            texts = [
+                f"うん、{count}体だね…気をつけて",
+                f"やっぱり{count}体見えるよ…",
+                f"間違いない、{count}体いるね…"
+            ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="hmm",
+                emotion="normal",
+                force=True
+            )
+        elif resnet_result and resnet_prob > 0.7:
+            # ResNetのみが検出（雰囲気）
+            texts = [
+                "なんか…気配を感じる…",
+                "何かいるような…気がする…",
+                "変な感じがする…気のせい…？"
+            ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="hmm",
+                emotion="囁き",
+                force=True
+            )
+    
+    # 確定アラート（最終確定時）
+    else:  # reaction_type == "confirm"
+        if count >= 10:
+            # 多数のゾンビ（確定）
+            texts = [
+                "危険！大量のゾンビが接近中！すぐに逃げて！",
+                f"{count}体以上いる！このままじゃ危険だよ！",
+                "もう囲まれてる…！早く安全な場所へ！"
+            ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="scream",
+                emotion="びっくり",
+                force=True
+            )
+        elif count >= 5:
+            # 警戒レベル（確定）
+            texts = [
+                f"警告！{count}体のゾンビを確認！注意して！",
+                f"{count}体のゾンビが接近中…慎重に行動して！",
+                f"危険…{count}体も接近してる…気をつけて！"
+            ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="gasp",
+                emotion="警戒・心配",
+                force=True
+            )
+        elif count > 0:
+            # 少数ゾンビ（確定）
+            if distance < 5.0:
+                # 近距離
+                texts = [
+                    f"{count}体のゾンビが近くにいるよ！気をつけて！",
+                    f"近くに{count}体…静かに行動して…",
+                    f"注意！目の前に{count}体いるよ！"
+                ]
+            else:
+                # 遠距離
+                texts = [
+                    f"{count}体のゾンビを発見…大丈夫、落ち着いて",
+                    f"大丈夫、{count}体だけだよ…冷静に",
+                    f"{count}体のゾンビがいるけど、まだ気づかれてないよ"
+                ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="altu",
+                emotion="normal",
+                force=True
+            )
+        elif resnet_result and resnet_prob > 0.7:
+            # ResNetのみが検出（雰囲気）
+            texts = [
+                "なんだか変な気配がする…注意して",
+                "何かいる気がする…気のせいかな？",
+                "ゾンビの気配を感じる…でも見えないね"
+            ]
+            text = random.choice(texts)
+            safe_speak_with_preset(
+                text=text,
+                preset_name="hmm",
+                emotion="囁き",
+                force=True
+            )
+
+# 旧バージョンとの互換性のために残す
+def legacy_react_to_zombie(count: int, distance: float = 0.0) -> None:
+    """
+    ゾンビ検出に対して適切な音声で反応（旧バージョン、互換性のために残す）
     
     Args:
         count: ゾンビの数

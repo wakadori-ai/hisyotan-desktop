@@ -84,9 +84,9 @@ class ZombieDetector:
             "many": 0       # 多数ゾンビ（10体以上）
         }
         self.cooldown_periods = {
-            "few": 10,      # 少数ゾンビ: 10秒（テスト用に短縮）
-            "warning": 10,  # 警戒レベル: 10秒（テスト用に短縮）
-            "many": 10      # 多数ゾンビ: 10秒（テスト用に短縮）
+            "few": 5,      # 少数ゾンビ: 5秒
+            "warning": 8,  # 警戒レベル: 8秒
+            "many": 10     # 多数ゾンビ: 10秒
         }
         
         # ディレクトリ準備
@@ -272,7 +272,7 @@ class ZombieDetector:
             # 高負荷時の調整
             if cpu_percent > self.cpu_threshold:
                 # CPU使用率が閾値を超えた場合、フレーム間隔を増やし、リサイズ率を下げる
-                self.adaptive_interval = min(PERFORMANCE_SETTINGS["frame_interval"] * 1.5, 10.0)
+                self.adaptive_interval = min(PERFORMANCE_SETTINGS["frame_interval"] * 1.5, 2.0)
                 self.resize_factor = max(PERFORMANCE_SETTINGS["resize_factor"] * 0.8, 0.3)
                 self.skip_ratio = min(PERFORMANCE_SETTINGS["skip_ratio"] + 1, 5)
                 logger.info(f"高CPU負荷 ({cpu_percent:.1f}%)のため設定調整: interval={self.adaptive_interval:.1f}s, resize={self.resize_factor:.2f}")
@@ -632,6 +632,45 @@ class ZombieDetector:
                 
                 current_time = time.time()
                 
+                # 【即時プリセット】- バウンディングボックス検出時の即時反応
+                # 即時プリセットはクールダウン対象外
+                if count > 0:
+                    try:
+                        # 即時の音声反応処理
+                        from ..voice.engine import react_to_zombie
+                        await asyncio.to_thread(
+                            react_to_zombie,
+                            count, 
+                            0.0, 
+                            "immediate", 
+                            resnet_result, 
+                            resnet_prob
+                        )
+                        print(f"[BACKEND] 即時プリセットボイス再生完了: {count}体")
+                    except Exception as e:
+                        print(f"[BACKEND] 即時プリセットボイス再生エラー: {e}")
+                        logger.error(f"即時プリセットボイス再生エラー: {e}")
+                
+                # 【補足リアクション】- ResNet分類後の補足
+                # 特定の条件でのみ実行（軽い遅延を追加して実行）
+                if count > 0 or (resnet_result and resnet_prob > 0.7):
+                    try:
+                        # 補足リアクションは0.5秒の軽い遅延を追加
+                        await asyncio.sleep(0.5)
+                        await asyncio.to_thread(
+                            react_to_zombie,
+                            count, 
+                            0.0, 
+                            "followup", 
+                            resnet_result, 
+                            resnet_prob
+                        )
+                        print(f"[BACKEND] 補足リアクションボイス再生完了: {count}体, ResNet結果={resnet_result}({resnet_prob:.2f})")
+                    except Exception as e:
+                        print(f"[BACKEND] 補足リアクションボイス再生エラー: {e}")
+                        logger.error(f"補足リアクションボイス再生エラー: {e}")
+                
+                # 【確定アラート】- 従来のコールバック処理（cooldown対象）
                 # 多数のゾンビ検出時（10体以上）
                 if count >= 10:
                     if current_time - self.cooldown_timestamps["many"] > self.cooldown_periods["many"]:
@@ -672,6 +711,8 @@ class ZombieDetector:
                     
         except Exception as e:
             logger.error(f"検出結果の処理中にエラーが発生: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     async def _call_callback(self, callback, zombie_count, screenshot, additional_data=None):
         """

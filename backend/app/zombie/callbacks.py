@@ -237,9 +237,20 @@ async def zombie_few_alert(count: int, frame_data: Optional[Any] = None, additio
     if additional_data and "closest_distance" in additional_data:
         distance = additional_data.get("closest_distance", 0.0)
     
-    # 新しいプリセット音声と合成音声を組み合わせた反応（より即時的）
+    # 確定アラートとして音声反応を実行
     if play_audio:
-        react_to_zombie(count, distance)
+        try:
+            await asyncio.to_thread(
+                react_to_zombie,
+                count, 
+                distance, 
+                "confirm", 
+                resnet_result, 
+                resnet_prob
+            )
+            print(f"[BACKEND] 確定アラート音声再生完了: {count}体")
+        except Exception as e:
+            logger.error(f"確定アラート音声再生エラー: {e}")
     
     # 通知メッセージの作成
     message_suffix = ""
@@ -297,7 +308,7 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
         play_audio: 音声を再生するかどうか
         force: 強制的に実行するかどうか
     """
-    from ..ws.manager import send_notification, manager
+    from ..ws.manager import send_notification
     from ..voice.engine import react_to_zombie
     from ..config.settings import Settings
     
@@ -312,13 +323,13 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
         resnet_result = additional_data.get("resnet_result", False)
         resnet_prob = additional_data.get("resnet_probability", 0.0)
     
-    logger.info(f"🟡 警戒レベルのゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
+    logger.warning(f"🟠 警戒レベルのゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
     print(f"[BACKEND] 警戒レベルのゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
     
     # デバウンスチェック（強制フラグがない場合）
     if not force and is_callback_throttled("zombie_warning"):
-        logger.debug("警戒ゾンビアラートはデバウンス中のためスキップ")
-        print("[BACKEND] 警戒ゾンビアラートはデバウンス中のためスキップ")
+        logger.debug("警戒レベルゾンビアラートはデバウンス中のためスキップ")
+        print("[BACKEND] 警戒レベルゾンビアラートはデバウンス中のためスキップ")
         return {"status": "throttled", "message": "デバウンス中のためスキップされました"}
     
     # 距離情報を取得（ない場合はデフォルト値）
@@ -326,9 +337,20 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
     if additional_data and "closest_distance" in additional_data:
         distance = additional_data.get("closest_distance", 0.0)
     
-    # 新しいプリセット音声と合成音声を組み合わせた反応（より即時的）
+    # 確定アラートとして音声反応を実行
     if play_audio:
-        react_to_zombie(count, distance)
+        try:
+            await asyncio.to_thread(
+                react_to_zombie,
+                count, 
+                distance, 
+                "confirm", 
+                resnet_result, 
+                resnet_prob
+            )
+            print(f"[BACKEND] 警戒レベル音声再生完了: {count}体")
+        except Exception as e:
+            logger.error(f"警戒レベル音声再生エラー: {e}")
     
     # 通知メッセージの作成
     message_suffix = ""
