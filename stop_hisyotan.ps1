@@ -1,32 +1,35 @@
-# stop_hisyotan.ps1
-Write-Host "🔍 秘書たん関連のプロセスをチェック中..."
+Write-Host "🔍 秘書たん関連プロセス（詳細コマンド確認）"
 
-# チェック対象のプロセスとキーワード
-$targets = @(
-    @{ Name = "python"; Keyword = "uvicorn" },
-    @{ Name = "python"; Keyword = "backend" },
-    @{ Name = "node";   Keyword = "vite" },
-    @{ Name = "electron"; Keyword = "hisyotan" }
-)
+$keywords = @("uvicorn", "hisyotan", "backend", "FastAPI", "multiprocessing", "spawn_main", "--multiprocessing-fork")
 
-foreach ($target in $targets) {
-    $procList = Get-Process -Name $target.Name -ErrorAction SilentlyContinue | Where-Object {
-        $_.Path -and $_.Path -like "*$($target.Keyword)*"
-    }
+# すべてのプロセスを取得
+$pythonProcs = Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -like "*python*" -and $_.CommandLine -ne $null
+}
 
-    if ($procList.Count -gt 0) {
-        Write-Host "❌ [$($target.Name)] $($target.Keyword) を含むプロセスが $($procList.Count) 件見つかりました。終了します..."
-        foreach ($proc in $procList) {
-            try {
-                Stop-Process -Id $proc.Id -Force -ErrorAction Stop
-                Write-Host "✅ プロセス (PID: $($proc.Id)) を終了しました"
-            } catch {
-                Write-Host "⚠️ 終了に失敗しました: $_"
-            }
+# 条件に一致するプロセスを抽出
+$targetProcs = @()
+
+foreach ($proc in $pythonProcs) {
+    foreach ($keyword in $keywords) {
+        if ($keyword -and $proc.CommandLine.ToLower().Contains($keyword.ToLower())) {
+            $targetProcs += $proc
+            break
         }
-    } else {
-        Write-Host "✔ [$($target.Name)] $($target.Keyword) は実行中ではありません"
     }
 }
 
-Write-Host "🎉 終了処理完了！"
+# プロセス終了処理
+if ($targetProcs.Count -eq 0) {
+    Write-Host "✔ Pythonプロセスに該当なし（クリーン）"
+} else {
+    foreach ($proc in $targetProcs) {
+        Write-Host "❌ 該当プロセス検出: PID=$($proc.ProcessId) : $($proc.CommandLine)"
+        try {
+            Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
+            Write-Host "✅ 終了しました"
+        } catch {
+            Write-Host "⚠️ 終了失敗: $_"
+        }
+    }
+}
