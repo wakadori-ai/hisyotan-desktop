@@ -6,6 +6,9 @@ export default defineConfig({
   root: 'frontend/ui', // 開発サーバーのルートディレクトリを指定
   base: './', // 相対パスでビルドするために必要
   
+  // 静的アセット用のパブリックディレクトリを設定
+  publicDir: resolve(__dirname, 'assets'),
+  
   // Electron統合のためのサーバー設定
   server: {
     port: 3000,
@@ -21,7 +24,7 @@ export default defineConfig({
       '@core': resolve(__dirname, 'frontend/core'),
       '@ui': resolve(__dirname, 'frontend/ui'),
       '@emotion': resolve(__dirname, 'frontend/emotion'),
-      '@assets': resolve(__dirname, 'frontend/assets'),
+      '@assets': resolve(__dirname, 'assets'),
       '@config': resolve(__dirname, 'frontend/config'),
       '@voice': resolve(__dirname, 'frontend/voice')
     }

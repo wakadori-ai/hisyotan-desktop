@@ -599,34 +599,62 @@ console.log('📝 秘書たんレンダラープロセス初期化...');
 
 // 画像パス解決のための関数
 async function resolveImagePath(relativePath) {
-  if (!window.electronAPI) {
-    console.warn('electronAPI が利用できません');
-    return relativePath;
-  }
-
+  // パスの先頭に余計な ./ や / があれば削除
+  const cleanPath = relativePath.replace(/^(\.\/)/g, '');
+  // ただし、先頭が / だけの場合（絶対パス）は保持する
+  
   try {
-    // 先頭の./ or / を削除
-    const cleanPath = relativePath.replace(/^(\.\/|\/)/g, '');
+    // 0. 既に絶対パスで始まっている場合（/assets/images/...）はそのまま返す
+    if (relativePath.startsWith('/assets/')) {
+      console.log(`絶対パスをそのまま使用: ${relativePath}`);
+      return relativePath;
+    }
     
-    // 新しいresolveImagePath APIがあればそれを使用
-    if (window.electronAPI.resolveImagePath) {
-      const resolvedPath = await window.electronAPI.resolveImagePath(cleanPath);
-      if (resolvedPath) {
-        console.log(`画像パスを解決しました: ${relativePath} → ${resolvedPath}`);
-        return resolvedPath;
+    // 1. Electron環境での絶対パス解決（本番環境用）
+    if (window.electronAPI) {
+      // 新しいresolveImagePath APIがあればそれを使用
+      if (window.electronAPI.resolveImagePath) {
+        try {
+          const resolvedPath = await window.electronAPI.resolveImagePath(cleanPath);
+          if (resolvedPath) {
+            console.log(`画像パスを解決しました: ${relativePath} → ${resolvedPath}`);
+            return resolvedPath;
+          }
+        } catch (err) {
+          console.warn(`resolveImagePathでのエラー: ${err.message}`);
+        }
+      }
+      
+      // 代替手段としてgetAssetPathを使用
+      if (window.electronAPI.getAssetPath) {
+        try {
+          const assetPath = await window.electronAPI.getAssetPath(cleanPath);
+          if (assetPath) {
+            console.log(`アセットパスを解決しました: ${relativePath} → ${assetPath}`);
+            return assetPath;
+          }
+        } catch (err) {
+          console.warn(`getAssetPathでのエラー: ${err.message}`);
+        }
       }
     }
     
-    // 代替手段としてgetAssetPathを使用
-    if (window.electronAPI.getAssetPath) {
-      const assetPath = await window.electronAPI.getAssetPath(cleanPath);
-      if (assetPath) {
-        console.log(`アセットパスを解決しました: ${relativePath} → ${assetPath}`);
-        return assetPath;
-      }
+    // 2. 開発環境でのパス解決（Vite開発サーバー用）
+    // 既に/で始まるパスはViteのpublicDirから探索されるのでそのまま
+    if (relativePath.startsWith('/')) {
+      return relativePath;
     }
     
-    console.warn(`画像パスを解決できませんでした: ${relativePath}`);
+    // パスにassetsが含まれている場合の処理
+    if (cleanPath.startsWith('assets/')) {
+      return `/${cleanPath}`; // assetsから始まる場合は先頭に/をつけて絶対パスに
+    } else if (!cleanPath.includes('assets/')) {
+      // assetsが含まれていなければ追加
+      return `/assets/${cleanPath}`;
+    }
+    
+    // 3. いずれの方法でも解決できない場合は、相対パスをそのまま返す
+    console.warn(`画像パスを解決できませんでした: ${relativePath} - 元のパスを使用します`);
     return relativePath;
   } catch (error) {
     console.error(`画像パス解決エラー: ${error.message}`);
@@ -646,15 +674,14 @@ async function loadSecretaryImage(emotion = 'normal') {
     // 感情に基づいて画像ファイル名を決定
     const imageFileName = `secretary_${emotion}.png`;
     
-    // 複数のパスパターンを試す
+    // 複数のパスパターンを試す（優先順位順）
     const pathOptions = [
-      `./assets/images/${imageFileName}`,
-      `assets/images/${imageFileName}`,
-      `/assets/images/${imageFileName}`,
-      `../../assets/images/${imageFileName}`,
-      `images/${imageFileName}`,
-      `/images/${imageFileName}`,
-      `/static/images/${imageFileName}`
+      `/assets/images/${imageFileName}`,       // Vite開発サーバー（絶対パス）- 最優先
+      `assets/images/${imageFileName}`,        // assetsフォルダ直下から
+      `./assets/images/${imageFileName}`,      // 相対パス
+      `../../assets/images/${imageFileName}`,  // 上位ディレクトリから
+      `/images/${imageFileName}`,              // 別構造のケース
+      `/static/images/${imageFileName}`        // バックエンド静的ファイル
     ];
 
     // 最初のパスを設定
