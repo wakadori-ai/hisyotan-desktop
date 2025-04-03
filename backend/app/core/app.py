@@ -83,12 +83,13 @@ def register_routers(app: FastAPI) -> None:
     """
     try:
         # 各種ルーターのインポート
-        from ..routers import health_router, voice_router, websocket_router
+        from ..routers import health_router, voice_router, websocket_router, settings_router
         
         # ルーターの登録
         app.include_router(health_router)
         app.include_router(voice_router)
         app.include_router(websocket_router)
+        app.include_router(settings_router)
         
         logger.info("🔄 ルーターを登録しました")
         

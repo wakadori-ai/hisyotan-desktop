@@ -245,7 +245,7 @@
             z-index: 1002;
             opacity: 0;
             transition: all 0.3s ease;
-            pointer-events: none;
+            pointer-events: auto;
             transform: translateY(-5px) scale(0.95);
             display: none;
         }
@@ -839,6 +839,17 @@
                 console.error(`speechManagerに${method}メソッドが存在しません`);
             }
         });
+    </script>
+
+    <!-- ES Modules サポート -->
+    <script type="module">
+        // 設定APIクライアントの初期化
+        import apiClient from './apiClient.js';
+        
+        // グローバルアクセス用に設定
+        window.settingsApi = apiClient;
+        
+        console.log('🔌 ES Modules サポート初期化完了');
     </script>
 </body>
 </html> 

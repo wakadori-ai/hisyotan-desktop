@@ -2,6 +2,7 @@
 // UI表示制御用のモジュール
 
 import { logDebug, logError, logZombieWarning } from '../core/logger.js';
+import { updateSetting } from './apiClient.js';
 
 // DOM要素
 let speechBubble;
@@ -630,6 +631,25 @@ export function renderSettingUI(uiPayload) {
   speechSettingUI.style.setProperty('display', 'block', 'important');
   console.log('💭 speechSettingUIを表示に設定しました');
   
+  // 閉じるボタンが存在することを確認
+  if (speechBubble) {
+    // 既存の閉じるボタンを確認
+    let closeButton = speechBubble.querySelector('.bubble-close');
+    if (!closeButton) {
+      console.log('💭 閉じるボタンが見つからないため新規作成します');
+      closeButton = document.createElement('div');
+      closeButton.className = 'bubble-close';
+      closeButton.textContent = '×';
+      closeButton.onclick = function() {
+        hideBubble();
+      };
+      speechBubble.appendChild(closeButton);
+      console.log('💭 閉じるボタンを追加しました');
+    } else {
+      console.log('💭 既存の閉じるボタンを確認しました:', closeButton);
+    }
+  }
+  
   // 吹き出しにマウスイベントリスナーを追加（設定UI表示中はマウスフォーカス中に表示を維持）
   if (speechBubble) {
     // 既存のリスナーを削除
@@ -655,6 +675,8 @@ export function renderSettingUI(uiPayload) {
  * @param {number} index - トグルスイッチのインデックス
  */
 function renderToggleSwitch(payload, index) {
+  console.log('✨ renderToggleSwitch 開始:', payload);
+  
   // トグルスイッチを作成
   const toggleContainer = document.createElement('div');
   toggleContainer.className = 'toggle-container';
@@ -686,8 +708,9 @@ function renderToggleSwitch(payload, index) {
     toggleContainer.appendChild(description);
   }
   
-  // イベントリスナーを追加
+  // ①トグル要素自体へのchangeイベントリスナー
   toggle.addEventListener('change', (e) => {
+    console.log('🔄 トグル変更イベント発生: ', e.target.checked);
     const newValue = e.target.checked;
     logDebug(`設定値変更: "${payload.label}" = ${newValue}`);
     
@@ -700,13 +723,76 @@ function renderToggleSwitch(payload, index) {
     toggleSlider.classList.add('toggled');
     setTimeout(() => toggleSlider.classList.remove('toggled'), 300);
     
+    // 設定キーが指定されている場合はAPIを呼び出す
+    if (payload.key) {
+      try {
+        console.log(`🔄 設定APIを呼び出します: ${payload.key}=${newValue}`);
+        updateSetting(payload.key, newValue)
+          .then(response => {
+            console.log('✅ 設定更新成功:', response);
+          })
+          .catch(error => {
+            console.error('❌ 設定更新失敗:', error);
+            logError(`設定APIエラー: ${error.message || '不明なエラー'}`);
+          });
+      } catch (err) {
+        console.error('設定API呼び出しエラー:', err);
+        logError(`設定API呼び出しエラー: ${err.message}`);
+      }
+    }
+    
     // コールバック関数を呼び出し
     if (typeof payload.onChange === 'function') {
       try {
+        console.log('🔄 onChange コールバックを実行: ', payload.onChange);
         payload.onChange(newValue);
       } catch (err) {
         logError(`設定変更コールバックでエラー: ${err.message}`);
+        console.error('コールバックエラー詳細: ', err);
       }
+    } else {
+      console.log('⚠️ onChangeコールバックが関数ではありません: ', payload.onChange);
+    }
+  });
+  
+  // ②トグルスライダーへのクリックイベントリスナー
+  toggleSlider.addEventListener('click', (e) => {
+    console.log('👆 トグルスライダークリックイベント発生');
+    e.preventDefault(); // デフォルトの動作を防止
+    
+    // toggle要素のチェック状態を反転
+    toggle.checked = !toggle.checked;
+    
+    // 手動でchangeイベントを発火
+    const changeEvent = new Event('change', { bubbles: true });
+    toggle.dispatchEvent(changeEvent);
+  });
+  
+  // ③ラベルへのクリックイベントリスナー（追加）
+  label.addEventListener('click', (e) => {
+    console.log('👆 ラベルクリックイベント発生');
+    e.preventDefault(); // デフォルトの動作を防止
+    
+    // toggle要素のチェック状態を反転
+    toggle.checked = !toggle.checked;
+    
+    // 手動でchangeイベントを発火
+    const changeEvent = new Event('change', { bubbles: true });
+    toggle.dispatchEvent(changeEvent);
+  });
+  
+  // ④トグルコンテナ全体へのクリックイベントリスナー（追加）
+  toggleContainer.addEventListener('click', (e) => {
+    // toggleやlabelのクリックイベントと重複しないように
+    if (e.target === toggleContainer) {
+      console.log('👆 トグルコンテナクリックイベント発生');
+      
+      // toggle要素のチェック状態を反転
+      toggle.checked = !toggle.checked;
+      
+      // 手動でchangeイベントを発火
+      const changeEvent = new Event('change', { bubbles: true });
+      toggle.dispatchEvent(changeEvent);
     }
   });
   
@@ -718,6 +804,13 @@ function renderToggleSwitch(payload, index) {
   toggleContainer.appendChild(toggleSwitch);
   
   speechSettingUI.appendChild(toggleContainer);
+  
+  console.log('✅ renderToggleSwitch 完了:', {
+    container: toggleContainer,
+    toggle: toggle,
+    slider: toggleSlider,
+    label: label
+  });
 }
 
 /**

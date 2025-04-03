@@ -1,7 +1,7 @@
 // speechManager.js
 // 発話・音声合成用のモジュール
 
-import { logDebug, logError, logZombieWarning } from '@core/logger.js';
+import { logDebug, logError, logZombieWarning } from '../core/logger.js';
 import { showError, shouldShowError } from '@ui/uiHelper.js';
 import { setText, showBubble, hideBubble, initUIElements, renderSettingUI } from '@ui/uiHelper.js';
 import { 
@@ -151,6 +151,7 @@ function forceShowBubble(formattedText, eventType = 'default') {
  * @param {string} [speechObj.emotion] - 感情タイプ
  * @param {number} [speechObj.duration] - 表示時間（ミリ秒）
  * @param {Object} [speechObj.uiPayload] - UI表示用のペイロード（typeが'setting'の場合）
+ * @param {boolean} [speechObj.autoClose] - 自動で閉じるかどうか（デフォルトはtrue）
  */
 export function speakWithObject(speechObj) {
   try {
@@ -164,11 +165,12 @@ export function speakWithObject(speechObj) {
     const emotion = speechObj.emotion || 'normal';
     const duration = speechObj.duration || messageDisplayTime;
     const eventType = speechObj.id || 'default';
+    const autoClose = speechObj.autoClose !== false; // 明示的にfalseでない限りtrue
     
     // 現在のセリフを保存
     currentSpeech = speechObj;
     
-    logDebug(`拡張セリフ表示: タイプ=${type}, ID=${eventType}, テキスト="${speechObj.text}"`);
+    logDebug(`拡張セリフ表示: タイプ=${type}, ID=${eventType}, テキスト="${speechObj.text}", 自動閉じる=${autoClose}`);
     
     // 設定UIタイプの場合は専用の処理
     if (type === 'setting' && speechObj.uiPayload) {
@@ -197,7 +199,7 @@ export function speakWithObject(speechObj) {
         bubbleHTML: document.getElementById('speechBubble')?.innerHTML || '存在しません'
       });
       
-      // 設定UIの場合は自動非表示しない
+      // 設定UIの場合やautoCloseがfalseの場合は自動非表示しない
       return;
     }
     
@@ -207,7 +209,9 @@ export function speakWithObject(speechObj) {
       emotion, 
       duration, 
       null, // アニメーションはemotionから自動設定
-      eventType
+      eventType,
+      null,  // プリセット音声
+      autoClose // 自動クローズフラグを追加
     );
     
   } catch (err) {
@@ -223,8 +227,9 @@ export function speakWithObject(speechObj) {
  * @param {string} animation - アニメーション（bounce_light, trembling, nervous-shake, null）
  * @param {string} eventType - イベントタイプ（イベント識別用、デフォルトは'default'）
  * @param {string} presetSound - 先行再生するプリセット音声の名前（オプション）
+ * @param {boolean} autoClose - 自動で閉じるかどうか（デフォルトはtrue）
  */
-export function speak(message, emotion = 'normal', displayTime = messageDisplayTime, animation = null, eventType = 'default', presetSound = null) {
+export function speak(message, emotion = 'normal', displayTime = messageDisplayTime, animation = null, eventType = 'default', presetSound = null, autoClose = true) {
   try {
     // 基本的なセリフオブジェクトを作成（後方互換性のため）
     currentSpeech = {
@@ -232,7 +237,8 @@ export function speak(message, emotion = 'normal', displayTime = messageDisplayT
       type: 'normal',
       text: message,
       emotion: emotion,
-      duration: displayTime
+      duration: displayTime,
+      autoClose: autoClose
     };
     
     // 多重実行チェック（同一メッセージ・同一イベントタイプの場合はスキップ）
@@ -346,32 +352,37 @@ export function speak(message, emotion = 'normal', displayTime = messageDisplayT
     lastSpokenEvent = eventType;
     lastSpokenMessage = message;
     
-    // 非表示タイマーをセット（デフォルトのディスプレイタイム）
-    const hideTimerId = setTimeout(() => {
-      hideBubble();
-      hideTimeoutMap.delete(eventType);
-      
-      // アニメーションも停止
-      if (animation) {
-        if (animation === 'bounce_light') {
-          stopLightBounce();
-        } else if (animation === 'trembling') {
-          stopTrembling();
-        } else if (animation === 'nervous_shake') {
-          stopNervousShake();
+    // 設定UIの場合やautoCloseがfalseの場合は自動非表示しない
+    if (eventType.startsWith('setting_') || !autoClose) {
+      logDebug(`自動非表示タイマーをスキップします（${eventType}${!autoClose ? '、autoClose=false' : ''}）`);
+    } else {
+      // 非表示タイマーをセット（デフォルトのディスプレイタイム）
+      const hideTimerId = setTimeout(() => {
+        hideBubble();
+        hideTimeoutMap.delete(eventType);
+        
+        // アニメーションも停止
+        if (animation) {
+          if (animation === 'bounce_light') {
+            stopLightBounce();
+          } else if (animation === 'trembling') {
+            stopTrembling();
+          } else if (animation === 'nervous_shake') {
+            stopNervousShake();
+          }
         }
-      }
+        
+        // 通常表情に戻す（少し時間差を付ける）
+        setTimeout(() => {
+          setExpression('normal');
+          stopTalking();
+        }, 500);
+        
+      }, displayTime);
       
-      // 通常表情に戻す（少し時間差を付ける）
-      setTimeout(() => {
-        setExpression('normal');
-        stopTalking();
-      }, 500);
-      
-    }, displayTime);
-    
-    // タイマーIDをMapに保存
-    hideTimeoutMap.set(eventType, hideTimerId);
+      // タイマーIDをMapに保存
+      hideTimeoutMap.set(eventType, hideTimerId);
+    }
     
     // 吹き出しが実際に表示されたか確認するためのデバッグ
     setTimeout(() => {
@@ -679,6 +690,7 @@ export async function showHordeModeToggle(currentState = false, onChangeCallback
       type: "setting",
       text: "今夜はホード夜モードにする…？",
       emotion: "gentle", // またはnormal
+      autoClose: false, // 自動で閉じないようにする
       uiPayload: {
         type: "toggle",
         label: "ホード夜モード",
