@@ -5,28 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>秘書たん</title>
   <!-- CSSファイルはrenderer.jsから読み込まれます -->
-  <style>
-    /* インラインテスト用スタイル - 必ず適用されるはず */
-    .inline-test-box {
-      position: fixed;
-      top: 80px;
-      left: 20px;
-      width: 220px;
-      height: 60px;
-      background: rgba(0, 0, 255, 0.3);
-      border: 3px dashed blue;
-      z-index: 9999999;
-      pointer-events: none;
-      color: white;
-      font-weight: bold;
-      text-align: center;
-      padding-top: 10px;
-    }
-  </style>
 </head>
 <body>
   <div id="app"></div>
-  <div class="inline-test-box">インラインCSSテスト</div>
   <!-- 新しい構成のrenderer.jsを読み込む -->
   <script type="module" src="/src/renderer/renderer.js"></script>
 </body>

@@ -1,37 +1,28 @@
 /* 肉球ボタンのラッパー */
 .paw-button-wrapper {
-  position: relative;
+  position: fixed;
   width: 100%;
   height: 100%;
   pointer-events: auto;
   z-index: 999;
-}
-
-/* 肉球ボタンの背景 */
-.paw-background {
-  position: absolute;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: rgba(80, 20, 80, 0.15);
-  backdrop-filter: blur(2px);
-  box-shadow: 0 0 15px rgba(255, 192, 203, 0.3);
-  transition: all 0.3s ease;
-}
-
-/* 肉球ボタン */
-#paw-button {
-  width: 100px;
-  height: 100px;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-end;
+  align-items: flex-end;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  top: 0;
+}
+
+/* 肉球アイコン */
+.paw-icon {
   font-size: 42px;
+  position: relative;
+  z-index: 1000;
+  pointer-events: auto;
   cursor: pointer;
   transition: all 0.3s ease;
   opacity: 0.9;
-  z-index: 1000;
-  pointer-events: auto;
   animation: 
     floaty 3s ease-in-out infinite,
     fuwafuwa 2s ease-in-out infinite;
@@ -39,11 +30,37 @@
     drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2))
     drop-shadow(0 0 8px rgba(255, 192, 203, 0.6));
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-  position: absolute;
+}
+
+/* 肉球ボタンの背景 */
+.paw-background {
+  position: fixed;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(80, 20, 80, 0.15);
+  backdrop-filter: blur(2px);
+  box-shadow: 0 0 15px rgba(255, 192, 203, 0.3);
+  transition: all 0.3s ease;
+  bottom: 29px;
+  right: 44px;
+  z-index: 999;
+}
+
+/* 肉球ボタン */
+#paw-button {
+  width: 100px;
+  height: 100px;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 /* ホバー時のスタイル */
-#paw-button:hover {
+#paw-button:hover .paw-icon {
   transform: scale(1.2);
   opacity: 1;
   filter: 
@@ -53,21 +70,21 @@
   animation-play-state: paused;
 }
 
-#paw-button:hover + .paw-background {
+#paw-button:hover .paw-background {
   width: 70px;
   height: 70px;
   background: rgba(100, 30, 100, 0.2);
   box-shadow: 0 0 20px rgba(255, 192, 203, 0.5);
 }
 
-#paw-button:active {
+#paw-button:active .paw-icon {
   transform: scale(0.9);
   filter: drop-shadow(0 0 15px rgba(255, 130, 180, 1));
 }
 
 /* 終了ボタン */
 #quit-button {
-  position: absolute;
+  position: fixed;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -84,6 +101,8 @@
   transition: all 0.3s ease;
   border: 2px solid rgba(255, 255, 255, 0.5);
   opacity: 0.6;
+  bottom: 15px;
+  right: 15px;
 }
 
 #quit-button:hover {

@@ -6,30 +6,8 @@
 
 // スタイルシート読み込み（インポート時にコンソール出力を追加）
 console.log('🎨 styles.cssを読み込み開始します');
-import stylesModule from '../ui/styles/main.css?inline';
-console.log('✅ styles.cssの読み込み完了:', stylesModule);
-
-// 明示的にCSSを適用する試み
-const ensureCssApplied = () => {
-  // CSSが読み込まれたことを視覚的に確認するための要素を追加
-  const debugMarker = document.createElement('div');
-  debugMarker.className = 'css-load-marker';
-  debugMarker.textContent = 'CSS読込確認';
-  debugMarker.style.cssText = `
-    position: fixed;
-    top: 150px;
-    left: 20px;
-    background: purple;
-    color: white;
-    padding: 5px;
-    z-index: 999999;
-    font-size: 12px;
-    border-radius: 4px;
-  `;
-  document.body.appendChild(debugMarker);
-  
-  console.log('💫 明示的なCSS適用処理を実行しました');
-};
+import '../ui/styles/main.css';
+console.log('✅ styles.cssの読み込み完了');
 
 // ヘルパーモジュールをインポート
 import * as uiHelper from './uiHelper.js';
@@ -47,9 +25,6 @@ window.settingsApi = apiClient;
 // DOM構築後の初期化
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🌟 UIの初期化を開始します');
-  
-  // CSSが確実に適用されるようにする
-  ensureCssApplied();
   
   // UIを生成
   uiHelper.createUI();

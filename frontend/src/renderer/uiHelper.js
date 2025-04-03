@@ -104,9 +104,11 @@ export function createUI() {
   if (appDiv) {
     appDiv.innerHTML = `
       <div class="test-debug-box"></div>
-      <div class="paw-button-wrapper">
-        <div id="paw-button">🐾</div>
-        <div class="paw-background"></div>
+      <div id="paw-button">
+        <div class="paw-button-wrapper">
+          <div class="paw-background"></div>
+          <span class="paw-icon">🐾</span>
+        </div>
       </div>
       <div id="quit-button">×</div>
       <div class="quit-bubble">アプリを終了しますか？</div>

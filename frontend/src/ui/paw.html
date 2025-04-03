@@ -19,7 +19,9 @@
 <body>
     <div class="paw-button-wrapper">
         <img id="assistantImage" src="/assets/images/secretary_normal.png" alt="秘書たん" />
-        <div id="paw-button">🐾</div>
+        <div id="paw-button">
+            <span class="paw-icon">🐾</span>
+        </div>
         <div class="paw-background"></div>
         <div id="quit-button">
             <span>✨</span>
@@ -64,16 +66,16 @@
             const pawButtonMargin = 15; // 余白
             
             pawButton.style.position = 'fixed';
-            pawButton.style.bottom = `${quitButtonRect.height + pawButtonMargin + 15}px`; // 終了ボタンの上
-            pawButton.style.right = `${15}px`;
+            pawButton.style.bottom = '24px';
+            pawButton.style.right = '24px';
             pawButton.style.left = 'auto';
             pawButton.style.top = 'auto';
             
             // 肉球背景も一緒に移動
             if (pawBackground) {
                 pawBackground.style.position = 'fixed';
-                pawBackground.style.bottom = `${quitButtonRect.height + pawButtonMargin + 20}px`;
-                pawBackground.style.right = `${35}px`;
+                pawBackground.style.bottom = '29px';
+                pawBackground.style.right = '44px';
                 pawBackground.style.left = 'auto';
                 pawBackground.style.top = 'auto';
             }
@@ -83,8 +85,8 @@
             const assistantMargin = 5; // 余白
             
             assistantImage.style.position = 'fixed';
-            assistantImage.style.bottom = `${quitButtonRect.height + pawButtonRect.height + assistantMargin + 15}px`; // 肉球ボタンの上
-            assistantImage.style.right = `${5}px`; // 右寄せ（少し余白）
+            assistantImage.style.bottom = '124px'; // 肉球ボタンの上（100px + 余白）
+            assistantImage.style.right = '5px'; // 右寄せ（少し余白）
             assistantImage.style.left = 'auto';
             assistantImage.style.top = 'auto';
             
@@ -93,8 +95,8 @@
             const bubbleMargin = 10; // 余白
             
             speechBubble.style.position = 'fixed';
-            speechBubble.style.bottom = `${assistantRect.height + quitButtonRect.height + pawButtonRect.height + bubbleMargin + 15}px`; // 立ち絵の上
-            speechBubble.style.right = `${5}px`; // 右寄せ（少し余白）
+            speechBubble.style.bottom = '300px'; // 立ち絵の上（推定値）
+            speechBubble.style.right = '5px'; // 右寄せ（少し余白）
             speechBubble.style.left = 'auto';
             speechBubble.style.top = 'auto';
             
@@ -112,16 +114,16 @@
         window.addEventListener('DOMContentLoaded', async () => {
             console.log('🐾 統合肉球UI初期化完了');
             
-            // レイアウト調整関数を初期化と保存
+            // レイアウト調整関数を初期化と保存（一時的にコメントアウト）
             updateLayoutPositions = initLayoutPositions;
             
-            // 初期レイアウト設定
-            updateLayoutPositions();
+            // 初期レイアウト設定（一時的にコメントアウト）
+            // updateLayoutPositions();
             
-            // リサイズイベントのリスナーを設定
-            window.addEventListener('resize', () => {
-                updateLayoutPositions();
-            });
+            // リサイズイベントのリスナーを設定（一時的にコメントアウト）
+            // window.addEventListener('resize', () => {
+            //     updateLayoutPositions();
+            // });
             
             // 秘書たん画像を非表示に初期化
             const secretaryTan = document.getElementById('assistantImage');
