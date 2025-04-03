@@ -8,6 +8,18 @@ const iconv = require('iconv-lite');
 // 開発モードかどうかを判定
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+// 環境変数からアプリ名を取得
+const appNameFromEnv = process.env.HISYOTAN_APP_NAME || null;
+if (appNameFromEnv) {
+  console.log(`アプリ名を環境変数から取得: ${appNameFromEnv}`);
+}
+
+// 環境変数からpreloadPathを取得
+const preloadPathFromEnv = process.env.HISYOTAN_PRELOAD_PATH || null;
+if (preloadPathFromEnv) {
+  console.log(`preloadパスを環境変数から取得: ${preloadPathFromEnv}`);
+}
+
 // 設定読み込み
 let config = {};
 try {
@@ -390,7 +402,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: preloadPathFromEnv ? path.resolve(__dirname, preloadPathFromEnv) : path.join(__dirname, 'preload.js'),
       webSecurity: false
     }
   });
