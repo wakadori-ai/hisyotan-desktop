@@ -11,9 +11,6 @@
             overflow: hidden;
             background-color: transparent;
             user-select: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             width: 100vw;
             height: 100vh;
         }
@@ -84,14 +81,10 @@
 
         .paw-button-wrapper {
             position: relative;
-            width: 240px;
-            height: 240px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            width: 100%;
+            height: 100%;
             pointer-events: auto;
             z-index: 999;
-            margin: auto;
         }
         
         .paw-background {
@@ -103,7 +96,6 @@
             backdrop-filter: blur(2px);
             box-shadow: 0 0 15px rgba(255, 192, 203, 0.3);
             transition: all 0.3s ease;
-            bottom: 40px;
         }
         
         #paw-button {
@@ -126,7 +118,6 @@
                 drop-shadow(0 0 8px rgba(255, 192, 203, 0.6));
             text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
             position: absolute;
-            bottom: 30px;
         }
         
         #paw-button:hover {
@@ -154,8 +145,6 @@
         /* 終了ボタンのスタイル更新 - より控えめに */
         #quit-button {
             position: absolute;
-            bottom: 15px;
-            right: 15px;
             width: 36px;
             height: 36px;
             border-radius: 50%;
@@ -185,8 +174,6 @@
         /* 吹き出しの表示位置を調整 - ウィンドウ内に収まるように */
         .quit-bubble {
             position: absolute;
-            bottom: 48px;
-            right: 0;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 12px;
             padding: 8px 12px;
@@ -204,6 +191,8 @@
             min-width: 160px;
             line-height: 1.4;
             text-align: center;
+            bottom: 48px;
+            right: 0;
         }
 
         .quit-bubble:after {
@@ -228,8 +217,6 @@
             position: absolute;
             width: 140px;
             height: auto;
-            bottom: 80px;
-            left: 20px;
             z-index: 998;
             transform-origin: bottom center;
             opacity: 0;
@@ -246,8 +233,6 @@
         /* 秘書たんの吹き出し */
         .speech-bubble {
             position: absolute;
-            top: 10px;
-            left: 20px;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 16px;
             padding: 12px 16px;
@@ -269,7 +254,6 @@
             content: '';
             position: absolute;
             bottom: -8px;
-            left: 40px;
             width: 0;
             height: 0;
             border-left: 8px solid transparent;
@@ -324,6 +308,161 @@
     <script>
         // Electron APIが利用可能かチェック
         const isElectron = window && window.electronAPI;
+        
+        // レイアウト調整関数
+        let updateLayoutPositions;
+        
+        // レイアウト調整関数の実装（Electron APIからのインポートが難しい場合のためにインラインで実装）
+        function initLayoutPositions() {
+            // 要素の取得
+            const quitButton = document.getElementById('quit-button');
+            const pawButton = document.getElementById('paw-button');
+            const assistantImage = document.getElementById('assistantImage');
+            const speechBubble = document.getElementById('speechBubble');
+            const pawBackground = document.querySelector('.paw-background');
+            
+            if (!quitButton || !pawButton || !assistantImage || !speechBubble) {
+                console.log('レイアウト調整: 一部のUI要素が見つかりません');
+                return;
+            }
+            
+            // 終了ボタンを右下に配置
+            quitButton.style.position = 'fixed';
+            quitButton.style.bottom = '15px';
+            quitButton.style.right = '15px';
+            quitButton.style.left = 'auto';
+            quitButton.style.top = 'auto';
+            
+            // 肉球ボタンをその少し上に配置
+            const quitButtonRect = quitButton.getBoundingClientRect();
+            const pawButtonMargin = 15; // 余白
+            
+            pawButton.style.position = 'fixed';
+            pawButton.style.bottom = `${quitButtonRect.height + pawButtonMargin + 15}px`; // 終了ボタンの上
+            pawButton.style.right = `${15}px`;
+            pawButton.style.left = 'auto';
+            pawButton.style.top = 'auto';
+            
+            // 肉球背景も一緒に移動
+            if (pawBackground) {
+                pawBackground.style.position = 'fixed';
+                pawBackground.style.bottom = `${quitButtonRect.height + pawButtonMargin + 20}px`;
+                pawBackground.style.right = `${35}px`;
+                pawBackground.style.left = 'auto';
+                pawBackground.style.top = 'auto';
+            }
+            
+            // 秘書たん立ち絵を肉球ボタンの上に配置
+            const pawButtonRect = pawButton.getBoundingClientRect();
+            const assistantMargin = 5; // 余白
+            
+            assistantImage.style.position = 'fixed';
+            assistantImage.style.bottom = `${quitButtonRect.height + pawButtonRect.height + assistantMargin + 15}px`; // 肉球ボタンの上
+            assistantImage.style.right = `${5}px`; // 右寄せ（少し余白）
+            assistantImage.style.left = 'auto';
+            assistantImage.style.top = 'auto';
+            
+            // 吹き出しを秘書たんの頭の上に配置
+            const assistantRect = assistantImage.getBoundingClientRect();
+            const bubbleMargin = 10; // 余白
+            
+            speechBubble.style.position = 'fixed';
+            speechBubble.style.bottom = `${assistantRect.height + quitButtonRect.height + pawButtonRect.height + bubbleMargin + 15}px`; // 立ち絵の上
+            speechBubble.style.right = `${5}px`; // 右寄せ（少し余白）
+            speechBubble.style.left = 'auto';
+            speechBubble.style.top = 'auto';
+            
+            // 吹き出しの三角形部分の位置調整
+            const bubbleArrow = document.querySelector('.speech-bubble:after');
+            if (bubbleArrow) {
+                bubbleArrow.style.left = 'auto';
+                bubbleArrow.style.right = '40px';
+            }
+            
+            console.log('UIレイアウト位置の更新が完了しました');
+        }
+
+        // ページ読み込み時に初期化
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('🐾 統合肉球UI初期化完了');
+            
+            // レイアウト調整関数を初期化と保存
+            updateLayoutPositions = initLayoutPositions;
+            
+            // 初期レイアウト設定
+            updateLayoutPositions();
+            
+            // リサイズイベントのリスナーを設定
+            window.addEventListener('resize', () => {
+                updateLayoutPositions();
+            });
+            
+            // 秘書たん画像を非表示に初期化
+            const secretaryTan = document.getElementById('assistantImage');
+            if (secretaryTan) {
+                secretaryTan.style.opacity = '0';
+                
+                // Electron API が利用可能な場合は画像パスを解決
+                if (isElectron && window.electronAPI.resolveAssetPath) {
+                    try {
+                        const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_normal.png');
+                        secretaryTan.src = resolvedPath || '/assets/images/secretary_normal.png';
+                        console.log('画像パスを解決しました:', resolvedPath);
+                    } catch (error) {
+                        console.error('画像パス解決エラー:', error);
+                    }
+                }
+            }
+            
+            // 設定UIイベントのリスナーを登録
+            if (isElectron && window.electron && window.electron.ipcRenderer) {
+                // メインプロセスからの設定表示リクエストを受け取る
+                window.electron.ipcRenderer.on('display-settings-bubble', async (data) => {
+                    console.log('設定UI表示リクエストを受信:', data);
+                    
+                    // 吹き出しのテキストと表情を設定
+                    const speechBubble = document.getElementById('speechBubble');
+                    const speechText = document.getElementById('speechText');
+                    const secretaryTan = document.getElementById('assistantImage');
+                    
+                    if (speechBubble && speechText && secretaryTan) {
+                        // テキストを設定
+                        speechText.textContent = data.text || '設定モードだよ！何を変更する？';
+                        
+                        // 吹き出しを表示
+                        speechBubble.classList.add('active');
+                        
+                        // 秘書たん画像の表情を変更
+                        const emotion = data.emotion || 'happy';
+                        let imagePath = `/assets/images/secretary_${emotion}.png`;
+                        
+                        // 画像パスを解決
+                        if (window.electronAPI.resolveAssetPath) {
+                            try {
+                                const resolvedPath = await window.electronAPI.resolveAssetPath(`assets/images/secretary_${emotion}.png`);
+                                if (resolvedPath) {
+                                    imagePath = resolvedPath;
+                                }
+                            } catch (error) {
+                                console.error('画像パス解決エラー:', error);
+                            }
+                        }
+                        
+                        secretaryTan.src = imagePath;
+                        secretaryTan.style.opacity = '1';
+                        secretaryTan.classList.add('active');
+                        
+                        // 音声合成
+                        if (window.electronAPI.speakText) {
+                            window.electronAPI.speakText(data.text || '設定モードだよ！何を変更する？', emotion)
+                                .catch(error => {
+                                    console.error('音声合成エラー:', error);
+                                });
+                        }
+                    }
+                });
+            }
+        });
         
         // ランダムセリフと表情の組み合わせ
         const greetings = [
@@ -550,28 +689,6 @@
             }
         });
         
-        // ページ読み込み時に初期化
-        window.addEventListener('DOMContentLoaded', async () => {
-            console.log('🐾 統合肉球UI初期化完了');
-            
-            // 秘書たん画像を非表示に初期化
-            const secretaryTan = document.getElementById('assistantImage');
-            if (secretaryTan) {
-                secretaryTan.style.opacity = '0';
-                
-                // Electron API が利用可能な場合は画像パスを解決
-                if (isElectron && window.electronAPI.resolveAssetPath) {
-                    try {
-                        const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_normal.png');
-                        secretaryTan.src = resolvedPath || '/assets/images/secretary_normal.png';
-                        console.log('画像パスを解決しました:', resolvedPath);
-                    } catch (error) {
-                        console.error('画像パス解決エラー:', error);
-                    }
-                }
-            }
-        });
-
         // テスト用の設定トグル表示関数
         function testSettingToggle() {
             // スピーチマネージャーからインポートした関数を使用

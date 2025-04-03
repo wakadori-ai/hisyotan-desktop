@@ -22,6 +22,8 @@ import { setupDebugPanel } from './handlers/debugPanel.js';
 import { setupAssistantImage } from './handlers/assistantImage.js';
 import { loadAndApplySettings } from './handlers/settingsLoader.js';
 import { showBubble, hideBubble } from './handlers/bubbleManager.js';
+// レイアウトマネージャーをインポート
+import { setupLayoutManager } from './handlers/layoutManager.js';
 
 // 起動中フラグ
 let isStartupInProgress = true;
@@ -86,6 +88,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupAssistantImage();
     setupDebugPanel();
     setupContextMenuEvents();
+    // レイアウトマネージャーの初期化
+    setupLayoutManager();
     
     logDebug('すべての機能の初期化が完了しました');
     

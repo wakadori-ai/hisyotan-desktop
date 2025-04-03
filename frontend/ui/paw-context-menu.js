@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Electron環境で実行されているかを判定
-const isElectron = window && window.electronAPI;
-if (!isElectron) {
+const isElectronContext = window && window.electronAPI;
+if (!isElectronContext) {
   console.log('⚠️ Electron APIが検出されませんでした。一部機能が制限されます。');
 } 

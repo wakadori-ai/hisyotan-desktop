@@ -132,11 +132,18 @@ function createPawWindow() {
   console.log('preloadスクリプトの絶対パス:', preloadPath);
   console.log('このファイルが存在するか:', fs.existsSync(preloadPath));
   
+  // 画面の右から20%、下から5%の位置を計算
+  const winWidth = 360;
+  const winHeight = 640;
+  
+  const xPosition = Math.round(width * 0.90) - winWidth;
+  const yPosition = Math.round(height * 0.98) - winHeight;
+  
   pawWindow = new BrowserWindow({
-    width: 240,
-    height: 240,
-    x: width - 260, // 画面右端から少し内側に配置
-    y: height - 270, // 画面右下に配置
+    width: winWidth,
+    height: winHeight,
+    x: xPosition,
+    y: yPosition,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -160,6 +167,10 @@ function createPawWindow() {
     : path.join(app.getAppPath(), 'dist', 'paw.html'); // 本番モード
   
   pawWindow.loadFile(pawPath);
+
+  pawWindow.webContents.once('did-finish-load', () => {
+    pawWindow.setIgnoreMouseEvents(false);
+  });
   
   // ウィンドウが閉じられたときの処理
   pawWindow.on('closed', () => {
@@ -243,6 +254,26 @@ ipcMain.handle('speak-text', async (event, text, emotion = 'normal') => {
     return { success: true };
   } catch (error) {
     console.error('音声合成に失敗しました:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 設定UIを表示するハンドラー
+ipcMain.handle('show-settings-ui', async (event) => {
+  try {
+    console.log('設定UI表示リクエストを受信しました');
+    
+    // 秘書たんに「設定モードだよ」と喋らせる
+    if (pawWindow && !pawWindow.isDestroyed()) {
+      pawWindow.webContents.send('display-settings-bubble', {
+        text: '「設定モードだよ！何を変更する？」',
+        emotion: 'happy'
+      });
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('設定UI表示に失敗しました:', error);
     return { success: false, error: error.message };
   }
 });

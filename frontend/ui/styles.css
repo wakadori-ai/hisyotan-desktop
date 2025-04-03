@@ -599,7 +599,7 @@ body.mouse-active .speech-bubble.show {
   width: 38px !important;
   height: 38px !important;
   border-radius: 50% !important;
-  background-color: rgba(255, 100, 150, 0.9) !important;
+  background-color: rgba(255, 100, 150, 1.0) !important;
   color: #fff !important;
   font-size: 20px !important;
   display: flex !important; /* 初期表示はJSで制御 */
