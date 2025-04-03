@@ -1,0 +1,11 @@
+/* ベース設定のインポート */
+@import './base/_variables.css';
+@import './base/_reset.css';
+
+/* コンポーネントのインポート */
+@import './components/_assistant.css';
+@import './components/_speech-bubble.css';
+@import './components/_paw-button.css';
+
+/* アニメーションのインポート */
+@import './animations/_keyframes.css'; 
