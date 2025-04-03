@@ -2,7 +2,7 @@
   "name": "hisyotan-desktop",
   "version": "1.0.0",
   "description": "ふにゃ秘書たん - かわいいAI秘書アプリ",
-  "main": "frontend/core/main.js",
+  "main": "frontend/src/main/index.js",
   "scripts": {
     "start": "electron . --app-name=hisyotan",
     "dev": "vite --port 5173",

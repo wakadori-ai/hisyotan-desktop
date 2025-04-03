@@ -4,8 +4,8 @@ const path = require('path');
 console.log('📝 preloadスクリプトをdistフォルダにコピーします...');
 
 // コピー元のパス
-const preloadPath = path.join(__dirname, 'frontend', 'core', 'preload.js');
-const pawPreloadPath = path.join(__dirname, 'frontend', 'core', 'paw-preload.js');
+const preloadPath = path.join(__dirname, 'frontend', 'src', 'main', 'preload', 'preload.js');
+const pawPreloadPath = path.join(__dirname, 'frontend', 'src', 'main', 'preload', 'paw-preload.js');
 
 // コピー先のパス
 const distPreloadPath = path.join(__dirname, 'dist', 'preload.js');
