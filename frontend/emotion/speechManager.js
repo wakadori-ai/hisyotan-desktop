@@ -647,6 +647,16 @@ export async function showHordeModeToggle(currentState = false, onChangeCallback
     // 現在の状態を設定
     isHordeModeEnabled = currentState;
     
+    // UI要素を初期化（呼び出されたHTMLコンテキストに応じて）
+    const speechBubble = document.getElementById('speechBubble');
+    const speechText = document.getElementById('speechText');
+    
+    // 要素が見つからない場合はUIElementを再初期化
+    if (!speechBubble || !speechText) {
+      logDebug('吹き出し要素が見つからないためUIを再初期化します');
+      initUIElements();
+    }
+    
     // ホード夜モード設定用のセリフオブジェクトを作成
     const hordeToggleSpeech = {
       id: "setting_horde_mode",

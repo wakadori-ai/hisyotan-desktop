@@ -4,7 +4,7 @@
 // スタイルシートをインポート
 import '../styles.css';
 
-import { logDebug, logError, saveErrorLog } from '@core/logger.js';
+import { logDebug, logError, logWarn, saveErrorLog } from '@core/logger.js';
 import { loadConfig } from '@config/configLoader.js';
 import { initUIElements, showError, shouldShowError } from '@ui/uiHelper.js';
 import { initExpressionElements, setExpression } from '@emotion/expressionManager.js';
@@ -272,11 +272,44 @@ async function loadAndApplySettings() {
           }
         }
         
-        console.log('秘書たんの設定を適用しました', config.assistant);
+        // クリック透過設定の適用
+        if (typeof config.assistant.clickThroughDisabled === 'boolean') {
+          // 設定値をUIに反映
+          const clickThroughToggle = document.getElementById('clickThroughToggle');
+          if (clickThroughToggle) {
+            clickThroughToggle.checked = config.assistant.clickThroughDisabled;
+          }
+          
+          // 設定に応じてクリック透過モードを切り替え
+          if (config.assistant.clickThroughDisabled) {
+            // クリック透過を無効化（クリック可能にする）
+            if (window.electronAPI && window.electronAPI.enableClickThrough) {
+              window.electronAPI.enableClickThrough();
+              logDebug('設定からクリック透過を無効化しました（クリック可能）');
+            }
+          } else {
+            // デバッグモードが有効でなければクリック透過を有効化
+            if (!document.body.classList.contains('pointer-events-enabled')) {
+              if (window.electronAPI && window.electronAPI.disableClickThrough) {
+                window.electronAPI.disableClickThrough();
+                logDebug('設定からクリック透過を有効化しました（クリック透過）');
+              }
+            }
+          }
+        } else {
+          // 初期値がない場合はクリック可能をデフォルトに設定
+          window.currentSettings.clickThroughDisabled = true;
+          if (window.electronAPI && window.electronAPI.enableClickThrough) {
+            window.electronAPI.enableClickThrough();
+            logDebug('初期値：クリック透過を無効化しました（クリック可能）');
+          }
+        }
+        
+        logDebug('秘書たんの設定を適用しました');
       }
     }
   } catch (error) {
-    console.error('設定の読み込みと適用に失敗しました:', error);
+    logError('設定の読み込みと適用に失敗しました:', error);
   }
 }
 
@@ -289,7 +322,9 @@ function setupMouseEventHandling() {
     document.getElementById('statusIndicator'),
     document.getElementById('settingsIcon'),
     document.getElementById('debugMenu'),
-    document.getElementById('overlayMenu')
+    document.getElementById('overlayMenu'),
+    document.querySelector('.paw-button-wrapper'),
+    document.getElementById('assistantImage')
   ].filter(element => element !== null);
   
   // electronAPIが利用可能かチェック
@@ -320,7 +355,11 @@ function setupMouseEventHandling() {
             element.matches(':hover')
           );
           
-          if (!isOverInteractive) {
+          // デバッグモードが有効、または設定でクリック透過が無効の場合は無効化しない
+          const isDebugMode = document.body.classList.contains('pointer-events-enabled');
+          const clickThroughDisabled = window.currentSettings?.clickThroughDisabled === true;
+          
+          if (!isOverInteractive && !isDebugMode && !clickThroughDisabled) {
             window.electronAPI.disableMouseEvents();
             logDebug('マウスイベントを無効化しました（デバウンス処理）');
           }
@@ -337,8 +376,9 @@ function setupMouseEventHandling() {
       element.addEventListener('mouseleave', disableMouseEventsWithDebounce);
     });
     
-    // 初期状態では無効化しておく
-    window.electronAPI.disableMouseEvents();
+    // 初期状態では有効化しておく（右クリックイベントが機能するように）
+    window.electronAPI.enableMouseEvents();
+    logDebug('初期状態：マウスイベントを有効化しました');
   } else {
     logDebug('electronAPIが利用できないため、マウスイベント処理を設定できません');
   }
@@ -395,10 +435,25 @@ window.toggleClickThroughMode = function() {
   // electronAPIが利用可能かチェック
   if (window.electronAPI && window.electronAPI.toggleClickThrough) {
     window.electronAPI.toggleClickThrough().then(isDisabled => {
+      // 設定に保存（clickThroughDisabled = クリック透過が無効＝クリック可能）
+      if (window.currentSettings) {
+        window.currentSettings.clickThroughDisabled = isDisabled;
+        
+        // 設定を永続化
+        if (window.electronAPI && window.electronAPI.saveSettings) {
+          window.electronAPI.saveSettings({
+            assistant: {
+              ...window.currentSettings,
+              clickThroughDisabled: isDisabled
+            }
+          }).catch(err => logError(`クリック透過設定保存エラー: ${err.message}`));
+        }
+      }
+      
       // クリックスルーが無効（つまりクリック可能）ならデバッグモード表示
       if (isDisabled) {
         document.body.classList.add('pointer-events-enabled');
-        console.log('デバッグモード有効: クリック可能');
+        logDebug('デバッグモード有効: クリック可能');
         
         // デバッグパネルを表示
         const debugPanel = document.getElementById('debug-panel');
@@ -407,10 +462,12 @@ window.toggleClickThroughMode = function() {
         }
         
         // 操作可能状態を通知
-        speak('操作モードが有効になりました。Alt+Cで元に戻せます。', 'normal', 3000);
+        if (window.speechManager && window.speechManager.speak) {
+          window.speechManager.speak('操作モードが有効になりました。Alt+Cで元に戻せます。', 'normal', 3000);
+        }
       } else {
         document.body.classList.remove('pointer-events-enabled');
-        console.log('デバッグモード無効: クリック透過');
+        logDebug('デバッグモード無効: クリック透過');
         
         // デバッグパネルを非表示
         const debugPanel = document.getElementById('debug-panel');
@@ -419,11 +476,13 @@ window.toggleClickThroughMode = function() {
         }
         
         // クリックスルーモードに戻ったことを通知
-        speak('クリック透過モードに戻りました', 'normal', 2000);
+        if (window.speechManager && window.speechManager.speak) {
+          window.speechManager.speak('クリック透過モードに戻りました', 'normal', 2000);
+        }
       }
     });
   } else {
-    console.error('electronAPI.toggleClickThrough が利用できません');
+    logError('electronAPI.toggleClickThrough が利用できません');
   }
 };
 
@@ -531,6 +590,26 @@ function setupDebugPanel() {
     `;
     debugPanel.appendChild(debugTitle);
     
+    // クリック透過切り替えボタン
+    const clickThroughBtn = document.createElement('button');
+    clickThroughBtn.textContent = 'クリック透過切替';
+    clickThroughBtn.className = 'debug-btn';
+    clickThroughBtn.style.cssText = `
+      background: #9b59b6;
+      border: none;
+      color: white;
+      padding: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-bottom: 5px;
+    `;
+    clickThroughBtn.onclick = () => {
+      logDebug('クリック透過切替ボタンがクリックされました');
+      window.toggleClickThroughMode();
+    };
+    debugPanel.appendChild(clickThroughBtn);
+    
     // ゾンビ警告テストボタン
     const zombieWarningBtn = document.createElement('button');
     zombieWarningBtn.textContent = 'ゾンビ警告テスト';
@@ -545,7 +624,7 @@ function setupDebugPanel() {
       font-size: 12px;
     `;
     zombieWarningBtn.onclick = () => {
-      console.log('ゾンビ警告テストボタンがクリックされました');
+      logDebug('ゾンビ警告テストボタンがクリックされました');
       sendTestZombieWarning();
     };
     debugPanel.appendChild(zombieWarningBtn);
@@ -565,7 +644,7 @@ function setupDebugPanel() {
       margin-top: 5px;
     `;
     zombieDetectionBtn.onclick = () => {
-      console.log('ゾンビ検出テストボタンがクリックされました');
+      logDebug('ゾンビ検出テストボタンがクリックされました');
       sendTestDetection();
     };
     debugPanel.appendChild(zombieDetectionBtn);
@@ -589,10 +668,43 @@ function setupDebugPanel() {
       if (typeof window.toggleWsDebugMode === 'function') {
         window.toggleWsDebugMode();
       } else {
-        console.log('WebSocketデバッグモード切替機能が利用できません');
+        logDebug('WebSocketデバッグモード切替機能が利用できません');
       }
     };
     debugPanel.appendChild(toggleWsLogBtn);
+    
+    // ステータス表示領域
+    const statusArea = document.createElement('div');
+    statusArea.id = 'debug-status';
+    statusArea.style.cssText = `
+      margin-top: 10px;
+      font-size: 11px;
+      color: #ddd;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      padding-top: 5px;
+    `;
+    statusArea.innerHTML = 'クリック透過: <span id="click-through-status">-</span><br>';
+    debugPanel.appendChild(statusArea);
+    
+    // クリック透過状態の更新関数
+    const updateClickThroughStatus = () => {
+      const statusSpan = document.getElementById('click-through-status');
+      if (statusSpan) {
+        const isEnabled = document.body.classList.contains('pointer-events-enabled');
+        statusSpan.textContent = isEnabled ? '無効' : '有効';
+        statusSpan.style.color = isEnabled ? '#72ff7d' : '#ff7272';
+      }
+    };
+    
+    // ステータス更新
+    updateClickThroughStatus();
+    
+    // クリック透過状態が変更されたときに更新
+    if (window.electronAPI) {
+      window.electronAPI.onClickThroughChanged((isEnabled) => {
+        updateClickThroughStatus();
+      });
+    }
     
     // デバッグパネルをボディに追加
     document.body.appendChild(debugPanel);
@@ -1036,47 +1148,109 @@ document.addEventListener('keydown', (e) => {
  * @description 秘書たんウィンドウで右クリックしたときの動作を設定します
  */
 function setupContextMenuEvents() {
-  // 秘書たん画像と吹き出しの領域を取得
-  const assistantContainer = document.querySelector('.assistant-container');
-  const speechBubble = document.getElementById('speechBubble');
+  // 右クリックイベントを設定する要素候補のリスト
+  const possibleContainers = [
+    document.querySelector('.assistant-container'), // 古い全画面オーバーレイ用
+    document.querySelector('.paw-button-wrapper'),  // 現在のpaw.html用
+    document.getElementById('assistantImage')       // 秘書たん画像自体
+  ];
   
-  if (!assistantContainer) {
-    logError('右クリックイベント設定：assistant-container要素が見つかりません');
+  // 有効なコンテナを見つける
+  const validContainers = possibleContainers.filter(container => container !== null);
+  
+  if (validContainers.length === 0) {
+    logWarn('右クリックイベント設定：有効な要素が見つかりませんでした。.assistant-containerまたは.paw-button-wrapperが存在するか確認してください。🚨');
     return;
   }
   
-  // 右クリックイベントリスナーを追加（アシスタントコンテナ）
-  assistantContainer.addEventListener('contextmenu', (event) => {
-    // デフォルトのコンテキストメニューを抑制
-    event.preventDefault();
-    
-    // 現在のホード夜モードの状態を取得
-    const currentHordeModeState = window.speechManager?.getHordeModeState() || false;
-    
-    // ホード夜モード設定UIを表示
-    if (window.speechManager && window.speechManager.showHordeModeToggle) {
-      logDebug('右クリックでホード夜モード設定UIを表示します');
-      window.speechManager.showHordeModeToggle(currentHordeModeState);
+  logDebug(`右クリックイベント設定：${validContainers.length}個の要素に右クリックイベントを設定します 📝`);
+  
+  // 各有効なコンテナに右クリックイベントを設定
+  validContainers.forEach(container => {
+    container.addEventListener('contextmenu', (event) => {
+      // デフォルトのコンテキストメニューを抑制
+      event.preventDefault();
       
-      // 設定UIの自動非表示タイマーを設定
-      setupAutoHideSetting();
-    } else {
-      logError('speechManager.showHordeModeToggleが利用できません');
+      // イベントの伝播を停止（バブリングを防止）
+      event.stopPropagation();
+      
+      // イベント発生元要素をログ出力
+      const elementInfo = container.id 
+        ? `#${container.id}` 
+        : container.className 
+          ? `.${container.className.split(' ')[0]}` 
+          : 'unknown';
+      logDebug(`右クリックイベント発生: ${elementInfo} 要素 🖱️`);
+      
+      // 現在のホード夜モードの状態を取得
+      const currentHordeModeState = window.speechManager?.getHordeModeState() || false;
+      
+      // ホード夜モード設定UIを表示
+      if (window.speechManager && window.speechManager.showHordeModeToggle) {
+        logDebug('右クリックでホード夜モード設定UIを表示します 🎮');
+        window.speechManager.showHordeModeToggle(currentHordeModeState);
+        
+        // 設定UIの自動非表示タイマーを設定
+        setupAutoHideSetting();
+      } else {
+        logError('speechManager.showHordeModeToggleが利用できません 🚨');
+      }
+    });
+    
+    // イベント登録のログ出力
+    const elementInfo = container.id 
+      ? `#${container.id}` 
+      : container.className 
+        ? `.${container.className.split(' ')[0]}` 
+        : 'unknown';
+    logDebug(`右クリックイベント設定：${elementInfo}に設定完了 ✅`);
+  });
+  
+  // 追加：全体のcontextmenuイベントも捕捉（他の要素からのバブリングをキャッチ）
+  document.addEventListener('contextmenu', (event) => {
+    // assistantImageまたはpaw-button-wrapperの子孫要素からのイベントかチェック
+    const isFromAssistant = event.composedPath().some(el => {
+      if (el instanceof Element) {
+        return el.id === 'assistantImage' || 
+               el.classList?.contains('paw-button-wrapper') ||
+               el.classList?.contains('assistant-container');
+      }
+      return false;
+    });
+    
+    if (isFromAssistant) {
+      event.preventDefault();
+      logDebug('秘書たん関連要素からの右クリックイベントをdocumentで捕捉しました 🔍');
+      
+      // 既に個別要素で処理済みの場合は実行しない（二重実行防止）
+      if (event.defaultPrevented) {
+        return;
+      }
+      
+      // 現在のホード夜モードの状態を取得して設定UIを表示
+      const currentHordeModeState = window.speechManager?.getHordeModeState() || false;
+      if (window.speechManager?.showHordeModeToggle) {
+        window.speechManager.showHordeModeToggle(currentHordeModeState);
+        setupAutoHideSetting();
+      }
     }
   });
   
   // 吹き出し内の右クリックイベントリスナー（すでに吹き出しが表示されている場合）
+  const speechBubble = document.getElementById('speechBubble');
   if (speechBubble) {
     speechBubble.addEventListener('contextmenu', (event) => {
       // デフォルトのコンテキストメニューを抑制
       event.preventDefault();
+      event.stopPropagation();
+      logDebug('吹き出し内で右クリックが発生しました 💬');
       
       // 吹き出しが既に表示されている場合は特に何もしない
       // または特定のアクションを追加することも可能
     });
   }
   
-  logDebug('右クリックイベントリスナーを設定しました');
+  logDebug('右クリックイベントリスナーの設定が完了しました ✨');
 }
 
 /**

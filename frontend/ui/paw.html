@@ -89,7 +89,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            pointer-events: none;
+            pointer-events: auto;
             z-index: 999;
             margin: auto;
         }
@@ -224,7 +224,7 @@
         }
 
         /* 秘書たん画像のスタイル */
-        #secretary-tan {
+        #assistantImage {
             position: absolute;
             width: 140px;
             height: auto;
@@ -233,11 +233,13 @@
             z-index: 998;
             transform-origin: bottom center;
             opacity: 0;
-            pointer-events: none;
             transition: opacity 0.2s ease;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: auto;
         }
 
-        #secretary-tan.active {
+        #assistantImage.active {
             animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
@@ -306,7 +308,7 @@
 </head>
 <body>
     <div class="paw-button-wrapper">
-        <img id="secretary-tan" src="/assets/images/secretary_normal.png" alt="秘書たん" />
+        <img id="assistantImage" src="/assets/images/secretary_normal.png" alt="秘書たん" />
         <div id="paw-button">🐾</div>
         <div class="paw-background"></div>
         <div id="quit-button">
@@ -344,7 +346,7 @@
         async function showSpeechBubble() {
             const speechBubble = document.getElementById('speechBubble');
             const speechText = document.getElementById('speechText');
-            const secretaryTan = document.getElementById('secretary-tan');
+            const secretaryTan = document.getElementById('assistantImage');
             
             if (speechBubble && speechText && secretaryTan) {
                 // ランダムなセリフと表情を選択
@@ -401,7 +403,7 @@
         // 吹き出しを非表示にする関数
         function hideBubble() {
             const speechBubble = document.getElementById('speechBubble');
-            const secretaryTan = document.getElementById('secretary-tan');
+            const secretaryTan = document.getElementById('assistantImage');
             
             if (speechBubble) {
                 speechBubble.classList.remove('active');
@@ -425,7 +427,7 @@
                 // 終了確認の吹き出しを表示
                 const speechBubble = document.getElementById('speechBubble');
                 const speechText = document.getElementById('speechText');
-                const secretaryTan = document.getElementById('secretary-tan');
+                const secretaryTan = document.getElementById('assistantImage');
                 
                 if (speechBubble && speechText) {
                     // テキストを設定
@@ -553,7 +555,7 @@
             console.log('🐾 統合肉球UI初期化完了');
             
             // 秘書たん画像を非表示に初期化
-            const secretaryTan = document.getElementById('secretary-tan');
+            const secretaryTan = document.getElementById('assistantImage');
             if (secretaryTan) {
                 secretaryTan.style.opacity = '0';
                 
@@ -615,5 +617,8 @@
             window.testSettingToggle = testSettingToggle;
         }
     </script>
+
+    <!-- 右クリックメニュー用の専用スクリプト（Viteパスエイリアス非依存） -->
+    <script src="paw-context-menu.js"></script>
 </body>
 </html> 

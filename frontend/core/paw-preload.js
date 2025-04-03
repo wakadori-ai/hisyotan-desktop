@@ -55,5 +55,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resolveAssetPath: (relativePath) => ipcRenderer.invoke('resolve-asset-path', relativePath),
   
   // 画像ファイルの存在確認
-  checkImageExists: (imagePath) => ipcRenderer.invoke('check-image-exists', imagePath)
+  checkImageExists: (imagePath) => ipcRenderer.invoke('check-image-exists', imagePath),
+  
+  // 設定UIを表示する
+  showSettingsUI: () => ipcRenderer.invoke('show-settings-ui'),
+  
+  // 設定を取得する
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  
+  // 設定を保存する
+  saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings)
 }); 
