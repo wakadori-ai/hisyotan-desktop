@@ -79,21 +79,21 @@ Set-Location $ScriptDir
 if ($BackendOnly) {
     Write-Log "FastAPI バックエンドを起動します（Ctrl+Cで停止可）" "Info"
     # 直接実行することでCtrl+Cで停止できるようにする
-    python -m uvicorn backend.main:app --reload --port 8000
+    python -m uvicorn backend.main:app --reload --port 8000 --app-name hisyotan
     exit
 }
 
 if ($FrontendOnly) {
     Write-Log "Vite フロントエンドを起動します（Ctrl+Cで停止可）" "Info"
     # 直接実行することでCtrl+Cで停止できるようにする
-    npm run dev
+    npm run dev -- --hisyotan
     exit
 }
 
 if ($ElectronOnly) {
     Write-Log "Electron アプリのみ起動します（Ctrl+Cで停止可）" "Info"
     # 直接実行することでCtrl+Cで停止できるようにする
-    npm start
+    npm start -- --app-name=hisyotan
     exit
 }
 
@@ -139,30 +139,30 @@ if ($Dev) {
     Write-Log "🔧 開発モード（Vite + Electron）で起動します" "Info"
 
     # バックエンド（FastAPI）を独立プロセスとして起動
-    Start-Process -FilePath "python.exe" -ArgumentList "-m", "uvicorn", "backend.main:app", "--reload", "--port", "8000" -WindowStyle Hidden
+    Start-Process -FilePath "python.exe" -ArgumentList "-m", "uvicorn", "backend.main:app", "--reload", "--port", "8000", "--app-name", "hisyotan" -WindowStyle Hidden
 
     # Viteを独立プロセスとして起動
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev" -WindowStyle Hidden
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev -- --hisyotan" -WindowStyle Hidden
     
     # 少し待機してからElectronを起動（Viteとバックエンドの起動を待つ）
     Start-Sleep -Seconds 5
     
     # 開発モード用Electronを独立プロセスとして起動
     $env:VITE_DEV_SERVER_URL = "http://localhost:5173/"
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npx electron ." -WindowStyle Hidden
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npx electron . --app-name=hisyotan" -WindowStyle Hidden
 
     Write-Log "`n🌐 Vite: http://localhost:5173/ にアクセスできます" "Info"
     Write-Log "🌐 API: http://localhost:8000/ で起動しています" "Info" 
     Write-Log "🛠️ 変更は自動で反映されます（HMR有効）" "Info"
 } else {
     # バックエンド（FastAPI）を独立プロセスとして起動
-    Start-Process -FilePath "python.exe" -ArgumentList "-m", "uvicorn", "backend.main:app", "--port", "8000" -WindowStyle Hidden
+    Start-Process -FilePath "python.exe" -ArgumentList "-m", "uvicorn", "backend.main:app", "--port", "8000", "--app-name", "hisyotan" -WindowStyle Hidden
     
     # 少し待機してからElectronを起動（バックエンドの起動を待つ）
     Start-Sleep -Seconds 3
     
     # 通常モードでElectronを独立プロセスとして起動
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm start" -WindowStyle Hidden
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm start -- --app-name=hisyotan" -WindowStyle Hidden
 }
 
 Write-Log "`n✨✨ 秘書たんを起動しました！ ✨✨" "Cute"
