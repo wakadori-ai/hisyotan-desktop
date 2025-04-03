@@ -35,9 +35,11 @@ def setup_parser():
                       help='詳細ログを有効化')
     parser.add_argument('--model-path', '-m', type=str,
                       help='YOLOモデルファイルへのパス (デフォルトはYOLOv8n)')
+    parser.add_argument('--no-gpu', action='store_true',
+                      help='GPU使用を無効化してCPUのみで実行')
     return parser
 
-async def debug_zombie_detection(threshold=0.3, verbose=False, model_path=None):
+async def debug_zombie_detection(threshold=0.3, verbose=False, model_path=None, use_gpu=True):
     """ゾンビ検出のデバッグ実行"""
     try:
         # 環境変数の設定
@@ -58,6 +60,19 @@ async def debug_zombie_detection(threshold=0.3, verbose=False, model_path=None):
             import traceback
             traceback.print_exc()
             return
+        
+        # GPU状態の確認
+        if use_gpu and torch.cuda.is_available():
+            logger.info(f"GPU検出: {torch.cuda.get_device_name(0)}")
+        else:
+            if not use_gpu:
+                logger.info("GPU無効モード: CPUのみを使用します")
+            elif not torch.cuda.is_available():
+                logger.info("GPU検出できません: CPUのみを使用します")
+                use_gpu = False
+            else:
+                logger.info("GPU検出: できませんでした")
+                use_gpu = False
         
         # モデルのロード処理を修正
         try:
@@ -83,8 +98,8 @@ async def debug_zombie_detection(threshold=0.3, verbose=False, model_path=None):
                 model_path = "yolov8n.pt"
             
             # 検出器インスタンスを作成
-            detector = ZombieDetector(model_path=model_path, confidence=threshold, debug_mode=True)
-            logger.info(f"ZombieDetectorインスタンスを作成しました: モデル={model_path}, 閾値={threshold}")
+            detector = ZombieDetector(model_path=model_path, confidence=threshold, debug_mode=True, use_gpu=use_gpu)
+            logger.info(f"ZombieDetectorインスタンスを作成しました: モデル={model_path}, 閾値={threshold}, GPU={use_gpu}")
             
             # モデルをロード
             logger.info("モデルのロードを開始します...")
@@ -151,7 +166,8 @@ async def main():
     await debug_zombie_detection(
         threshold=args.threshold, 
         verbose=args.verbose,
-        model_path=args.model_path
+        model_path=args.model_path,
+        use_gpu=not args.no_gpu
     )
     
     logger.info(f"✅ デバッグスクリプトを終了します")

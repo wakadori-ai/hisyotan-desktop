@@ -39,7 +39,7 @@ MAX_DETECTION_DIR_SIZE_MB = 500  # 検出ディレクトリの最大サイズ（
 class ZombieDetector:
     """ゾンビ検出クラス"""
     
-    def __init__(self, model_path: str = None, confidence: float = 0.45, debug_mode: bool = False, target_classes: Optional[List[int]] = None, resnet_enabled: bool = True):
+    def __init__(self, model_path: str = None, confidence: float = 0.45, debug_mode: bool = False, target_classes: Optional[List[int]] = None, resnet_enabled: bool = True, use_gpu: bool = True):
         """
         ZombieDetectorクラスのコンストラクタ
         
@@ -49,6 +49,7 @@ class ZombieDetector:
             debug_mode: デバッグモードフラグ
             target_classes: 検出対象のクラスIDリスト（デフォルトは人物クラス[0]のみ）
             resnet_enabled: ResNet分類器を有効にするかどうか
+            use_gpu: GPUを使用するかどうか（デフォルト: True）
         """
         
         self.model_path = model_path
@@ -64,6 +65,10 @@ class ZombieDetector:
         self.resize_factor = PERFORMANCE_SETTINGS["resize_factor"]
         self.skip_ratio = PERFORMANCE_SETTINGS["skip_ratio"]
         self.cpu_threshold = PERFORMANCE_SETTINGS["cpu_threshold"]
+        
+        # GPU設定
+        self.use_gpu = use_gpu and torch.cuda.is_available()
+        self.device = torch.device('cuda' if self.use_gpu else 'cpu')
         
         # ResNet分類器の設定
         self.resnet_enabled = resnet_enabled
@@ -100,8 +105,22 @@ class ZombieDetector:
         try:            
             # モデルのロードは重い処理なので非同期で行う
             loop = asyncio.get_event_loop()
+            
+            # GPUサポート状態のログ出力
+            if self.use_gpu:
+                gpu_info = f"GPU: {torch.cuda.get_device_name(0)}" if torch.cuda.is_available() else "GPU利用可能だがデバイスが見つかりません"
+                logger.info(f"GPU検出: {gpu_info}")
+            else:
+                logger.info("CPU モードで実行します")
+            
+            # YOLOモデルをロード（デバイスパラメータなしで初期化）
             self.model = await loop.run_in_executor(None, lambda: YOLO(self.model_path))
-            logger.info(f"YOLOモデルのロードに成功: {self.model_path}")
+            
+            # モデル読み込み後にデバイスを設定
+            if self.use_gpu and torch.cuda.is_available():
+                await loop.run_in_executor(None, lambda: self.model.to(self.device))
+                
+            logger.info(f"YOLOモデルのロードに成功: {self.model_path} (デバイス: {self.device})")
             
             # ResNet分類器も初期化
             if self.resnet_enabled:
@@ -112,12 +131,12 @@ class ZombieDetector:
                     from ml.train import ZombieClassifier
                     logger.info("ZombieClassifierをインポートしました")
                     
-                    # 分類器のインスタンス化と実行
+                    # 分類器のインスタンス化と実行（デバイスを指定）
                     self.resnet_classifier = await loop.run_in_executor(
                         None, 
-                        lambda: ZombieClassifier(data_path=os.path.join(DATA_DIR, "datasets", "zombie_classifier"))
+                        lambda: ZombieClassifier(data_path=os.path.join(DATA_DIR, "datasets", "zombie_classifier"), device=self.device)
                     )
-                    logger.info("ResNet分類器の初期化に成功しました")
+                    logger.info(f"ResNet分類器の初期化に成功しました (デバイス: {self.device})")
                 except ImportError as e:
                     logger.error(f"ZombieClassifierのインポートに失敗: {e}")
                     
@@ -375,12 +394,12 @@ class ZombieDetector:
                     print(f"[BACKEND] 閾値設定エラー: {e}")
             
             if verbose_mode:
-                print(f"[BACKEND] ゾンビ検出 - 閾値: {effective_threshold}, デバッグモード: {debug_mode}")
+                print(f"[BACKEND] ゾンビ検出 - 閾値: {effective_threshold}, デバッグモード: {debug_mode}, デバイス: {self.device}")
             
             # 非同期で画像処理を実行
             loop = asyncio.get_event_loop()
             
-            # 実際の検出処理はバックグラウンドスレッドで実行
+            # 実際の検出処理はバックグラウンドスレッドで実行（デバイスパラメータなし）
             result = await loop.run_in_executor(
                 None, 
                 lambda: self.model.predict(

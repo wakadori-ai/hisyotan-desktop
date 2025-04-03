@@ -59,11 +59,12 @@ class ZombieDataset(Dataset):
         return image, label
 
 class ZombieClassifier:
-    def __init__(self, data_path='../data/datasets/zombie_classifier'):
+    def __init__(self, data_path='../data/datasets/zombie_classifier', device=None):
         """ゾンビ分類器の初期化
         
         Args:
             data_path: データセットへのパス
+            device: 使用するデバイス (None の場合は自動選択)
         """
         self.data_path = Path(data_path)
         # 絶対パスで正確にbackend/models ディレクトリを指定
@@ -79,8 +80,11 @@ class ZombieClassifier:
         self.model = None
         self.classes = ['not_zombie', 'zombie']  # クラスラベル
         
-        # GPUが利用可能かチェック
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # GPUが利用可能かチェック (明示的に指定されたデバイスを優先)
+        if device is not None:
+            self.device = device
+        else:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"使用デバイス: {self.device}")
         
         # 変換の定義
