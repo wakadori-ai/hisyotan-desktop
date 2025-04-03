@@ -86,6 +86,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     setupDebugPanel();
     
+    // 右クリックイベントハンドラの設定
+    setupContextMenuEvents();
+    
     logDebug('すべての機能の初期化が完了しました');
     
     // 起動完了フラグを設定（10秒後に通常動作へ移行）
@@ -826,54 +829,6 @@ async function loadSecretaryImage(emotion = 'normal') {
   }
 }
 
-// DOMロード完了時の処理
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🐾 DOMがロードされました');
-  
-  try {
-    // 秘書たん画像の初期ロード
-    await loadSecretaryImage('normal');
-    
-    // Electron APIが利用可能かチェック
-    if (window.electronAPI) {
-      console.log('✅ Electron APIが利用可能です');
-      
-      // 感情変化イベントの監視
-      if (window.electronAPI.onEmotionChange) {
-        window.electronAPI.onEmotionChange((emotionValue) => {
-          console.log(`😊 感情状態が変化しました: ${emotionValue}`);
-          
-          // 感情値に応じて画像を切り替え
-          let emotion = 'normal';
-          if (emotionValue > 30) emotion = 'happy';
-          else if (emotionValue < -30) emotion = 'sad';
-          
-          loadSecretaryImage(emotion);
-        });
-      }
-      
-      // アニメーション関連イベントの登録
-      if (window.electronAPI.onPrepareShowAnimation) {
-        window.electronAPI.onPrepareShowAnimation(() => {
-          console.log('🎬 表示アニメーション準備');
-          // 表示アニメーションの準備処理
-        });
-      }
-      
-      if (window.electronAPI.onPrepareHideAnimation) {
-        window.electronAPI.onPrepareHideAnimation(() => {
-          console.log('🎬 非表示アニメーション準備');
-          // 非表示アニメーションの準備処理
-        });
-      }
-    } else {
-      console.warn('⚠️ Electron APIが利用できません');
-    }
-  } catch (error) {
-    console.error(`初期化エラー: ${error.message}`);
-  }
-});
-
 // 吹き出しを表示する関数
 function showBubble(text, duration = 5000) {
   try {
@@ -958,4 +913,287 @@ window.openDevTools = function() {
   }
 };
 
-console.log('�� レンダラープロセス初期化完了');
+console.log('📝 レンダラープロセス初期化完了');
+
+/**
+ * ホード夜モード設定UIを表示する関数
+ * @param {boolean} currentValue - 現在の設定値
+ * @param {Function} onChangeCallback - 値変更時のコールバック
+ */
+function showHordeModeSettings(currentValue = false, onChangeCallback = null) {
+  try {
+    // speechManagerからホード夜モード設定関数を呼び出す
+    if (window.speechManager && window.speechManager.showHordeModeToggle) {
+      window.speechManager.showHordeModeToggle(currentValue, (newValue) => {
+        logDebug(`ホード夜モード設定が変更されました: ${newValue}`);
+        
+        // アプリケーション設定に保存
+        if (window.electronAPI && window.electronAPI.saveSettings) {
+          window.electronAPI.saveSettings({ 
+            hordeMode: newValue 
+          }).catch(err => logError(`設定保存エラー: ${err.message}`));
+        }
+        
+        // コールバックがあれば実行
+        if (typeof onChangeCallback === 'function') {
+          onChangeCallback(newValue);
+        }
+      });
+    } else {
+      logError('speechManagerが見つからないかshowHordeModeToggle関数が利用できません');
+    }
+  } catch (err) {
+    logError(`ホード夜モード設定表示エラー: ${err.message}`);
+  }
+}
+
+/**
+ * 複数設定項目を含む設定UIテスト関数
+ */
+function showMultipleSettings() {
+  try {
+    // 現在の設定値を取得
+    const isHordeModeEnabled = window.speechManager?.getHordeModeState() || false;
+    
+    // 複数の設定項目を含むUIペイロードを作成
+    const settingsPayload = {
+      id: "multiple_settings",
+      type: "setting",
+      text: "アプリの設定を変更できるよ。何か変えたい設定はある？",
+      emotion: "normal",
+      uiPayload: [
+        {
+          type: "toggle",
+          label: "ホード夜モード",
+          description: "夜間にゾンビの出現頻度が上がります",
+          value: isHordeModeEnabled,
+          onChange: (newValue) => {
+            // ホード夜モードの状態を更新
+            window.speechManager?.setHordeModeState(newValue);
+            logDebug(`ホード夜モード設定変更: ${newValue}`);
+            
+            // 設定を保存
+            if (window.electronAPI && window.electronAPI.saveSettings) {
+              window.electronAPI.saveSettings({ hordeMode: newValue })
+                .catch(err => logError(`設定保存エラー: ${err.message}`));
+            }
+          }
+        },
+        {
+          type: "toggle",
+          label: "自動音声読み上げ",
+          description: "セリフを自動的に音声合成で読み上げます",
+          value: true,
+          onChange: (newValue) => {
+            logDebug(`自動音声読み上げ設定変更: ${newValue}`);
+            // 実際の処理はここに実装
+          }
+        },
+        {
+          type: "toggle",
+          label: "常に最前面表示",
+          value: false,
+          onChange: (newValue) => {
+            logDebug(`常に最前面表示設定変更: ${newValue}`);
+            // 実際の処理はここに実装
+          }
+        }
+      ]
+    };
+    
+    // 設定UIを表示
+    window.speechManager?.speakWithObject(settingsPayload);
+    
+  } catch (err) {
+    logError(`複数設定項目表示エラー: ${err.message}`);
+  }
+}
+
+// グローバルスコープに公開（開発者ツールからアクセスできるように）
+if (typeof window !== 'undefined') {
+  window.showHordeModeSettings = showHordeModeSettings;
+  window.showMultipleSettings = showMultipleSettings;
+}
+
+// ショートカットキー設定：
+// Alt+H: ホード夜モード設定トグル表示
+// Alt+S: 複数設定項目表示
+document.addEventListener('keydown', (e) => {
+  // Alt+H: ホード夜モード設定
+  if (e.altKey && e.key === 'h') {
+    const currentValue = window.speechManager?.getHordeModeState() || false;
+    showHordeModeSettings(currentValue);
+  }
+  
+  // Alt+S: 複数設定項目表示
+  if (e.altKey && e.key === 's') {
+    showMultipleSettings();
+  }
+});
+
+/**
+ * 右クリック（コンテキストメニュー）の設定
+ * @description 秘書たんウィンドウで右クリックしたときの動作を設定します
+ */
+function setupContextMenuEvents() {
+  // 秘書たん画像と吹き出しの領域を取得
+  const assistantContainer = document.querySelector('.assistant-container');
+  const speechBubble = document.getElementById('speechBubble');
+  
+  if (!assistantContainer) {
+    logError('右クリックイベント設定：assistant-container要素が見つかりません');
+    return;
+  }
+  
+  // 右クリックイベントリスナーを追加（アシスタントコンテナ）
+  assistantContainer.addEventListener('contextmenu', (event) => {
+    // デフォルトのコンテキストメニューを抑制
+    event.preventDefault();
+    
+    // 現在のホード夜モードの状態を取得
+    const currentHordeModeState = window.speechManager?.getHordeModeState() || false;
+    
+    // ホード夜モード設定UIを表示
+    if (window.speechManager && window.speechManager.showHordeModeToggle) {
+      logDebug('右クリックでホード夜モード設定UIを表示します');
+      window.speechManager.showHordeModeToggle(currentHordeModeState);
+      
+      // 設定UIの自動非表示タイマーを設定
+      setupAutoHideSetting();
+    } else {
+      logError('speechManager.showHordeModeToggleが利用できません');
+    }
+  });
+  
+  // 吹き出し内の右クリックイベントリスナー（すでに吹き出しが表示されている場合）
+  if (speechBubble) {
+    speechBubble.addEventListener('contextmenu', (event) => {
+      // デフォルトのコンテキストメニューを抑制
+      event.preventDefault();
+      
+      // 吹き出しが既に表示されている場合は特に何もしない
+      // または特定のアクションを追加することも可能
+    });
+  }
+  
+  logDebug('右クリックイベントリスナーを設定しました');
+}
+
+/**
+ * 設定UI表示後の自動非表示タイマーを設定
+ */
+function setupAutoHideSetting() {
+  // 吹き出し要素を取得
+  const speechBubble = document.getElementById('speechBubble');
+  if (!speechBubble) return;
+  
+  // マウスが離れたときの状態管理
+  let mouseLeftTime = null;
+  let autoHideTimerId = null;
+  
+  // マウス侵入時のイベントハンドラ
+  const handleMouseEnter = () => {
+    // タイマーをクリア
+    if (autoHideTimerId) {
+      clearTimeout(autoHideTimerId);
+      autoHideTimerId = null;
+    }
+    mouseLeftTime = null;
+    
+    // CSS用のクラスを追加して表示を維持
+    speechBubble.classList.add('keep-visible');
+  };
+  
+  // マウスが離れたときのイベントハンドラ
+  const handleMouseLeave = () => {
+    // 表示維持用のクラスを削除
+    speechBubble.classList.remove('keep-visible');
+    mouseLeftTime = Date.now();
+    
+    // 3秒後に非表示にする
+    autoHideTimerId = setTimeout(() => {
+      hideSpeechBubble();
+      
+      // イベントリスナーを削除
+      speechBubble.removeEventListener('mouseenter', handleMouseEnter);
+      speechBubble.removeEventListener('mouseleave', handleMouseLeave);
+      
+      logDebug('設定UI吹き出しを自動的に非表示にしました');
+    }, 3000);
+  };
+  
+  // 既存のイベントリスナーを一度削除してからセット
+  speechBubble.removeEventListener('mouseenter', handleMouseEnter);
+  speechBubble.removeEventListener('mouseleave', handleMouseLeave);
+  
+  // 新しいイベントリスナーを追加
+  speechBubble.addEventListener('mouseenter', handleMouseEnter);
+  speechBubble.addEventListener('mouseleave', handleMouseLeave);
+  
+  // いずれにしても10秒後には強制的に非表示
+  setTimeout(() => {
+    // マウスが長時間その上にある場合は非表示にしない
+    if (!mouseLeftTime || Date.now() - mouseLeftTime > 3000) {
+      return;
+    }
+    
+    if (autoHideTimerId) {
+      clearTimeout(autoHideTimerId);
+      autoHideTimerId = null;
+    }
+    
+    // 吹き出しを非表示
+    hideSpeechBubble();
+    
+    // イベントリスナーを削除
+    speechBubble.removeEventListener('mouseenter', handleMouseEnter);
+    speechBubble.removeEventListener('mouseleave', handleMouseLeave);
+    
+    logDebug('設定UI吹き出しを強制的に非表示にしました（タイムアウト）');
+  }, 10000);
+  
+  logDebug('設定UI吹き出しの自動非表示タイマーを設定しました');
+}
+
+/**
+ * 吹き出しを非表示にするヘルパー関数
+ * 利用可能なAPI/メソッドに応じて適切な非表示処理を行う
+ */
+function hideSpeechBubble() {
+  const speechBubble = document.getElementById('speechBubble');
+  if (!speechBubble) return;
+  
+  try {
+    // 方法1: speechManagerのhideBubble関数を使用
+    if (window.speechManager && typeof window.speechManager.hideBubble === 'function') {
+      window.speechManager.hideBubble();
+      return;
+    }
+    
+    // 方法2: uiHelperからインポートしたhideBubble関数を使用
+    if (typeof hideBubble === 'function') {
+      hideBubble();
+      return;
+    }
+    
+    // 方法3: スタイルで直接非表示に
+    speechBubble.className = 'speech-bubble hide';
+    speechBubble.style.opacity = '0';
+    speechBubble.style.visibility = 'hidden';
+    
+    setTimeout(() => {
+      speechBubble.style.display = 'none';
+    }, 300);
+    
+    logDebug('吹き出しを直接スタイルで非表示にしました');
+  } catch (err) {
+    logError(`吹き出し非表示処理でエラー: ${err.message}`);
+    
+    // エラー発生時は直接スタイルで非表示に
+    if (speechBubble) {
+      speechBubble.style.display = 'none';
+      speechBubble.style.visibility = 'hidden';
+      speechBubble.style.opacity = '0';
+    }
+  }
+}

@@ -3,7 +3,7 @@
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
 import { showError, shouldShowError } from '@ui/uiHelper.js';
-import { setText, showBubble, hideBubble, initUIElements } from '@ui/uiHelper.js';
+import { setText, showBubble, hideBubble, initUIElements, renderSettingUI } from '@ui/uiHelper.js';
 import { 
   setExpression, 
   startTalking, 
@@ -49,6 +49,12 @@ let voicevoxRetryCount = 0;
 const MAX_VOICEVOX_RETRIES = 5;
 const VOICEVOX_RETRY_INTERVAL = 3000; // 再確認間隔（ミリ秒）
 let voicevoxConnectionErrorShown = false;
+
+// 現在表示中のセリフデータ
+let currentSpeech = null;
+
+// ホード夜モードの状態管理
+let isHordeModeEnabled = false;
 
 // 🌟 モジュール読み込み時にUI要素を初期化（これがキモ！）
 initUIElements();
@@ -137,6 +143,63 @@ function forceShowBubble(formattedText, eventType = 'default') {
 }
 
 /**
+ * 拡張された秘書たんセリフオブジェクト型を使用して発話させる
+ * @param {Object} speechObj - セリフオブジェクト
+ * @param {string} speechObj.id - セリフID
+ * @param {string} speechObj.type - セリフの種類（'normal'|'system'|'setting'）
+ * @param {string} speechObj.text - セリフテキスト
+ * @param {string} [speechObj.emotion] - 感情タイプ
+ * @param {number} [speechObj.duration] - 表示時間（ミリ秒）
+ * @param {Object} [speechObj.uiPayload] - UI表示用のペイロード（typeが'setting'の場合）
+ */
+export function speakWithObject(speechObj) {
+  try {
+    if (!speechObj || !speechObj.text) {
+      logError('セリフオブジェクトまたはテキストが指定されていません');
+      return;
+    }
+    
+    // デフォルト値の設定
+    const type = speechObj.type || 'normal';
+    const emotion = speechObj.emotion || 'normal';
+    const duration = speechObj.duration || messageDisplayTime;
+    const eventType = speechObj.id || 'default';
+    
+    // 現在のセリフを保存
+    currentSpeech = speechObj;
+    
+    logDebug(`拡張セリフ表示: タイプ=${type}, ID=${eventType}, テキスト="${speechObj.text}"`);
+    
+    // 設定UIタイプの場合は専用の処理
+    if (type === 'setting' && speechObj.uiPayload) {
+      showBubble(eventType);
+      const formattedMessage = formatMessage(speechObj.text);
+      
+      // 通常のテキスト設定（uiPayloadとともに）
+      setText(formattedMessage);
+      
+      // 設定UI要素をレンダリング
+      renderSettingUI(speechObj.uiPayload);
+      
+      // 設定UIの場合は自動非表示しない
+      return;
+    }
+    
+    // 通常の発話処理
+    speak(
+      speechObj.text, 
+      emotion, 
+      duration, 
+      null, // アニメーションはemotionから自動設定
+      eventType
+    );
+    
+  } catch (err) {
+    logError(`拡張セリフ表示処理でエラー: ${err.message}`);
+  }
+}
+
+/**
  * 秘書たんにセリフを話させる
  * @param {string} message - セリフ
  * @param {string} emotion - 感情（normal, happy, surprised, serious, sleepy, relieved, smile）
@@ -147,6 +210,15 @@ function forceShowBubble(formattedText, eventType = 'default') {
  */
 export function speak(message, emotion = 'normal', displayTime = messageDisplayTime, animation = null, eventType = 'default', presetSound = null) {
   try {
+    // 基本的なセリフオブジェクトを作成（後方互換性のため）
+    currentSpeech = {
+      id: eventType,
+      type: 'normal',
+      text: message,
+      emotion: emotion,
+      duration: displayTime
+    };
+    
     // 多重実行チェック（同一メッセージ・同一イベントタイプの場合はスキップ）
     const isDuplicate = (lastSpokenEvent === eventType && lastSpokenMessage === message);
     if (isDuplicate) {
@@ -564,8 +636,101 @@ export function speakWithPreset(presetSound, message, emotion = 'normal', displa
   }
 }
 
-// 必ず実行する部分：グローバルに関数を公開
+/**
+ * ホード夜モードの切り替え設定UIを表示する
+ * @param {boolean} currentState - 現在のホード夜モードの状態
+ * @param {Function} onChangeCallback - 状態変更時のコールバック関数（オプション）
+ * @returns {Promise<void>} 非同期処理の結果
+ */
+export async function showHordeModeToggle(currentState = false, onChangeCallback) {
+  try {
+    // 現在の状態を設定
+    isHordeModeEnabled = currentState;
+    
+    // ホード夜モード設定用のセリフオブジェクトを作成
+    const hordeToggleSpeech = {
+      id: "setting_horde_mode",
+      type: "setting",
+      text: "今夜はホード夜モードにする…？",
+      emotion: "gentle", // またはnormal
+      uiPayload: {
+        type: "toggle",
+        label: "ホード夜モード",
+        value: currentState,
+        onChange: (newValue) => {
+          // 状態を更新
+          isHordeModeEnabled = newValue;
+          logDebug(`ホード夜モードが${newValue ? 'オン' : 'オフ'}に変更されました`);
+          
+          // カスタムコールバックが指定されていれば実行
+          if (typeof onChangeCallback === 'function') {
+            onChangeCallback(newValue);
+          }
+          
+          // 変更後のフィードバックセリフ
+          const feedbackMessage = newValue 
+            ? "ホード夜モードをオンにしたよ。怖いけど一緒に頑張ろうね…" 
+            : "ホード夜モードをオフにしたよ。ほっとした～";
+          
+          const feedbackEmotion = newValue ? "serious" : "relieved";
+          
+          // 少し遅延させてフィードバックを表示
+          setTimeout(() => {
+            speak(
+              feedbackMessage,
+              feedbackEmotion,
+              5000,
+              null,
+              "horde_mode_feedback"
+            );
+          }, 500);
+        }
+      }
+    };
+    
+    // セリフオブジェクトを表示
+    speakWithObject(hordeToggleSpeech);
+    
+    // 自動クローズタイマーは設定しない（ユーザーのマウスアウトで閉じる）
+    
+    return true;
+  } catch (err) {
+    logError(`ホード夜モードトグル表示エラー: ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * 現在のホード夜モードの状態を取得する
+ * @returns {boolean} ホード夜モードが有効ならtrue
+ */
+export function getHordeModeState() {
+  return isHordeModeEnabled;
+}
+
+/**
+ * ホード夜モードの状態を直接設定する
+ * @param {boolean} enabled - 設定する状態
+ */
+export function setHordeModeState(enabled) {
+  isHordeModeEnabled = !!enabled;
+  logDebug(`ホード夜モードを直接${isHordeModeEnabled ? 'オン' : 'オフ'}に設定しました`);
+  return isHordeModeEnabled;
+}
+
+// グローバルスコープにspeechManagerを公開（テストなどで使用）
 if (typeof window !== 'undefined') {
-  window.speak = speak;
-  logDebug('speak関数をグローバルスコープに公開しました');
+  window.speechManager = {
+    speak,
+    speakWithObject,
+    speakWithPreset,
+    sayMessage,
+    checkVoicevoxConnection,
+    setConfig,
+    hideTimeoutMap,
+    showHordeModeToggle,
+    getHordeModeState,
+    setHordeModeState
+  };
+  logDebug('speechManagerをグローバルスコープに公開しました');
 } 

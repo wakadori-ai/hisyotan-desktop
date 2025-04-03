@@ -6,6 +6,7 @@ import { logDebug, logError, logZombieWarning } from '../core/logger.js';
 // DOM要素
 let speechBubble;
 let speechText;
+let speechSettingUI; // 設定UI要素
 let errorBubble;
 let errorText;
 let statusIndicator;
@@ -40,6 +41,20 @@ export function initUIElements() {
   errorBubble = document.getElementById('errorBubble');
   errorText = document.getElementById('errorText');
   statusIndicator = document.getElementById('statusIndicator');
+  
+  // 設定UI用のコンテナ作成（なければ）
+  if (!document.getElementById('speechSettingUI')) {
+    if (speechBubble) {
+      speechSettingUI = document.createElement('div');
+      speechSettingUI.id = 'speechSettingUI';
+      speechSettingUI.className = 'speech-setting-ui';
+      speechSettingUI.style.display = 'none';
+      speechBubble.appendChild(speechSettingUI);
+      logDebug('設定UI要素を作成しました');
+    }
+  } else {
+    speechSettingUI = document.getElementById('speechSettingUI');
+  }
   
   // 必須要素の存在チェック
   if (!speechBubble) {
@@ -622,5 +637,171 @@ export function updateConnectionStatus(status, reconnectAttempts = 0, maxReconne
     }
     
     logDebug(`接続状態更新: ${status}`);
+  }
+}
+
+/**
+ * 設定UI要素をレンダリングする
+ * @param {Object|Array} uiPayload - UI表示用のペイロード（単一オブジェクトまたは配列）
+ */
+export function renderSettingUI(uiPayload) {
+  logDebug(`設定UI表示: ${Array.isArray(uiPayload) ? `${uiPayload.length}個の項目` : `タイプ=${uiPayload.type}`}`);
+  
+  if (!speechSettingUI) {
+    speechSettingUI = document.getElementById('speechSettingUI');
+    if (!speechSettingUI) {
+      logError('speechSettingUI要素が見つかりません');
+      
+      // 吹き出し内に作成
+      if (speechBubble) {
+        speechSettingUI = document.createElement('div');
+        speechSettingUI.id = 'speechSettingUI';
+        speechSettingUI.className = 'speech-setting-ui';
+        speechBubble.appendChild(speechSettingUI);
+        logDebug('設定UI要素を動的に作成しました');
+      } else {
+        logError('speechBubble要素も見つかりません。設定UIを表示できません');
+        return;
+      }
+    }
+  }
+  
+  // 内容をクリア
+  speechSettingUI.innerHTML = '';
+  
+  // 複数のUIペイロードに対応（配列の場合）
+  const payloads = Array.isArray(uiPayload) ? uiPayload : [uiPayload];
+  
+  // 各UIペイロードごとに処理
+  payloads.forEach((payload, index) => {
+    // UIタイプに応じたコンテンツを作成
+    if (payload.type === 'toggle') {
+      renderToggleSwitch(payload, index);
+    } else {
+      logError(`未対応の設定UIタイプ: ${payload.type}`);
+    }
+  });
+  
+  // 設定UI要素を表示
+  speechSettingUI.style.display = 'block';
+  
+  // 吹き出しにマウスイベントリスナーを追加（設定UI表示中はマウスフォーカス中に表示を維持）
+  if (speechBubble) {
+    // 既存のリスナーを削除
+    speechBubble.removeEventListener('mouseenter', keepBubbleVisible);
+    speechBubble.removeEventListener('mouseleave', allowBubbleHide);
+    
+    // 新しいリスナーを追加
+    speechBubble.addEventListener('mouseenter', keepBubbleVisible);
+    speechBubble.addEventListener('mouseleave', allowBubbleHide);
+  }
+  
+  logDebug('設定UI表示完了');
+}
+
+/**
+ * トグルスイッチを描画する（renderSettingUIの補助関数）
+ * @private
+ * @param {Object} payload - トグルスイッチの設定
+ * @param {number} index - トグルスイッチのインデックス
+ */
+function renderToggleSwitch(payload, index) {
+  // トグルスイッチを作成
+  const toggleContainer = document.createElement('div');
+  toggleContainer.className = 'toggle-container';
+  
+  // ラベルを作成
+  const label = document.createElement('label');
+  label.className = 'toggle-label';
+  label.textContent = payload.label;
+  
+  // トグルスイッチを作成
+  const toggleSwitch = document.createElement('div');
+  toggleSwitch.className = 'toggle-switch-container';
+  
+  const toggle = document.createElement('input');
+  toggle.type = 'checkbox';
+  toggle.id = `setting-toggle-${Date.now()}-${index}`;
+  toggle.className = 'toggle-switch';
+  toggle.checked = payload.value;
+  
+  const toggleSlider = document.createElement('label');
+  toggleSlider.className = 'toggle-slider';
+  toggleSlider.htmlFor = toggle.id;
+  
+  // トグルの説明テキストがあれば追加
+  if (payload.description) {
+    const description = document.createElement('div');
+    description.className = 'toggle-description';
+    description.textContent = payload.description;
+    toggleContainer.appendChild(description);
+  }
+  
+  // イベントリスナーを追加
+  toggle.addEventListener('change', (e) => {
+    const newValue = e.target.checked;
+    logDebug(`設定値変更: "${payload.label}" = ${newValue}`);
+    
+    // 効果音再生（任意）
+    if (typeof window.playPresetSound === 'function') {
+      window.playPresetSound(newValue ? 'toggle_on' : 'toggle_off').catch(() => {});
+    }
+    
+    // アニメーション効果（任意）
+    toggleSlider.classList.add('toggled');
+    setTimeout(() => toggleSlider.classList.remove('toggled'), 300);
+    
+    // コールバック関数を呼び出し
+    if (typeof payload.onChange === 'function') {
+      try {
+        payload.onChange(newValue);
+      } catch (err) {
+        logError(`設定変更コールバックでエラー: ${err.message}`);
+      }
+    }
+  });
+  
+  // 要素を組み立て
+  toggleSwitch.appendChild(toggle);
+  toggleSwitch.appendChild(toggleSlider);
+  
+  toggleContainer.appendChild(label);
+  toggleContainer.appendChild(toggleSwitch);
+  
+  speechSettingUI.appendChild(toggleContainer);
+}
+
+/**
+ * 吹き出しを表示状態に維持する（マウスホバー時）
+ * @private
+ */
+function keepBubbleVisible() {
+  logDebug('吹き出しにマウスが入りました。表示を維持します');
+  
+  // 既存の非表示タイマーをクリア
+  if (window.hideTimeoutMap && window.hideTimeoutMap.size > 0) {
+    for (const [key, timerId] of window.hideTimeoutMap.entries()) {
+      clearTimeout(timerId);
+      logDebug(`タイマー ${key} をクリアしました`);
+    }
+    window.hideTimeoutMap.clear();
+  }
+  
+  // 吹き出しに特別なクラスを追加
+  if (speechBubble) {
+    speechBubble.classList.add('keep-visible');
+  }
+}
+
+/**
+ * 吹き出しの自動非表示を許可する（マウスリーブ時）
+ * @private
+ */
+function allowBubbleHide() {
+  logDebug('吹き出しからマウスが離れました。表示維持を解除します');
+  
+  // 吹き出しから特別なクラスを削除
+  if (speechBubble) {
+    speechBubble.classList.remove('keep-visible');
   }
 } 

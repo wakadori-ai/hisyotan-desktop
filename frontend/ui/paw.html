@@ -569,6 +569,51 @@
                 }
             }
         });
+
+        // テスト用の設定トグル表示関数
+        function testSettingToggle() {
+            // スピーチマネージャーからインポートした関数を使用
+            const { speakWithObject } = window.speechManager;
+            
+            if (!speakWithObject) {
+                console.error('speakWithObject関数が見つかりません');
+                return;
+            }
+            
+            // 設定UIを含むセリフオブジェクトを作成
+            const settingSpeech = {
+                id: 'setting_test',
+                type: 'setting',
+                text: 'この設定を変更しますか？',
+                emotion: 'normal',
+                uiPayload: {
+                    type: 'toggle',
+                    label: 'テスト設定を有効にする',
+                    value: false,
+                    onChange: (newValue) => {
+                        console.log(`設定が変更されました: ${newValue}`);
+                        // 設定変更後のフィードバック
+                        setTimeout(() => {
+                            window.speechManager.speak(
+                                newValue ? 'テスト設定を有効にしました！' : 'テスト設定を無効にしました',
+                                newValue ? 'happy' : 'normal',
+                                5000,
+                                null,
+                                'setting_feedback'
+                            );
+                        }, 500);
+                    }
+                }
+            };
+            
+            // 設定UIを表示
+            speakWithObject(settingSpeech);
+        }
+
+        // グローバルオブジェクトに追加（開発者ツールからアクセスできるように）
+        if (typeof window !== 'undefined') {
+            window.testSettingToggle = testSettingToggle;
+        }
     </script>
 </body>
 </html> 
