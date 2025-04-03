@@ -1,4 +1,4 @@
-﻿# 秘書たん一発起動スクリプト（2025-04-02 改訂）
+﻿# 秘書たん一発起動スクリプト（2025-04-04 改訂）
 # 管理者権限不要・実行ポリシー一時変更
 # 個別起動オプション対応：-BackendOnly, -FrontendOnly, -ElectronOnly
 # 通常・開発モードはバックグラウンド起動
@@ -120,7 +120,11 @@ if ($ElectronOnly) {
     Write-Log "Electron アプリのみ起動します（Ctrl+Cで停止可）" "Info"
     # 環境変数を設定
     $env:HISYOTAN_APP_NAME = "hisyotan"
-    $env:HISYOTAN_PRELOAD_PATH = "./preload.js"
+    
+    # 新しいプリロードパスを指定
+    $env:HISYOTAN_PRELOAD_PATH = "./dist/preload.js"
+    $env:HISYOTAN_PAW_PRELOAD_PATH = "./dist/paw-preload.js"
+    
     # 直接実行することでCtrl+Cで停止できるようにする
     npx electron .
     exit
@@ -133,7 +137,7 @@ function Show-Logo {
 ╭─────────────────────────────────────────────╮
 │                                             │
 │     秘書たん - かわいいAI秘書アプリ 🎀      │
-│         (一発起動版 v1.1.0)                  │
+│         (一発起動版 v1.2.0)                  │
 │                                             │
 │           ／l、                             │
 │          =^ω^=                             │
@@ -295,7 +299,10 @@ if ($Dev) {
         # 開発モード用Electronを独立プロセスとして起動
         $env:VITE_DEV_SERVER_URL = "http://localhost:5173/"
         $env:HISYOTAN_APP_NAME = "hisyotan"  # 環境変数として渡す
-        $env:HISYOTAN_PRELOAD_PATH = "./preload.js"  # preloadパスも環境変数として渡す
+        
+        # 新しいpreloadパスを設定
+        $env:HISYOTAN_PRELOAD_PATH = "./frontend/src/main/preload/preload.js"
+        $env:HISYOTAN_PAW_PRELOAD_PATH = "./frontend/src/main/preload/paw-preload.js"
         
         # 引数なしで単純に起動する（すべての情報は環境変数経由で）
         $electronProcess = Start-Process -FilePath "pwsh" -ArgumentList "-Command", "npx electron ." -WindowStyle Hidden -PassThru
@@ -322,7 +329,11 @@ if ($Dev) {
     
     # 通常モードでElectronを独立プロセスとして起動
     $env:HISYOTAN_APP_NAME = "hisyotan"  # 環境変数として渡す
-    $env:HISYOTAN_PRELOAD_PATH = "./preload.js"  # preloadパスも環境変数として渡す
+    
+    # 新しいpreloadパスを設定（本番ビルド用）
+    $env:HISYOTAN_PRELOAD_PATH = "./dist/preload.js"
+    $env:HISYOTAN_PAW_PRELOAD_PATH = "./dist/paw-preload.js"
+    
     $electronProcess = Start-Process -FilePath "pwsh" -ArgumentList "-Command", "npx electron ." -WindowStyle Hidden -PassThru
     $procInfo["Electron"] = $electronProcess.Id
     Write-Log "💫 Electron起動: プロセスID $($electronProcess.Id)" "Info"

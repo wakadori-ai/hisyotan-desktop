@@ -185,14 +185,19 @@ try {
 }
 
 # 従来のキーワード検索も残しておく
-$keyword = "hisyotan"
-$targetProcs = Get-CimInstance Win32_Process | Where-Object {
-    $_.CommandLine -ne $null -and
-    $_.CommandLine.ToLower().Contains($keyword)
+$keywords = @("hisyotan", "frontend/src/main/index.js", "frontend/core/main.js")
+$targetProcs = @()
+
+foreach ($keyword in $keywords) {
+    $keywordProcs = Get-CimInstance Win32_Process | Where-Object {
+        $_.CommandLine -ne $null -and
+        $_.CommandLine.ToLower().Contains($keyword.ToLower())
+    }
+    $targetProcs += $keywordProcs
 }
 
 # キーワード検索とタイトル検索の結果を統合
-$targetProcs = $targetProcs + $targetProcsVite + $titleProcs
+$targetProcs = $targetProcs + $targetProcsVite + $titleProcs | Select-Object -Unique ProcessId, Name, CommandLine
 
 # キーワード検索による終了処理
 if ($targetProcs.Count -eq 0) {
