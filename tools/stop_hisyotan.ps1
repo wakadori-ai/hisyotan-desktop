@@ -1,37 +1,28 @@
 ﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Write-Host "🔍 秘書たんプロセスだけを優しく終了するよ..."
 
-Write-Host "🔍 秘書たん関連プロセス（詳細コマンド確認）"
+# 「hisyotan」系のプロセスだけに限定（CommandLineが必要）
+$keyword = "hisyotan"
 
-$keywords = @("uvicorn", "hisyotan", "backend", "FastAPI", "multiprocessing", "spawn_main", "--multiprocessing-fork")
-
-# すべてのプロセスを取得
-$pythonProcs = Get-CimInstance Win32_Process | Where-Object {
-    $_.Name -like "*python*" -and $_.CommandLine -ne $null
+$targetProcs = Get-CimInstance Win32_Process | Where-Object {
+    $_.CommandLine -ne $null -and
+    $_.CommandLine.ToLower().Contains($keyword)
 }
 
-# 条件に一致するプロセスを抽出
-$targetProcs = @()
-
-foreach ($proc in $pythonProcs) {
-    foreach ($keyword in $keywords) {
-        if ($keyword -and $proc.CommandLine.ToLower().Contains($keyword.ToLower())) {
-            $targetProcs += $proc
-            break
-        }
-    }
-}
-
-# プロセス終了処理
+# 終了処理
 if ($targetProcs.Count -eq 0) {
-    Write-Host "✔ Pythonプロセスに該当なし（クリーン）"
+    Write-Host "✔ クリーンだよ！秘書たんはもういないの"
 } else {
     foreach ($proc in $targetProcs) {
-        Write-Host "❌ 該当プロセス検出: PID=$($proc.ProcessId) : $($proc.CommandLine)"
+        Write-Host "`n🧹 終了対象:"
+        Write-Host "   PID: $($proc.ProcessId)"
+        Write-Host "   ファイル: $($proc.Name)"
+        Write-Host "   コマンド: $($proc.CommandLine)"
         try {
             Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
-            Write-Host "✅ 終了しました"
+            Write-Host "✅ ちゃんと終了できたよ〜"
         } catch {
-            Write-Host "⚠️ 終了失敗: $_"
+            Write-Host "⚠️ 終了できなかった... $_"
         }
     }
 }
