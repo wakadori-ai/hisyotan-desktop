@@ -5,6 +5,16 @@ import { resolve } from 'path';
 export default defineConfig({
   root: 'frontend', // 開発サーバーのルートディレクトリを変更
   base: './', // 相対パスでビルドするために必要
+  css: {
+    devSourcemap: true,
+    // CSSモジュールのロード問題を解決するための設定
+    postcss: {},
+    preprocessorOptions: {
+      css: {
+        charset: false
+      }
+    }
+  },
   
   // 静的アセット用のパブリックディレクトリを設定
   // frontend/ui/public が実際のパブリックフォルダになります
@@ -28,17 +38,25 @@ export default defineConfig({
       '@assets': resolve(__dirname, 'frontend/ui/public/assets'),
       '@config': resolve(__dirname, 'frontend/config'),
       '@voice': resolve(__dirname, 'frontend/voice')
-    }
+    },
+    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.css']
   },
   
   // Electronでの使用に適した設定
   build: {
     outDir: 'dist', // ルートからの相対パスになるよう調整
     emptyOutDir: true,
+    // アセットのインライン化サイズを調整（CSSが適切に処理されるように）
+    assetsInlineLimit: 0,
+    // CSSを別ファイルとして抽出するためのオプション
+    cssCodeSplit: true,
     // ビルド設定
     rollupOptions: {
       input: {
         index: resolve(__dirname, 'frontend/index.html')
+      },
+      output: {
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   }

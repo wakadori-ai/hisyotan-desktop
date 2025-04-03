@@ -36,6 +36,7 @@ function createPawWindow(app) {
     x: xPosition,
     y: yPosition,
     transparent: true,
+    backgroundColor: '#20FFFFFF',
     frame: false,
     alwaysOnTop: true,
     hasShadow: false,
@@ -45,7 +46,8 @@ function createPawWindow(app) {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      enableRemoteModule: true // @electron/remoteを使用する場合
+      enableRemoteModule: true, // @electron/remoteを使用する場合
+      sandbox: false,
     }
   });
   
@@ -53,18 +55,30 @@ function createPawWindow(app) {
   pawWindow.setAlwaysOnTop(true, 'screen-saver'); // screen-saverは最も高い優先度
   
   // 肉球ボタンページの読み込み
-  const pawPath = process.env.VITE_DEV_SERVER_URL
-    ? `${process.env.VITE_DEV_SERVER_URL}` // 開発モード - Viteサーバー経由
-    : path.join(app.getAppPath(), 'dist', 'index.html'); // 本番モード - ビルド済みindexを使用
+  // 開発モードと本番モードでの読み込みパスを明確に分ける
+  const isDev = !!process.env.VITE_DEV_SERVER_URL;
+  console.log('開発モード:', isDev);
   
-  if (process.env.VITE_DEV_SERVER_URL) {
-    pawWindow.loadURL(pawPath); // 開発サーバーのURLをロード
+  if (isDev) {
+    // 開発モード - Viteサーバー経由
+    const devUrl = `${process.env.VITE_DEV_SERVER_URL}`;
+    console.log('開発サーバーURL:', devUrl);
+    pawWindow.loadURL(new URL('index.html', devUrl).toString());
   } else {
-    pawWindow.loadFile(pawPath); // ビルド済みファイルをロード
+    // 本番モード - ビルド済みindexを使用
+    const prodPath = path.join(app.getAppPath(), 'dist', 'index.html');
+    console.log('本番モードindex.htmlパス:', prodPath);
+    pawWindow.loadFile(prodPath);
+  }
+
+  // コンソールを開く（デバッグ用）
+  if (isDev) {
+    pawWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
   pawWindow.webContents.once('did-finish-load', () => {
     pawWindow.setIgnoreMouseEvents(false);
+    console.log('肉球ウィンドウのロードが完了しました');
   });
   
   // @electron/remoteをウィンドウで有効化

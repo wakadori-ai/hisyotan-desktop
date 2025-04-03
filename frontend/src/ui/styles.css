@@ -9,6 +9,32 @@
   --zombie-shadow-color: rgba(100, 20, 20, 0.7);
 }
 
+/* テスト用の強制スタイル - 必ず表示されるはず */
+body {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.test-debug-box {
+  position: fixed !important;
+  top: 20px !important;
+  left: 20px !important;
+  width: 200px !important;
+  height: 100px !important;
+  background: rgba(255, 0, 0, 0.3) !important;
+  border: 3px dashed red !important;
+  z-index: 9999999 !important;
+  pointer-events: none !important;
+}
+
+/* デバッグモード用スタイル */
+.debug-mode {
+  border: 4px solid lime !important;
+}
+
+body.debug-mode {
+  background: rgba(0, 255, 0, 0.1) !important;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -32,6 +58,7 @@ body, html {
   -webkit-app-region: drag; /* ウィンドウのドラッグを有効にする */
 }
 
+/* 秘書たんコンテナ - ふにゃUI統合 */
 .assistant-container {
   overflow: hidden !important;
   position: fixed !important;
@@ -43,7 +70,7 @@ body, html {
   transition: transform 0.3s ease, opacity 0.3s ease !important;
 }
 
-/* 立ち絵サイズコントロール */
+/* 立ち絵サイズコントロール - ふにゃUI統合 */
 #assistantImage {
   max-width: 35vw !important;
   max-height: 70vh !important;
@@ -69,42 +96,47 @@ body.mouse-active .assistant-image {
   opacity: 0.4; /* マウス操作時は透明度を下げる */
 }
 
+/* 吹き出しの基本スタイル - ふにゃUI統合 */
 .speech-bubble {
   position: absolute !important;
   bottom: auto !important;
-  top: 20% !important; /* 画面の上部に固定 */
+  top: 20% !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  background-color: #fff5e0 !important; /* より明るく不透明な背景 */
-  border: 3px solid #8B4513 !important; /* 太く暗いボーダー */
+  background-color: #fff5e0 !important;
+  border: 3px solid #8B4513 !important;
   border-radius: 18px !important;
   padding: 14px 18px !important;
   margin-bottom: 20px !important;
   max-width: 280px !important;
   min-height: 60px !important;
-  min-width: 200px !important; /* 最小幅を設定 */
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important; /* より強いシャドウ */
-  z-index: 99999 !important;
+  min-width: 200px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+  z-index: 2147483647 !important; /* 最大z-index値を基本値として設定 */
   display: none;
+  opacity: 0;
+  visibility: hidden;
   align-items: center !important;
-  pointer-events: auto !important; /* 吹き出しだけはクリック可能に */
+  pointer-events: auto !important;
   -webkit-app-region: no-drag !important;
   transition: opacity 0.3s ease, visibility 0.3s ease !important;
 }
 
+/* 表示状態 - ふにゃUI統合 */
 .speech-bubble.show {
   display: flex !important;
   opacity: 1 !important;
   visibility: visible !important;
   animation: popIn 0.3s ease forwards !important;
-  position: absolute !important;
-  z-index: 2147483647 !important; /* 最高のz-index値 */
-  left: 50% !important;
-  top: 20% !important;
-  transform: translateX(-50%) !important;
+}
+
+/* さらに強力なセレクタ（IDとタグ指定を追加） */
+div#speechBubble.speech-bubble.show {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 2147483647 !important;
   pointer-events: auto !important;
-  background-color: #fff5e0 !important;
-  border: 3px solid #8B4513 !important;
 }
 
 /* ゾンビ警告表示用の特別なスタイル */
@@ -113,27 +145,37 @@ body.mouse-active .assistant-image {
   opacity: 1 !important;
   visibility: visible !important;
   z-index: 2147483647 !important;
-  border: 3px solid #ff4500 !important; /* 赤っぽいボーダー */
-  background-color: #fff0f0 !important; /* 赤みがかった背景 */
-  box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3) !important; /* 赤みがかったシャドウ */
+  border: 3px solid #ff4500 !important;
+  background-color: #fff0f0 !important;
+  box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3) !important;
 }
 
-/* 吹き出しも同様に */
+/* マウス操作時の透明度設定 */
 body.mouse-active .speech-bubble.show {
   opacity: 0.7 !important;
 }
 
+/* 非表示状態 - ふにゃUI統合 */
 .speech-bubble.hide {
   opacity: 0 !important;
   visibility: hidden !important;
+  display: none !important; /* 非表示に display: none を追加 */
 }
 
+/* さらに強力なセレクタ（IDとタグ指定を追加） */
+div#speechBubble.speech-bubble.hide {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  display: none !important;
+}
+
+/* 吹き出しの矢印部分 */
 .speech-bubble::after {
   content: '' !important;
   position: absolute !important;
-  bottom: -12px !important; /* 少し下げる */
+  bottom: -12px !important;
   left: 20px !important;
-  width: 24px !important; /* 大きくする */
+  width: 24px !important;
   height: 24px !important;
   background-color: #fff5e0 !important;
   border-right: 3px solid #8B4513 !important;
@@ -141,15 +183,24 @@ body.mouse-active .speech-bubble.show {
   transform: rotate(45deg) !important;
 }
 
+/* マウスホバー時の表示維持 */
+.speech-bubble.keep-visible {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 2147483647 !important;
+}
+
 .bubble-icon {
   margin-right: 8px;
   font-size: 18px;
 }
 
+/* 吹き出し内のテキスト */
 .bubble-text {
   color: #4e3b2b !important;
   font-size: 16px !important;
-  font-weight: bold !important; /* 太字にする */
+  font-weight: bold !important;
   line-height: 1.5 !important;
   letter-spacing: 0.03em !important;
 }
@@ -349,7 +400,7 @@ body.mouse-active .speech-bubble.show {
   margin-top: 5px;
 }
 
-/* 歯車アイコン */
+/* 歯車アイコン - ふにゃUI統合 */
 .settings-icon {
   position: fixed;
   top: 10px;
@@ -376,7 +427,7 @@ body.mouse-active .speech-bubble.show {
   background: rgba(0, 0, 0, 0.3);
 }
 
-/* ゲーム内オーバーレイメニュー */
+/* ゲーム内オーバーレイメニュー - ふにゃUI統合 */
 .overlay-menu {
   position: fixed;
   top: 50%;
@@ -591,7 +642,7 @@ body.mouse-active .speech-bubble.show {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* 終了ボタン */
+/* 終了ボタン - ふにゃUI統合 */
 .quit-button {
   position: fixed !important;
   bottom: 15px !important;
@@ -640,6 +691,7 @@ body.mouse-active .speech-bubble.show {
   outline: 3px solid rgba(255, 50, 100, 1) !important;
 }
 
+/* 終了ボタンの吹き出し - ふにゃUI統合 */
 .quit-bubble {
   position: absolute !important;
   top: -70px !important;
@@ -694,7 +746,7 @@ body.mouse-active .speech-bubble.show {
   }
 }
 
-/* 閉じるボタン */
+/* 閉じるボタン - ふにゃUI統合 */
 .close-button {
   position: absolute;
   top: 10px;
@@ -724,7 +776,7 @@ body.mouse-active .speech-bubble.show {
   opacity: 1;
 }
 
-/* 吹き出しの閉じるボタン */
+/* 吹き出しの閉じるボタン - ふにゃUI統合 */
 .bubble-close-button {
   position: absolute;
   top: 5px;

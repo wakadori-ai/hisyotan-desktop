@@ -3,12 +3,17 @@
  * 肉球UI用のメインJSファイル
  * Viteビルドのエントリーポイント
  */
+// スタイルシート読み込み - 複数の方法を試す
+// import './styles.css'; // 相対パス
+// import '/src/ui/styles.css'; // 絶対パス
 
 import { createTestSettingsUI, hideBubble } from './paw-context-menu.js';
 import apiClient from '@core/apiClient.js';
 
-// スタイルシート読み込み
-import '@ui/styles.css';
+// デバッグ情報
+console.log('🌸 paw.js が読み込まれました');
+console.log('🔍 ビルドモード:', import.meta.env.MODE);
+console.log('📁 現在の実行パス:', import.meta.env.BASE_URL);
 
 // グローバルアクセス用に設定
 window.settingsApi = apiClient;

@@ -119,139 +119,84 @@ export function initUIElements() {
  * @param {string} eventType - イベントタイプ（オプション）
  */
 export function showBubble(eventType = 'default') {
-  if (eventType === 'zombie_warning') {
+  // ログ出力
+  const isZombieWarning = eventType === 'zombie_warning';
+  if (isZombieWarning) {
     logZombieWarning(`吹き出しを表示します... (イベント: ${eventType})`);
   } else {
     logDebug(`吹き出しを表示します... (イベント: ${eventType})`);
   }
   
-  // DOMが確実にあるか確認
+  // DOM要素の取得確認
   if (!speechBubble) {
-    if (eventType === 'zombie_warning') {
-      logZombieWarning('speechBubble要素が見つかりません');
-    } else {
-      logDebug('speechBubble要素が見つかりません');
-    }
     speechBubble = document.getElementById('speechBubble');
     if (!speechBubble) {
-      if (eventType === 'zombie_warning') {
-        logZombieWarning('speechBubble要素の再取得に失敗しました');
-      } else {
-        logDebug('speechBubble要素の再取得に失敗しました');
-      }
+      logError('speechBubble要素が見つかりません。表示できません。');
       return;
     }
   }
   
-  // zombie_warningイベントの場合は特別に強調
-  const isZombieWarning = eventType === 'zombie_warning';
+  // スタイル設定前の状態をデバッグ出力
   if (isZombieWarning) {
-    logZombieWarning('★★★ ZOMBIE WARNING表示の特別処理を実行 ★★★');
+    logZombieWarning('表示前の吹き出し状態:');
+    debugBubbleStyles();
   }
   
-  // クラスをリセットして表示クラスを追加（CSSカスケードの問題を避けるため）
-  speechBubble.className = '';
+  // ❶ hideクラスを確実に削除
+  speechBubble.classList.remove('hide');
   
-  // すべての非表示スタイルを解除してから表示クラスを追加
-  // CSSトランジションの問題を避けるためにまず非表示状態をリセット
-  speechBubble.style.display = 'flex';
-  speechBubble.style.visibility = 'visible';
-  speechBubble.style.opacity = '1';
+  // ❷ クラスのリセットとスタイル初期化
+  // 現在のクラスをすべてクリアせず、基本クラスとshowのみ設定
+  speechBubble.className = 'speech-bubble';
   
-  // 明示的に!importantを使用
+  // ❸ 表示のための直接スタイル設定（強制的に上書き）
   speechBubble.style.cssText = `
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
-    position: absolute !important;
     z-index: 2147483647 !important;
-    top: 20% !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
+    pointer-events: auto !important;
   `;
   
-  // クラスを後から追加してアニメーション効果を適用
-  // タイミングの問題を避けるためにrequestAnimationFrameを使用
-  requestAnimationFrame(() => {
-    // ゾンビ警告の場合は特別なクラスを追加
-    if (isZombieWarning) {
-      speechBubble.className = 'speech-bubble show zombie-warning';
-    } else {
-      speechBubble.className = 'speech-bubble show';
-    }
+  // ❹ リフローの強制（スタイル適用を確実にするため）
+  void speechBubble.offsetWidth;
   
-    // アニメーションをリセットして再適用（CSSアニメーションの問題に対処）
-    speechBubble.style.animation = 'none';
-    speechBubble.offsetHeight; // リフロー
-    speechBubble.style.animation = 'popIn 0.3s ease forwards !important';
-  });
-  
-  // zombie_warning時は追加の強制表示処理
+  // ❺ クラスの追加（showクラスを最後に追加）
+  speechBubble.classList.add('show');
   if (isZombieWarning) {
-    // 少し遅延させて強制的に表示を確保
-    setTimeout(() => {
-      if (speechBubble) {
-        logZombieWarning('ZOMBIE WARNING: 吹き出し表示を再強制');
-        speechBubble.style.cssText = `
-          display: flex !important;
-          visibility: visible !important;
-          opacity: 1 !important;
-          position: absolute !important;
-          top: 20% !important;
-          left: 50% !important;
-          transform: translateX(-50%) !important;
-          z-index: 2147483647 !important;
-          pointer-events: auto !important;
-        `;
-        speechBubble.className = 'speech-bubble show zombie-warning';
-        
-        // コンピューテッドスタイルを取得して確認
-        const computedStyle = window.getComputedStyle(speechBubble);
-        logZombieWarning(`強制表示後の計算済みスタイル: display=${computedStyle.display}, visibility=${computedStyle.visibility}, opacity=${computedStyle.opacity}`);
-      }
-    }, 50);
-    
-    // さらに時間をおいて二度目の確認
-    setTimeout(() => {
-      if (speechBubble) {
-        const computedStyle = window.getComputedStyle(speechBubble);
-        if (computedStyle.display !== 'flex' || computedStyle.visibility !== 'visible' || parseFloat(computedStyle.opacity) < 0.5) {
-          logZombieWarning('ZOMBIE WARNING: 吹き出しが正しく表示されていません。最終強制表示を実行');
-          
-          // 強制的に表示（スタイルを直接適用）
-          speechBubble.setAttribute('style', `
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: absolute !important;
-            top: 20% !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            z-index: 2147483647 !important;
-            pointer-events: auto !important;
-            background-color: #fff5e0 !important;
-            border: 3px solid #8B4513 !important;
-            border-radius: 18px !important;
-            padding: 14px 18px !important;
-            margin-bottom: 20px !important;
-            max-width: 280px !important;
-            min-height: 60px !important;
-            min-width: 200px !important;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
-          `);
-          
-          // 明示的にclassNameを再設定
-          speechBubble.className = 'speech-bubble show zombie-warning';
-        }
-      }
-    }, 200);
+    speechBubble.classList.add('zombie-warning');
   }
   
-  if (eventType === 'zombie_warning') {
-    logZombieWarning(`吹き出し表示設定完了: クラス=${speechBubble.className}, 表示=${speechBubble.style.display}, 可視性=${speechBubble.style.visibility}`);
-  } else {
-    logDebug(`吹き出し表示設定完了: クラス=${speechBubble.className}, 表示=${speechBubble.style.display}, 可視性=${speechBubble.style.visibility}`);
-  }
+  // ❻ スタイル上書きの追加保険（クラスだけでは不十分な場合のため）
+  setTimeout(() => {
+    // 確実に表示状態にする最終チェック
+    const computedStyle = window.getComputedStyle(speechBubble);
+    if (computedStyle.display !== 'flex' || 
+        computedStyle.visibility !== 'visible' || 
+        parseFloat(computedStyle.opacity) < 0.9) {
+      
+      console.log('[showBubble] 表示状態が不完全です。強制表示を実行します');
+      
+      // 最も強力な表示方法で強制表示
+      speechBubble.style.cssText = `
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 2147483647 !important;
+        pointer-events: auto !important;
+      `;
+    }
+    
+    // MutationObserverで状態監視開始
+    if (!window._speechTextObserverAttached) {
+      observeSpeechTextAutoRecovery();
+    }
+    
+    // 表示後の状態を確認
+    debugBubbleStyles();
+  }, 50);
+  
+  logDebug(`吹き出し表示設定完了: クラス=${speechBubble.className}`);
 }
 
 /**
@@ -260,26 +205,59 @@ export function showBubble(eventType = 'default') {
 export function hideBubble() {
   logDebug('吹き出しを非表示にします...');
   
+  // DOM要素の取得確認
   if (!speechBubble) {
-    logDebug('speechBubble要素が見つかりません');
-    return;
+    speechBubble = document.getElementById('speechBubble');
+    if (!speechBubble) {
+      logDebug('speechBubble要素が見つかりません。何も実行しません。');
+      return;
+    }
   }
   
-  // クラス名を変更
-  speechBubble.className = 'speech-bubble hide';
+  // スタイル設定前の状態をデバッグ出力
+  console.log('[hideBubble] 非表示前の吹き出し状態:');
+  debugBubbleStyles();
   
-  // トランジションが終了した後に完全に非表示にするが、
-  // 必ず非表示になることを保証するため直接スタイルも設定
-  speechBubble.style.opacity = '0';
-  speechBubble.style.visibility = 'hidden';
+  // ❶ showクラスを削除して非表示用クラスを追加（CSSトランジション用）
+  speechBubble.classList.remove('show', 'zombie-warning', 'keep-visible');
+  speechBubble.classList.add('hide');
   
-  // CSSトランジションが完了するまで少し待つ
+  // ❷ リフローの強制
+  void speechBubble.offsetWidth;
+  
+  // ❸ 直接スタイル設定で非表示を確実に
+  speechBubble.style.cssText = `
+    opacity: 0 !important;
+    visibility: hidden !important;
+    display: none !important;
+    pointer-events: none !important;
+  `;
+  
+  // ❹ 非表示化の確認と保険処理
   setTimeout(() => {
-    speechBubble.style.display = 'none';
-    logDebug('吹き出し完全に非表示完了');
-  }, 300); // CSSトランジションの時間に合わせる
+    // 再確認して強制非表示化
+    const computedStyle = window.getComputedStyle(speechBubble);
+    if (computedStyle.display !== 'none' || computedStyle.visibility !== 'hidden' || parseFloat(computedStyle.opacity) > 0.1) {
+      console.log('[hideBubble] 非表示化が不完全です。強制非表示を実行します');
+      
+      // 最も強力な方法で非表示化
+      speechBubble.className = 'speech-bubble hide';
+      speechBubble.style.cssText = `
+        opacity: 0 !important;
+        visibility: hidden !important;
+        display: none !important;
+        pointer-events: none !important;
+        position: absolute !important;
+        z-index: -1 !important;
+      `;
+    }
+    
+    // 非表示後の状態を確認
+    debugBubbleStyles();
+  }, 100);
   
-  logDebug('吹き出し非表示処理開始');
+  console.log('[hideBubble] 非表示処理後のクラス:', speechBubble.className);
+  logDebug('吹き出し非表示処理完了');
 }
 
 /**
@@ -846,4 +824,332 @@ function allowBubbleHide() {
   if (speechBubble) {
     speechBubble.classList.remove('keep-visible');
   }
-} 
+}
+
+/**
+ * 吹き出しのスタイル状態をデバッグ出力
+ * @return {Object} 吹き出しのスタイル情報
+ */
+export function debugBubbleStyles() {
+  const speechBubble = document.getElementById('speechBubble');
+  if (!speechBubble) {
+    console.log('speechBubble要素が見つかりません');
+    return null;
+  }
+  
+  const computedStyle = window.getComputedStyle(speechBubble);
+  const classes = speechBubble.className;
+  const inlineStyle = speechBubble.getAttribute('style');
+  
+  console.log('--- 吹き出しスタイルデバッグ ---');
+  console.log(`クラス: ${classes}`);
+  console.log(`インラインスタイル: ${inlineStyle || 'なし'}`);
+  console.log(`表示状態: display=${computedStyle.display}, visibility=${computedStyle.visibility}, opacity=${computedStyle.opacity}`);
+  console.log(`位置: top=${computedStyle.top}, left=${computedStyle.left}, z-index=${computedStyle.zIndex}`);
+  console.log('------------------------------');
+  
+  return {
+    classes,
+    inlineStyle,
+    computedStyle: {
+      display: computedStyle.display,
+      visibility: computedStyle.visibility,
+      opacity: computedStyle.opacity,
+      top: computedStyle.top,
+      left: computedStyle.left,
+      zIndex: computedStyle.zIndex
+    }
+  };
+}
+
+/**
+ * 吹き出しの表示状態を強制的にリセットして表示
+ * 緊急時のみ使用
+ */
+export function forceResetAndShowBubble() {
+  const speechBubble = document.getElementById('speechBubble');
+  if (!speechBubble) {
+    console.log('forceResetAndShowBubble: speechBubble要素が見つかりません');
+    return;
+  }
+  
+  console.log('吹き出し表示を強制リセットします...');
+  
+  // リセット前の状態を確認
+  debugBubbleStyles();
+  
+  // 全てをリセット
+  speechBubble.className = '';
+  speechBubble.removeAttribute('style');
+  
+  // リフローを強制
+  void speechBubble.offsetWidth;
+  
+  // 基本クラスを設定
+  speechBubble.className = 'speech-bubble';
+  
+  // 強制的に表示状態にする
+  speechBubble.style.cssText = `
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: absolute !important;
+    z-index: 2147483647 !important;
+    top: 20% !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    pointer-events: auto !important;
+  `;
+  
+  // 最後に show クラスを追加
+  setTimeout(() => {
+    speechBubble.classList.add('show');
+    console.log('強制表示処理完了:');
+    debugBubbleStyles();
+  }, 20);
+}
+
+/**
+ * 吹き出し表示のテスト
+ * 開発・デバッグ用の機能
+ * @param {number} [timeout=3000] - 表示から非表示までの時間（ミリ秒）
+ * @param {string} [text='吹き出し表示テスト中...'] - 表示するテキスト
+ * @param {boolean} [isZombie=false] - ゾンビ警告モードで表示するかどうか
+ */
+export function testBubbleDisplay(timeout = 3000, text = '吹き出し表示テスト中...', isZombie = false) {
+  console.log('=== 🧪 吹き出し表示テストを実行します ===');
+  console.log(`📝 パラメータ: timeout=${timeout}ms, zombie=${isZombie}`);
+  
+  // DOM要素確認
+  const speechBubble = document.getElementById('speechBubble');
+  const speechText = document.getElementById('speechText');
+  
+  if (!speechBubble) {
+    console.error('❌ speechBubble要素が見つかりません！テストを中止します。');
+    return;
+  }
+  
+  if (!speechText) {
+    console.warn('⚠️ speechText要素が見つかりません。テキスト設定をスキップします。');
+  } else {
+    // テキスト設定
+    speechText.textContent = text;
+    console.log(`✏️ テキスト設定: "${text}"`);
+  }
+  
+  // 現在の表示状態をデバッグ出力
+  console.log('📊 テスト前の吹き出し状態:');
+  debugBubbleStyles();
+  
+  // テストID生成（ログ識別用）
+  const testId = Math.floor(Math.random() * 1000);
+  console.log(`🆔 テストID: ${testId}`);
+  
+  // 表示処理
+  console.log(`▶️ [${testId}] showBubble() を実行します...`);
+  showBubble(isZombie ? 'zombie_warning' : 'default');
+  
+  // 表示直後の状態確認
+  setTimeout(() => {
+    console.log(`⏱️ [${testId}] showBubble() 実行から 50ms 経過`);
+    const status = debugBubbleStyles();
+    validateBubbleStatus(status, true);
+  }, 50);
+  
+  // 表示中の状態を一定時間後に確認
+  setTimeout(() => {
+    console.log(`⏱️ [${testId}] 表示から ${timeout / 2}ms 経過時の状態確認:`);
+    const status = debugBubbleStyles();
+    validateBubbleStatus(status, true);
+  }, timeout / 2);
+  
+  // 指定時間後に非表示化
+  setTimeout(() => {
+    console.log(`⏱️ [${testId}] ${timeout}ms 経過したため hideBubble() を実行します...`);
+    hideBubble();
+    
+    // 非表示後の状態確認
+    setTimeout(() => {
+      console.log(`⏱️ [${testId}] hideBubble() 実行から 150ms 経過時の状態確認:`);
+      const status = debugBubbleStyles();
+      validateBubbleStatus(status, false);
+      
+      console.log(`✅ [${testId}] 吹き出し表示テスト完了`);
+    }, 150);
+  }, timeout);
+  
+  console.log(`🔄 [${testId}] テスト実行中... ${timeout + 200}ms 後に完了予定`);
+}
+
+/**
+ * 吹き出しの状態を検証してレポート
+ * @private
+ * @param {Object} status - debugBubbleStyles() の戻り値
+ * @param {boolean} shouldBeVisible - 表示されているべきかどうか
+ * @return {boolean} 期待通りの状態かどうか
+ */
+function validateBubbleStatus(status, shouldBeVisible) {
+  if (!status) {
+    console.error('❌ 吹き出し状態の取得に失敗しました');
+    return false;
+  }
+  
+  const { display, visibility, opacity } = status.computedStyle;
+  const isVisible = visibility === 'visible' && parseFloat(opacity) > 0.5 && display !== 'none';
+  const hasShowClass = status.classes.includes('show');
+  const hasHideClass = status.classes.includes('hide');
+  const hasImportant = status.inlineStyle && status.inlineStyle.includes('!important');
+  
+  console.log('🔍 吹き出し状態分析:');
+  console.log(`- 視覚的に表示: ${isVisible ? '✅ YES' : '❌ NO'} (display=${display}, visibility=${visibility}, opacity=${opacity})`);
+  console.log(`- クラス状態: ${hasShowClass ? '🟢 show' : '⚪️ no-show'} / ${hasHideClass ? '🔴 hide' : '⚪️ no-hide'}`);
+  console.log(`- !important使用: ${hasImportant ? '✅ YES' : '❌ NO'}`);
+  
+  if (shouldBeVisible) {
+    // 表示されているべき場合のチェック
+    if (isVisible && hasShowClass && !hasHideClass) {
+      console.log('✅ 期待通り表示されています');
+      return true;
+    } else {
+      console.error('❌ 期待通り表示されていません');
+      console.log('- 期待: display=flex, visibility=visible, opacity>0.5, show クラスあり, hide クラスなし');
+      return false;
+    }
+  } else {
+    // 非表示であるべき場合のチェック
+    if (!isVisible && !hasShowClass && hasHideClass) {
+      console.log('✅ 期待通り非表示になっています');
+      return true;
+    } else {
+      console.error('❌ 期待通り非表示になっていません');
+      console.log('- 期待: display=none, visibility=hidden, opacity=0, show クラスなし, hide クラスあり');
+      return false;
+    }
+  }
+}
+
+/**
+ * 吹き出し表示の複数回切り替えテスト
+ * 表示と非表示を連続で切り替えて安定性を確認
+ * @param {number} [cycles=3] - テストサイクル数
+ * @param {number} [interval=1000] - 各状態の表示時間（ミリ秒）
+ */
+export function testBubbleToggle(cycles = 3, interval = 1000) {
+  console.log(`=== 🔄 吹き出し表示切り替えテスト開始 (${cycles}サイクル) ===`);
+  
+  // テストID生成（ログ識別用）
+  const testId = Math.floor(Math.random() * 1000);
+  console.log(`🆔 テストID: ${testId}`);
+  
+  let currentCycle = 0;
+  let isVisible = false;
+  
+  // DOM要素確認
+  const speechBubble = document.getElementById('speechBubble');
+  const speechText = document.getElementById('speechText');
+  
+  if (!speechBubble) {
+    console.error('❌ speechBubble要素が見つかりません！テストを中止します。');
+    return;
+  }
+  
+  // テキスト設定
+  if (speechText) {
+    speechText.textContent = `トグルテスト中... (ID: ${testId})`;
+    console.log(`✏️ テキスト設定: "トグルテスト中... (ID: ${testId})"`);
+  }
+  
+  // 初期状態を非表示に強制設定
+  hideBubble();
+  console.log(`▶️ [${testId}] 初期状態を非表示に設定しました`);
+  
+  // テスト状態の詳細を出力
+  console.log(`📊 [${testId}] テスト設定: ${cycles}サイクル × ${interval}ms間隔`);
+  console.log(`⏱️ [${testId}] 推定完了時間: ${new Date(Date.now() + (cycles * interval * 2)).toLocaleTimeString()}`);
+  
+  // 定期的に表示・非表示を切り替える
+  const toggleInterval = setInterval(() => {
+    isVisible = !isVisible;
+    
+    if (isVisible) {
+      // 表示処理
+      console.log(`▶️ [${testId}] サイクル ${currentCycle + 1}/${cycles}: showBubble() 実行`);
+      showBubble();
+      
+      // 表示状態確認
+      setTimeout(() => {
+        console.log(`🔍 [${testId}] サイクル ${currentCycle + 1}/${cycles}: 表示状態確認`);
+        const status = debugBubbleStyles();
+        validateBubbleStatus(status, true);
+      }, Math.min(interval / 3, 300));
+    } else {
+      // 非表示処理
+      console.log(`▶️ [${testId}] サイクル ${currentCycle + 1}/${cycles}: hideBubble() 実行`);
+      hideBubble();
+      
+      // 非表示状態確認
+      setTimeout(() => {
+        console.log(`🔍 [${testId}] サイクル ${currentCycle + 1}/${cycles}: 非表示状態確認`);
+        const status = debugBubbleStyles();
+        validateBubbleStatus(status, false);
+      }, Math.min(interval / 3, 300));
+      
+      currentCycle++;
+      
+      // 全サイクル完了したかチェック
+      if (currentCycle >= cycles) {
+        clearInterval(toggleInterval);
+        console.log(`✅ [${testId}] 吹き出し表示切り替えテスト完了 (${cycles}サイクル)`);
+        
+        // 最終状態を非表示に設定
+        setTimeout(() => {
+          console.log(`🧹 [${testId}] テスト終了処理: 最終状態を非表示に設定`);
+          hideBubble();
+        }, 100);
+      }
+    }
+  }, interval);
+  
+  return testId; // テストIDを返す（テスト識別用）
+}
+
+// uiHelper.js の最後に追加
+if (typeof window !== 'undefined') {
+  window.uiHelper = {
+    showBubble,
+    hideBubble,
+    setText,
+    showError,
+    updateConnectionStatus,
+    renderSettingUI,
+    initUIElements,
+    debugBubbleStyles,
+    forceResetAndShowBubble,
+    testBubbleDisplay,
+    testBubbleToggle,
+  };
+  
+  // DOMContentLoadedイベントでuiHelperの存在を確認
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('🔍 uiHelper初期化状態確認:', !!window.uiHelper);
+    console.log('🧰 利用可能な関数:', Object.keys(window.uiHelper).join(', '));
+  });
+  
+  // 初期化直後にもコンソールに状態を出力
+  console.log('🚀 uiHelper初期化完了:', !!window.uiHelper);
+}
+
+// モジュールとしてもエクスポート
+export default {
+  showBubble,
+  hideBubble,
+  setText,
+  showError,
+  updateConnectionStatus,
+  renderSettingUI,
+  initUIElements,
+  debugBubbleStyles,
+  forceResetAndShowBubble,
+  testBubbleDisplay,
+  testBubbleToggle,
+}; 

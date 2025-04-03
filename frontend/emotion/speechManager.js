@@ -111,7 +111,7 @@ function forceShowBubble(formattedText, eventType = 'default') {
     // データ属性にバックアップ
     speechText.dataset.backupText = formattedText;
     
-    // スタイルをリセットしてクラスも再設定
+    // クラスをリセット
     speechBubble.classList.remove('hide', 'show', 'speech-bubble', 'zombie-warning');
     speechBubble.removeAttribute('style');
     
@@ -119,7 +119,7 @@ function forceShowBubble(formattedText, eventType = 'default') {
     speechBubble.style.cssText = `
       display: flex !important;
       visibility: visible !important;
-      opacity: 1 !important;
+      opacity: 0 !important;  /* 最初は透明に設定 */
       position: absolute !important;
       z-index: 2147483647 !important;
       top: 20% !important;
@@ -128,14 +128,25 @@ function forceShowBubble(formattedText, eventType = 'default') {
       pointer-events: auto !important;
     `;
 
-    // クラスを追加
-    requestAnimationFrame(() => {
-      speechBubble.classList.add('speech-bubble', 'show');
+    // speech-bubbleクラスを追加
+    speechBubble.classList.add('speech-bubble');
+    console.log('[forceShowBubble] 基本クラス追加後:', speechBubble.className);
+    
+    // リフローを強制
+    void speechBubble.offsetWidth;
+    
+    // 遅延してからアニメーション用クラスを追加
+    setTimeout(() => {
+      // オパシティを1に設定
+      speechBubble.style.opacity = '1 !important';
       
+      // showクラスを追加
+      speechBubble.classList.add('show');
       if (isZombieEvent) {
         speechBubble.classList.add('zombie-warning');
       }
-    });
+      console.log('[forceShowBubble] show クラス追加後:', speechBubble.className);
+    }, 20);
   } else {
     logError('forceShowBubble: 吹き出し要素が見つかりません');
     initUIElements();
