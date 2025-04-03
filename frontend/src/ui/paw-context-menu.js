@@ -13,7 +13,7 @@ let apiClient = null;
 // このスクリプトがロードされたら、APIクライアントを動的にインポート
 (async function() {
   try {
-    const module = await import('./apiClient.js');
+    const module = await import('../core/apiClient.js');
     apiClient = module.default;
     console.log('✅ APIクライアントをロードしました');
   } catch (error) {
@@ -411,8 +411,8 @@ function handleRightClick(event) {
 async function showSettings() {
   // 既存の設定UIがあれば削除
   const existingSettings = document.querySelector('.paw-settings-container');
-  if (existingSettings) {
-    document.body.removeChild(existingSettings);
+  if (existingSettings && existingSettings.parentNode) {
+    existingSettings.parentNode.removeChild(existingSettings);
     return;
   }
   

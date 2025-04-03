@@ -6,7 +6,7 @@
 
 // スタイルシート読み込み（インポート時にコンソール出力を追加）
 console.log('🎨 styles.cssを読み込み開始します');
-import stylesModule from '../ui/styles.css?inline';
+import stylesModule from '../ui/styles/main.css?inline';
 console.log('✅ styles.cssの読み込み完了:', stylesModule);
 
 // 明示的にCSSを適用する試み

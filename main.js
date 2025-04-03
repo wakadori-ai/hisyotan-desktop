@@ -407,6 +407,22 @@ function createWindow() {
     }
   });
 
+  // CSPヘッダーを設定
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' http://localhost:* http://127.0.0.1:*;",
+          "script-src 'self' 'unsafe-eval' 'unsafe-inline' http://localhost:* http://127.0.0.1:*;",
+          "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*;",
+          "style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:*;",
+          "img-src 'self' data: http://localhost:* http://127.0.0.1:*;"
+        ].join(' ')
+      }
+    });
+  });
+
   // 開発モードの場合
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173/');

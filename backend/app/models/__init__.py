@@ -13,6 +13,8 @@ from .events import (
     ThreatLevel
 )
 
+from .voice import VoiceSynthesisRequest
+
 # 型ヒントのために必要な共通の基底インターフェースクラスを定義
 from typing import Protocol, runtime_checkable
 
@@ -28,5 +30,6 @@ __all__ = [
     'ErrorEvent',
     'SystemEvent',
     'EventType',
-    'ThreatLevel'
+    'ThreatLevel',
+    'VoiceSynthesisRequest'
 ] 

@@ -6,7 +6,7 @@
 import axios from 'axios';
 
 // APIクライアントの設定
-const BASE_URL = 'http://127.0.0.1:8000';
+const BASE_URL = 'http://localhost:8000';
 
 // axiosインスタンスの作成
 const apiClient = axios.create({
@@ -54,7 +54,17 @@ export async function getAllSettings() {
   }
 }
 
+/**
+ * 設定を取得するAPIを呼び出す（getAllSettingsのエイリアス）
+ * @returns {Promise<Object>} - レスポンスデータ
+ */
+export async function getSettings() {
+  console.log('🔍 getSettings関数が呼び出されました');
+  return getAllSettings();
+}
+
 export default {
   updateSetting,
-  getAllSettings
+  getAllSettings,
+  getSettings
 }; 
