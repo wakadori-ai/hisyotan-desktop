@@ -1,3 +1,5 @@
+﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 Write-Host "🔍 秘書たん関連プロセス（詳細コマンド確認）"
 
 $keywords = @("uvicorn", "hisyotan", "backend", "FastAPI", "multiprocessing", "spawn_main", "--multiprocessing-fork")

@@ -197,26 +197,42 @@ app.on('window-all-closed', () => {
     try {
       console.log('🛑 すべてのウィンドウ終了時にstop_hisyotan.ps1スクリプトを実行します');
       const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
-      const { exec } = require('child_process');
+      const { spawn } = require('child_process');
       
-      // PowerShellスクリプトを実行
-      exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
-        } else {
-          console.log(`✅ 停止スクリプト出力:\n${stdout}`);
-        }
+      // PowerShellスクリプトを実行（UTF-8エンコーディングを明示的に指定）
+      const stopProcess = spawn('powershell.exe', [
+        '-ExecutionPolicy', 'Bypass',
+        '-File', scriptPath
+      ], {
+        cwd: path.dirname(scriptPath),
+        stdio: 'pipe'
+      });
+      
+      stopProcess.stdout.on('data', (data) => {
+        const output = data.toString('utf8');
+        console.log(`✅ 停止スクリプト出力:\n${output}`);
+      });
+      
+      stopProcess.stderr.on('data', (data) => {
+        const output = data.toString('utf8');
+        console.error(`⚠️ 停止スクリプトエラー:\n${output}`);
+      });
+      
+      stopProcess.on('close', (code) => {
+        console.log(`停止スクリプトが終了コード ${code} で完了しました`);
+        shutdownBackend().then(() => {
+          app.quit();
+        }).catch(error => {
+          console.error('バックエンド終了処理に失敗しました:', error);
+          app.quit(); // エラーが発生しても強制終了
+        });
       });
     } catch (stopScriptError) {
       console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+      shutdownBackend().then(() => {
+        app.quit();
+      }).catch(() => app.quit());
     }
-    
-    shutdownBackend().then(() => {
-      app.quit();
-    }).catch(error => {
-      console.error('バックエンド終了処理に失敗しました:', error);
-      app.quit(); // エラーが発生しても強制終了
-    });
   }
 });
 
@@ -457,17 +473,15 @@ async function startBackendProcess() {
   try {
     console.log('バックエンドサーバーの起動を開始...');
     
-    // バックエンドのパスを設定
-    const backendPath = process.env.VITE_DEV_SERVER_URL 
-      ? path.join(__dirname, '..', '..', 'backend') // 開発モード
-      : path.join(app.getAppPath(), 'backend'); // 本番モード
-    
-    // 実行コマンドの設定
-    const backendCommand = path.join(backendPath, 'start_backend.bat');
+    // スクリプトのパスを設定
+    const scriptPath = path.resolve(__dirname, '..', '..', 'start.ps1');
     
     // バックエンドプロセスの起動
-    backendProcess = spawn('cmd.exe', ['/c', backendCommand], {
-      cwd: backendPath,
+    backendProcess = spawn('powershell.exe', [
+      '-ExecutionPolicy', 'Bypass',
+      '-File', scriptPath,
+      '-BackendOnly'
+    ], {
       stdio: 'pipe',
       shell: true,
       windowsHide: true
@@ -478,13 +492,13 @@ async function startBackendProcess() {
     
     // 出力のリスニング
     backendProcess.stdout.on('data', (data) => {
-      const decodedData = iconv.decode(Buffer.from(data), 'shiftjis');
+      const decodedData = iconv.decode(Buffer.from(data), 'utf8');
       console.log(`バックエンド出力: ${decodedData}`);
     });
     
     // エラー出力のリスニング
     backendProcess.stderr.on('data', (data) => {
-      const decodedData = iconv.decode(Buffer.from(data), 'shiftjis');
+      const decodedData = iconv.decode(Buffer.from(data), 'utf8');
       console.error(`バックエンドエラー: ${decodedData}`);
     });
     
@@ -524,15 +538,33 @@ async function shutdownBackend() {
     try {
       console.log('🛑 stop_hisyotan.ps1スクリプトを実行して秘書たん関連プロセスを終了します');
       const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
-      const { exec } = require('child_process');
+      const { spawn } = require('child_process');
       
-      // PowerShellスクリプトを実行
-      exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
-        } else {
-          console.log(`✅ 停止スクリプト出力:\n${stdout}`);
-        }
+      // PowerShellスクリプトを実行（UTF-8エンコーディングを明示的に指定）
+      const stopProcess = spawn('powershell.exe', [
+        '-ExecutionPolicy', 'Bypass',
+        '-File', scriptPath
+      ], {
+        cwd: path.dirname(scriptPath),
+        stdio: 'pipe'
+      });
+      
+      stopProcess.stdout.on('data', (data) => {
+        const output = data.toString('utf8');
+        console.log(`✅ 停止スクリプト出力:\n${output}`);
+      });
+      
+      stopProcess.stderr.on('data', (data) => {
+        const output = data.toString('utf8');
+        console.error(`⚠️ 停止スクリプトエラー:\n${output}`);
+      });
+      
+      // プロセス終了を待つ
+      await new Promise(resolve => {
+        stopProcess.on('close', (code) => {
+          console.log(`停止スクリプトが終了コード ${code} で完了しました`);
+          resolve();
+        });
       });
     } catch (stopScriptError) {
       console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
@@ -611,12 +643,14 @@ app.on('will-quit', () => {
   try {
     console.log('🛑 アプリケーション終了前にstop_hisyotan.ps1スクリプトを実行します');
     const scriptPath = path.resolve(__dirname, '..', '..', 'tools', 'stop_hisyotan.ps1');
-    const { exec } = require('child_process');
     
-    // PowerShellスクリプトを実行（同期的に実行して確実に処理を完了させる）
+    // PowerShellスクリプトを同期的に実行（UTF-8エンコーディングを明示的に指定）
     const { execSync } = require('child_process');
-    const result = execSync(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`);
-    console.log(`✅ 停止スクリプト出力:\n${result.toString()}`);
+    const result = execSync(
+      `powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, 
+      { encoding: 'utf8' }
+    );
+    console.log(`✅ 停止スクリプト出力:\n${result}`);
   } catch (stopScriptError) {
     console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
   }
