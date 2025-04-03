@@ -24,6 +24,8 @@ if (appNameFromEnv) {
 const preloadPathFromEnv = process.env.HISYOTAN_PRELOAD_PATH || null;
 if (preloadPathFromEnv) {
   console.log(`preloadパスを環境変数から取得: ${preloadPathFromEnv}`);
+} else {
+  console.log(`プリロードスクリプトパス: ${path.join(__dirname, 'preload.js')}`);
 }
 
 // 設定読み込み
@@ -447,20 +449,30 @@ function createWindow() {
   // デバッグ用の別ウィンドウ設定
   const isDebugging = process.argv.includes('--debug');
   
+  // preload.jsのパスを決定
+  let preloadPath = preloadPathFromEnv 
+    ? path.resolve(__dirname, preloadPathFromEnv) 
+    : path.join(__dirname, 'preload.js');
+  
+  console.log(`使用するpreloadパス: ${preloadPath}`);
+  
   mainWindow = new BrowserWindow({
     width: config.window.width || 400,
     height: config.window.height || 600,
     transparent: isDebugging ? false : (config.window.transparent !== false),
     frame: isDebugging ? true : (config.window.frame !== false),
     alwaysOnTop: config.window.alwaysOnTop !== false,
-    backgroundColor: isDebugging ? '#FFFFFF' : (config.window.backgroundColor || '#00000000'),
+    backgroundColor: isDebugging ? '#FFFFFF' : '#00000000', // 背景を完全に透明に設定
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: true,
-      preload: preloadPathFromEnv ? path.resolve(__dirname, preloadPathFromEnv) : path.join(__dirname, 'preload.js'),
-      webSecurity: false
+      nodeIntegration: false, // セキュリティのため無効化
+      contextIsolation: true, // セキュリティのため有効化
+      preload: preloadPath,
+      webSecurity: true // セキュリティのため有効化
     }
   });
+
+  // ウィンドウをクリックスルー可能に設定
+  mainWindow.setIgnoreMouseEvents(false);
 
   // CSPヘッダーを設定
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {

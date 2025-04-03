@@ -1,46 +1,86 @@
 /* 秘書たんコンテナ */
 .assistant-container {
-  overflow: hidden !important;
   position: fixed !important;
   bottom: 0 !important;
   right: 0 !important;
-  width: var(--assistant-width) !important;
-  height: var(--assistant-height) !important;
+  width: 160px !important;
+  height: 320px !important;
+  z-index: 996 !important;
   pointer-events: none !important;
-  transition: transform var(--transition-duration) var(--transition-timing),
-              opacity var(--transition-duration) var(--transition-timing) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: flex-end !important;
+  overflow: visible !important;
 }
 
 /* 立ち絵 */
-#assistantImage {
+.assistant-image {
   position: absolute;
+  bottom: 50px;
+  right: 5px;
   width: 140px;
   height: auto;
   z-index: 998;
   transform-origin: bottom center;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.4s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: auto;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
 }
 
 /* 立ち絵アクティブ状態 */
-#assistantImage.active {
+.assistant-image.active {
+  opacity: 1 !important;
   animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* UI ボタンコンテナ */
+.ui-buttons {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  z-index: 997;
+  pointer-events: auto;
+}
+
+/* ふわふわアニメーション */
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes bounceIn {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.8) translateY(20px);
+  }
+  70% { 
+    opacity: 1; 
+    transform: scale(1.05) translateY(-5px);
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1) translateY(0);
+  }
 }
 
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
-  #assistantImage {
-    max-width: 50vw;
-    max-height: 60vh;
+  .assistant-image {
+    max-width: 120px;
+    max-height: 240px;
   }
 }
 
 /* マウス操作時の透明度設定 */
 body.mouse-active .assistant-image {
-  opacity: 0.4;
+  opacity: 0.8;
 }
 
 /* デバッグモード用スタイル */

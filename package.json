@@ -2,7 +2,8 @@
   "name": "hisyotan-desktop",
   "version": "1.0.0",
   "description": "ふにゃ秘書たん - かわいいAI秘書アプリ",
-  "main": "frontend/src/main/es-module-loader.cjs",
+  "main": "main.js",
+  "type": "module",
   "scripts": {
     "start": "electron .",
     "dev": "vite --port 5173",

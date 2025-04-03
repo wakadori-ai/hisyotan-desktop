@@ -1,11 +1,10 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// ESモジュールの代わりにCommonJSを使用
+const { contextBridge, ipcRenderer } = require('electron');
+const fs = require('fs');
+const path = require('path');
 
-// ESモジュールでの__dirnameの代替
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// __dirnameはCommonJSで直接使用可能
+const __dirname = __dirname;
 
 /**
  * CSSをメインプロセスに注入する関数（必要な場合に使用）
@@ -86,7 +85,6 @@ contextBridge.exposeInMainWorld('electron', {
       const response = await fetch('http://127.0.0.1:8000/', {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
-        timeout: 5000
       });
       return response.ok;
     } catch (err) {

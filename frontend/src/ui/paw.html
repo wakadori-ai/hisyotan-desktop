@@ -8,28 +8,39 @@
     <!-- speechManager.js をグローバルに利用できるようにするためのスクリプト -->
     <script type="module">
         import * as SpeechManagerModule from '../emotion/speechManager.js';
+        import { hideBubble } from './paw-context-menu.js';
         
         // グローバルに公開するためwindowオブジェクトに登録
         window.speechManager = SpeechManagerModule;
+        window.hideBubble = hideBubble;
         
         // 初期化完了時にログ出力
         console.log('💬 speechManagerをグローバルに初期化しました');
     </script>
 </head>
 <body>
-    <div class="paw-button-wrapper">
-        <img id="assistantImage" src="/assets/images/secretary_normal.png" alt="秘書たん" />
-        <div id="paw-button">
-            <span class="paw-icon">🐾</span>
-        </div>
-        <div class="paw-background"></div>
-        <div id="quit-button">
-            <span>✨</span>
-            <div class="quit-bubble">おつかれさま？ 終了するの？</div>
-        </div>
-        <div id="speechBubble" class="speech-bubble">
-            <span id="speechText">秘書たんだよ！何かお手伝いできることはある？</span>
-            <div class="bubble-close" onclick="hideBubble()">×</div>
+    <div id="app" class="app-container">
+        <div class="assistant-container">
+            <img id="assistantImage" src="/assets/images/secretary_normal.png" alt="秘書たん" />
+            
+            <div id="speechBubble" class="speech-bubble">
+                <span id="speechText">「こんにちは！何かお手伝いしましょうか？」</span>
+                <div class="bubble-close" onclick="window.hideBubble()">×</div>
+            </div>
+            
+            <div class="ui-buttons">
+                <div class="paw-button-wrapper">
+                    <div id="paw-button">
+                        <span class="paw-icon">🐾</span>
+                    </div>
+                    <div class="paw-background"></div>
+                </div>
+                
+                <div id="quit-button">
+                    <span>✨</span>
+                    <div class="quit-bubble">おつかれさま？ 終了するの？</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -112,7 +123,7 @@
 
         // ページ読み込み時に初期化
         window.addEventListener('DOMContentLoaded', async () => {
-            console.log('🐾 統合肉球UI初期化完了');
+            console.log('🐾 UI初期化完了');
             
             // レイアウト調整関数を初期化と保存（一時的にコメントアウト）
             updateLayoutPositions = initLayoutPositions;
@@ -148,45 +159,22 @@
                 window.electron.ipcRenderer.on('display-settings-bubble', async (data) => {
                     console.log('設定UI表示リクエストを受信:', data);
                     
-                    // 吹き出しのテキストと表情を設定
-                    const speechBubble = document.getElementById('speechBubble');
-                    const speechText = document.getElementById('speechText');
-                    const secretaryTan = document.getElementById('assistantImage');
-                    
-                    if (speechBubble && speechText && secretaryTan) {
-                        // テキストを設定
-                        speechText.textContent = data.text || '設定モードだよ！何を変更する？';
-                        
-                        // 吹き出しを表示
-                        speechBubble.classList.add('active');
-                        
-                        // 秘書たん画像の表情を変更
-                        const emotion = data.emotion || 'happy';
-                        let imagePath = `/assets/images/secretary_${emotion}.png`;
-                        
-                        // 画像パスを解決
-                        if (window.electronAPI.resolveAssetPath) {
-                            try {
-                                const resolvedPath = await window.electronAPI.resolveAssetPath(`assets/images/secretary_${emotion}.png`);
-                                if (resolvedPath) {
-                                    imagePath = resolvedPath;
-                                }
-                            } catch (error) {
-                                console.error('画像パス解決エラー:', error);
-                            }
-                        }
-                        
-                        secretaryTan.src = imagePath;
-                        secretaryTan.style.opacity = '1';
+                    // 立ち絵の表示
+                    if (secretaryTan) {
                         secretaryTan.classList.add('active');
-                        
-                        // 音声合成
-                        if (window.electronAPI.speakText) {
-                            window.electronAPI.speakText(data.text || '設定モードだよ！何を変更する？', emotion)
-                                .catch(error => {
-                                    console.error('音声合成エラー:', error);
-                                });
-                        }
+                        secretaryTan.style.opacity = '1';
+                    }
+                    
+                    // 吹き出しの表示
+                    const speechBubble = document.getElementById('speechBubble');
+                    if (speechBubble) {
+                        speechBubble.classList.add('active');
+                    }
+                    
+                    // テキストの設定
+                    const speechText = document.getElementById('speechText');
+                    if (speechText) {
+                        speechText.textContent = data?.text || 'こんにちは！何かお手伝いできることはある？';
                     }
                 });
             }
@@ -264,24 +252,6 @@
                 setTimeout(() => {
                     hideBubble();
                 }, 5000);
-            }
-        }
-        
-        // 吹き出しを非表示にする関数
-        function hideBubble() {
-            const speechBubble = document.getElementById('speechBubble');
-            const secretaryTan = document.getElementById('assistantImage');
-            
-            if (speechBubble) {
-                speechBubble.classList.remove('active');
-            }
-            
-            if (secretaryTan) {
-                secretaryTan.classList.remove('active');
-                // アニメーション終了後に非表示
-                setTimeout(() => {
-                    secretaryTan.style.opacity = '0';
-                }, 300);
             }
         }
         

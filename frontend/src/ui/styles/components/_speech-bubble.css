@@ -1,35 +1,37 @@
 /* 吹き出しの基本スタイル */
 .speech-bubble {
   position: absolute;
+  right: 15px;
+  bottom: 170px;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
-  padding: 12px 16px;
-  font-size: 14px;
-  min-width: 180px;
-  max-width: 200px;
+  border-radius: 20px;
+  padding: 14px 18px;
+  font-size: 15px;
+  min-width: 200px;
+  max-width: 280px;
   color: #333;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 200, 220, 0.5);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  border: 1.5px solid rgba(255, 200, 220, 0.7);
   z-index: 1002;
   opacity: 0;
-  transition: all 0.3s ease;
+  transform: scale(0.95) translateY(10px);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   pointer-events: auto;
-  transform: translateY(-5px) scale(0.95);
   display: none;
 }
 
 /* 表示状態 */
-.speech-bubble.show {
+.speech-bubble.active, .speech-bubble.show {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: scale(1) translateY(0);
   display: block;
-  animation: fadeIn 0.3s ease forwards;
+  animation: bubblePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 /* 非表示状態 */
 .speech-bubble.hide {
   opacity: 0;
-  transform: translateY(-5px) scale(0.95);
+  transform: scale(0.95) translateY(10px);
   display: none;
 }
 
@@ -37,12 +39,72 @@
 .speech-bubble:after {
   content: '';
   position: absolute;
-  bottom: -8px;
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 8px solid rgba(255, 255, 255, 0.95);
+  bottom: -12px;
+  right: 40px;
+  width: 20px;
+  height: 20px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-right: 1.5px solid rgba(255, 200, 220, 0.7);
+  border-bottom: 1.5px solid rgba(255, 200, 220, 0.7);
+  transform: rotate(45deg);
+}
+
+/* 閉じるボタン */
+.bubble-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 150, 180, 0.8);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.bubble-close:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  background: rgba(255, 120, 160, 0.9);
+}
+
+/* 吹き出しテキスト */
+.speech-text {
+  display: block;
+  line-height: 1.5;
+  font-size: 15px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  padding-right: 15px;
+}
+
+/* 吹き出しポップアニメーション */
+@keyframes bubblePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* マウス操作時の透明度設定 */
+body.mouse-active .speech-bubble.active {
+  opacity: 0.9;
 }
 
 /* ゾンビ警告表示用スタイル */
@@ -68,11 +130,6 @@
   border: var(--border-width) solid var(--color-warning) !important;
   background-color: var(--color-error) !important;
   box-shadow: 0 4px 15px var(--color-warning-shadow) !important;
-}
-
-/* マウス操作時の透明度設定 */
-body.mouse-active .speech-bubble.show {
-  opacity: 0.7 !important;
 }
 
 /* 吹き出し内のアイコン */
