@@ -55,8 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 肉球ボタンのイベント設定
     const pawButton = document.getElementById('paw-button');
     if (pawButton) {
-      pawButton.addEventListener('click', () => {
-        createTestSettingsUI();
+      pawButton.addEventListener('click', async () => {
+        await createTestSettingsUI();
       });
     }
   }

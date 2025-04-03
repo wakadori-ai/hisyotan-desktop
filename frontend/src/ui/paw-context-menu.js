@@ -434,3 +434,6 @@ function showDebugInfo() {
 
 // 初期化
 setupContextMenuEvents(); 
+
+// 必要な関数をエクスポート
+export { createTestSettingsUI, hideBubble, showSettings, showDebugInfo }; 

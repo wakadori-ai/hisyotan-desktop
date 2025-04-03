@@ -3,6 +3,7 @@
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
 import { updateSetting } from './apiClient.js';
+import { createTestSettingsUI, hideBubble } from './paw-context-menu.js';
 
 // DOM要素
 let speechBubble;

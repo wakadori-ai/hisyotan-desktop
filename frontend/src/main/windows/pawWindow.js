@@ -48,7 +48,20 @@ function createPawWindow(app) {
       nodeIntegration: false,
       enableRemoteModule: true, // @electron/remoteを使用する場合
       sandbox: false,
+      webSecurity: true,
     }
+  });
+  
+  // Content Security Policyを設定
+  pawWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:*;"
+        ]
+      }
+    });
   });
   
   // 肉球ボタンウィンドウの設定

@@ -809,7 +809,9 @@
                 // フォールバック：テスト用設定UIを表示
                 console.log('speechManagerが利用できないため、テスト用設定UIを表示します');
                 if (typeof createTestSettingsUI === 'function') {
-                    createTestSettingsUI();
+                    (async () => {
+                        await createTestSettingsUI();
+                    })();
                 } else {
                     console.error('設定UI表示機能が利用できません');
                 }
