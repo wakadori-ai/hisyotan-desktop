@@ -243,11 +243,23 @@ function setupIPC() {
   
   // 画像パス解決
   ipcMain.handle('resolve-asset-path', (event, relativePath) => {
-    // 開発環境と本番環境でのパス解決
-    if (isDev) {
-      return path.join(__dirname, relativePath);
-    } else {
-      return path.join(process.resourcesPath, 'app', relativePath);
+    try {
+      // パス区切り文字を統一（\を/に変換）
+      const normalizedPath = relativePath.replace(/\\/g, '/');
+      
+      // 開発環境と本番環境でのパス解決
+      let resolvedPath;
+      if (isDev) {
+        resolvedPath = path.join(__dirname, normalizedPath);
+      } else {
+        resolvedPath = path.join(process.resourcesPath, 'app', normalizedPath);
+      }
+      
+      console.log(`アセットパス解決: ${relativePath} => ${resolvedPath}`);
+      return resolvedPath;
+    } catch (error) {
+      console.error('アセットパス解決エラー:', error);
+      return relativePath;
     }
   });
   

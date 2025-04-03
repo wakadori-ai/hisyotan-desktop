@@ -581,3 +581,61 @@ MIT License
 ## 📅 最終更新日
 
 2024年4月3日
+
+## パッケージ管理について
+
+このプロジェクトはパッケージ管理に**pnpm**を使用しています。npmやyarnではなく、pnpmを使ってください。
+
+### pnpmのインストール
+
+```bash
+npm install -g pnpm
+```
+
+### 依存関係のインストール
+
+```bash
+pnpm install
+```
+
+### 開発サーバーの起動
+
+```bash
+pnpm run dev:all
+```
+
+このコマンドは以下のステップを順番に実行します：
+1. バックエンドサーバー（FastAPI）の起動
+2. フロントエンドの開発サーバー（Vite）の起動 
+3. バックエンドとフロントエンドの準備完了を待機
+4. Electron アプリの起動
+
+## トラブルシューティング
+
+### 依存関係の競合がある場合
+
+`node_modules`と`package-lock.json`を完全に削除して、pnpmを使って再インストールしてください：
+
+```bash
+# Windowsの場合
+if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }
+if (Test-Path package-lock.json) { Remove-Item package-lock.json }
+if (Test-Path pnpm-lock.yaml) { Remove-Item pnpm-lock.yaml }
+pnpm install
+
+# Mac/Linuxの場合
+rm -rf node_modules package-lock.json pnpm-lock.yaml
+pnpm install
+```
+
+### 音声ファイルが見つからないエラー
+
+プロジェクト内のパスは全て `/` を使用して統一されています。Windowsでの `\` の使用は避けてください。
+
+### バックエンド接続エラー
+
+`ECONNREFUSED 127.0.0.1:8000` などのエラーが発生した場合は、バックエンドが完全に起動する前にElectronが起動してしまっている可能性があります。`pnpm run dev:all` を使うことで、バックエンドの準備完了を待ってからElectronが起動するようになっています。
+
+### ゾンビ検出関連のエラー
+
+最新の構造では `app.zombie` パッケージを使用しています。古いインポートパス `app.services.zombie` を参照しているコードがある場合は修正してください。

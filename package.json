@@ -10,7 +10,7 @@
     "dev:frontend": "vite --port 5173 --host",
     "dev:backend": "cross-env DEBUG_MODE=true python -m uvicorn backend.main:app --reload --port 8000",
     "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173/ ELECTRON_CSP_DEV=true electron .",
-    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
+    "dev:all": "concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\" \"wait-on http://localhost:8000 && wait-on http://localhost:5173 && pnpm run dev:electron\"",
     "build": "vite build && node copy-preload.js",
     "build:electron": "vite build && node copy-preload.js && electron-builder",
     "pack": "vite build && node copy-preload.js && electron-builder --dir",

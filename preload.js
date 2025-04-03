@@ -80,6 +80,21 @@ contextBridge.exposeInMainWorld('electron', {
   // API接続先の設定（環境変数から取得、デフォルトは127.0.0.1）
   apiHost: process.env.API_HOST || '127.0.0.1',
   
+  // バックエンド接続確認
+  checkBackendConnection: async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/status', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        timeout: 5000
+      });
+      return response.ok;
+    } catch (err) {
+      console.error('バックエンド接続エラー:', err);
+      return false;
+    }
+  },
+  
   // 他のIPC通信関数をここに追加していく
   speakText: (text, emotion) => ipcRenderer.invoke('speak-text', text, emotion),
   getSettings: () => ipcRenderer.invoke('get-settings'),

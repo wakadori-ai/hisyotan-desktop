@@ -284,12 +284,7 @@ async def zombie_few_alert(count: int, frame_data: Optional[Any] = None, additio
         message_type=alert_type,
         title="ゾンビ検出",
         importance="high",
-        data={
-            "count": count,
-            "positions": positions,
-            "resnet_result": resnet_result,
-            "resnet_probability": resnet_prob
-        }
+        skipAudio=False
     )
     
     return {

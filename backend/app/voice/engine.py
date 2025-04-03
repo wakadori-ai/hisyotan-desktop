@@ -31,9 +31,9 @@ last_message_cache: Dict[str, Tuple[str, float]] = {}
 # 音声再生中フラグ
 audio_playing = False
 # 合成音声キャッシュのパス
-CACHED_VOICE_DIR = "assets/sounds/generated"
+CACHED_VOICE_DIR = os.path.join("assets", "sounds", "generated")
 # プリセット音声のパス
-PRESET_VOICE_DIR = "assets/sounds/presets"
+PRESET_VOICE_DIR = os.path.join("assets", "sounds", "presets")
 # ThreadPoolExecutor for background tasks
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
