@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>秘書たん呼び出しボタン</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: transparent;
+            user-select: none;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        
+        @keyframes floaty {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+            100% { transform: translateY(0); }
+        }
+        
+        @keyframes fuwafuwa {
+            0% { 
+                filter: drop-shadow(0 0 5px rgba(255, 192, 203, 0.5));
+                opacity: 0.85;
+                transform: scale(1.00);
+            }
+            50% { 
+                filter: drop-shadow(0 0 10px rgba(255, 192, 203, 0.8));
+                opacity: 1;
+                transform: scale(1.05);
+            }
+            100% { 
+                filter: drop-shadow(0 0 5px rgba(255, 192, 203, 0.5));
+                opacity: 0.85;
+                transform: scale(1.00);
+            }
+        }
+
+        @keyframes popIn {
+            0% { 
+                opacity: 0;
+                transform: scale(0.6) translateY(20px);
+            }
+            70% { 
+                transform: scale(1.05) translateY(-5px);
+            }
+            100% { 
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes bounceIn {
+            0% { 
+                opacity: 0;
+                transform: scale(0.3) translateY(40px);
+            }
+            40% { 
+                transform: scale(1.1) translateY(-10px);
+            }
+            60% { 
+                transform: scale(0.9) translateY(5px);
+            }
+            80% { 
+                transform: scale(1.05) translateY(-2px);
+            }
+            100% { 
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .paw-button-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+            z-index: 999;
+        }
+        
+        .paw-background {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(80, 20, 80, 0.15);
+            backdrop-filter: blur(2px);
+            box-shadow: 0 0 15px rgba(255, 192, 203, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        #paw-button {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 42px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0.9;
+            z-index: 1000;
+            pointer-events: auto;
+            animation: 
+                floaty 3s ease-in-out infinite,
+                fuwafuwa 2s ease-in-out infinite;
+            filter: 
+                drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2))
+                drop-shadow(0 0 8px rgba(255, 192, 203, 0.6));
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            position: absolute;
+        }
+        
+        #paw-button:hover {
+            transform: scale(1.2);
+            opacity: 1;
+            filter: 
+                drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25))
+                drop-shadow(0 0 12px rgba(255, 192, 203, 0.9))
+                drop-shadow(0 0 5px white);
+            animation-play-state: paused;
+        }
+        
+        #paw-button:hover + .paw-background {
+            width: 70px;
+            height: 70px;
+            background: rgba(100, 30, 100, 0.2);
+            box-shadow: 0 0 20px rgba(255, 192, 203, 0.5);
+        }
+        
+        #paw-button:active {
+            transform: scale(0.9);
+            filter: drop-shadow(0 0 15px rgba(255, 130, 180, 1));
+        }
+        
+        /* 終了ボタンのスタイル更新 - より控えめに */
+        #quit-button {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: rgba(255, 100, 150, 0.7);
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 1001;
+            pointer-events: auto;
+            box-shadow: 0 0 4px rgba(255, 100, 150, 0.3);
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            opacity: 0.6;
+        }
+
+        #quit-button:hover {
+            opacity: 1;
+            transform: scale(1.1);
+            background-color: rgba(255, 80, 120, 0.9);
+            box-shadow: 0 0 15px rgba(255, 100, 150, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+        }
+        
+        /* 吹き出しの表示位置を調整 - ウィンドウ内に収まるように */
+        .quit-bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 14px;
+            white-space: nowrap;
+            color: #333;
+            opacity: 0;
+            transform: translateY(5px);
+            transition: all 0.2s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 200, 220, 0.5);
+            z-index: 1002;
+            width: auto;
+            min-width: 160px;
+            line-height: 1.4;
+            text-align: center;
+            bottom: 48px;
+            right: 0;
+        }
+
+        .quit-bubble:after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 17px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid rgba(255, 255, 255, 0.95);
+        }
+
+        #quit-button:hover .quit-bubble {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 秘書たん画像のスタイル */
+        #assistantImage {
+            position: absolute;
+            width: 140px;
+            height: auto;
+            z-index: 998;
+            transform-origin: bottom center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: auto;
+        }
+
+        #assistantImage.active {
+            animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* 秘書たんの吹き出し */
+        .speech-bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 12px 16px;
+            font-size: 14px;
+            min-width: 180px;
+            max-width: 200px;
+            color: #333;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 200, 220, 0.5);
+            z-index: 1002;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: auto;
+            transform: translateY(-5px) scale(0.95);
+            display: none;
+        }
+
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid rgba(255, 255, 255, 0.95);
+        }
+
+        .speech-bubble.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            display: block;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .speech-bubble .bubble-close {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 12px;
+            color: #999;
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.05);
+            pointer-events: auto;
+        }
+
+        .speech-bubble .bubble-close:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: #555;
+        }
+    </style>
+    <!-- speechManager.js をグローバルに利用できるようにするためのスクリプト -->
+    <script type="module">
+        import * as SpeechManagerModule from '../emotion/speechManager.js';
+        
+        // グローバルに公開するためwindowオブジェクトに登録
+        window.speechManager = SpeechManagerModule;
+        
+        // 初期化完了時にログ出力
+        console.log('💬 speechManagerをグローバルに初期化しました');
+    </script>
+</head>
+<body>
+    <div class="paw-button-wrapper">
+        <img id="assistantImage" src="/assets/images/secretary_normal.png" alt="秘書たん" />
+        <div id="paw-button">🐾</div>
+        <div class="paw-background"></div>
+        <div id="quit-button">
+            <span>✨</span>
+            <div class="quit-bubble">おつかれさま？ 終了するの？</div>
+        </div>
+        <div id="speechBubble" class="speech-bubble">
+            <span id="speechText">秘書たんだよ！何かお手伝いできることはある？</span>
+            <div class="bubble-close" onclick="hideBubble()">×</div>
+        </div>
+    </div>
+
+    <script>
+        // Electron APIが利用可能かチェック
+        const isElectron = window && window.electronAPI;
+        
+        // レイアウト調整関数
+        let updateLayoutPositions;
+        
+        // レイアウト調整関数の実装（Electron APIからのインポートが難しい場合のためにインラインで実装）
+        function initLayoutPositions() {
+            // 要素の取得
+            const quitButton = document.getElementById('quit-button');
+            const pawButton = document.getElementById('paw-button');
+            const assistantImage = document.getElementById('assistantImage');
+            const speechBubble = document.getElementById('speechBubble');
+            const pawBackground = document.querySelector('.paw-background');
+            
+            if (!quitButton || !pawButton || !assistantImage || !speechBubble) {
+                console.log('レイアウト調整: 一部のUI要素が見つかりません');
+                return;
+            }
+            
+            // 終了ボタンを右下に配置
+            quitButton.style.position = 'fixed';
+            quitButton.style.bottom = '15px';
+            quitButton.style.right = '15px';
+            quitButton.style.left = 'auto';
+            quitButton.style.top = 'auto';
+            
+            // 肉球ボタンをその少し上に配置
+            const quitButtonRect = quitButton.getBoundingClientRect();
+            const pawButtonMargin = 15; // 余白
+            
+            pawButton.style.position = 'fixed';
+            pawButton.style.bottom = `${quitButtonRect.height + pawButtonMargin + 15}px`; // 終了ボタンの上
+            pawButton.style.right = `${15}px`;
+            pawButton.style.left = 'auto';
+            pawButton.style.top = 'auto';
+            
+            // 肉球背景も一緒に移動
+            if (pawBackground) {
+                pawBackground.style.position = 'fixed';
+                pawBackground.style.bottom = `${quitButtonRect.height + pawButtonMargin + 20}px`;
+                pawBackground.style.right = `${35}px`;
+                pawBackground.style.left = 'auto';
+                pawBackground.style.top = 'auto';
+            }
+            
+            // 秘書たん立ち絵を肉球ボタンの上に配置
+            const pawButtonRect = pawButton.getBoundingClientRect();
+            const assistantMargin = 5; // 余白
+            
+            assistantImage.style.position = 'fixed';
+            assistantImage.style.bottom = `${quitButtonRect.height + pawButtonRect.height + assistantMargin + 15}px`; // 肉球ボタンの上
+            assistantImage.style.right = `${5}px`; // 右寄せ（少し余白）
+            assistantImage.style.left = 'auto';
+            assistantImage.style.top = 'auto';
+            
+            // 吹き出しを秘書たんの頭の上に配置
+            const assistantRect = assistantImage.getBoundingClientRect();
+            const bubbleMargin = 10; // 余白
+            
+            speechBubble.style.position = 'fixed';
+            speechBubble.style.bottom = `${assistantRect.height + quitButtonRect.height + pawButtonRect.height + bubbleMargin + 15}px`; // 立ち絵の上
+            speechBubble.style.right = `${5}px`; // 右寄せ（少し余白）
+            speechBubble.style.left = 'auto';
+            speechBubble.style.top = 'auto';
+            
+            // 吹き出しの三角形部分の位置調整
+            const bubbleArrow = document.querySelector('.speech-bubble:after');
+            if (bubbleArrow) {
+                bubbleArrow.style.left = 'auto';
+                bubbleArrow.style.right = '40px';
+            }
+            
+            console.log('UIレイアウト位置の更新が完了しました');
+        }
+
+        // ページ読み込み時に初期化
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('🐾 統合肉球UI初期化完了');
+            
+            // レイアウト調整関数を初期化と保存
+            updateLayoutPositions = initLayoutPositions;
+            
+            // 初期レイアウト設定
+            updateLayoutPositions();
+            
+            // リサイズイベントのリスナーを設定
+            window.addEventListener('resize', () => {
+                updateLayoutPositions();
+            });
+            
+            // 秘書たん画像を非表示に初期化
+            const secretaryTan = document.getElementById('assistantImage');
+            if (secretaryTan) {
+                secretaryTan.style.opacity = '0';
+                
+                // Electron API が利用可能な場合は画像パスを解決
+                if (isElectron && window.electronAPI.resolveAssetPath) {
+                    try {
+                        const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_normal.png');
+                        secretaryTan.src = resolvedPath || '/assets/images/secretary_normal.png';
+                        console.log('画像パスを解決しました:', resolvedPath);
+                    } catch (error) {
+                        console.error('画像パス解決エラー:', error);
+                    }
+                }
+            }
+            
+            // 設定UIイベントのリスナーを登録
+            if (isElectron && window.electron && window.electron.ipcRenderer) {
+                // メインプロセスからの設定表示リクエストを受け取る
+                window.electron.ipcRenderer.on('display-settings-bubble', async (data) => {
+                    console.log('設定UI表示リクエストを受信:', data);
+                    
+                    // 吹き出しのテキストと表情を設定
+                    const speechBubble = document.getElementById('speechBubble');
+                    const speechText = document.getElementById('speechText');
+                    const secretaryTan = document.getElementById('assistantImage');
+                    
+                    if (speechBubble && speechText && secretaryTan) {
+                        // テキストを設定
+                        speechText.textContent = data.text || '設定モードだよ！何を変更する？';
+                        
+                        // 吹き出しを表示
+                        speechBubble.classList.add('active');
+                        
+                        // 秘書たん画像の表情を変更
+                        const emotion = data.emotion || 'happy';
+                        let imagePath = `/assets/images/secretary_${emotion}.png`;
+                        
+                        // 画像パスを解決
+                        if (window.electronAPI.resolveAssetPath) {
+                            try {
+                                const resolvedPath = await window.electronAPI.resolveAssetPath(`assets/images/secretary_${emotion}.png`);
+                                if (resolvedPath) {
+                                    imagePath = resolvedPath;
+                                }
+                            } catch (error) {
+                                console.error('画像パス解決エラー:', error);
+                            }
+                        }
+                        
+                        secretaryTan.src = imagePath;
+                        secretaryTan.style.opacity = '1';
+                        secretaryTan.classList.add('active');
+                        
+                        // 音声合成
+                        if (window.electronAPI.speakText) {
+                            window.electronAPI.speakText(data.text || '設定モードだよ！何を変更する？', emotion)
+                                .catch(error => {
+                                    console.error('音声合成エラー:', error);
+                                });
+                        }
+                    }
+                });
+            }
+        });
+        
+        // ランダムセリフと表情の組み合わせ
+        const greetings = [
+            { text: "秘書たんだよ！何かお手伝いできることはある？", emotion: "normal" },
+            { text: "どうしたの？なにか手伝えることあるかな？", emotion: "happy" },
+            { text: "呼んでくれてありがと！何かできることはある？", emotion: "normal" },
+            { text: "お疲れさま！少し休憩する？", emotion: "smile" },
+            { text: "秘書たんと一緒に頑張ろう！", emotion: "happy" },
+            { text: "ふにゃ〜、なにかな？", emotion: "relieved" }
+        ];
+        
+        // 肉球ボタンのクリックイベント
+        document.getElementById('paw-button').addEventListener('click', () => {
+            if (isElectron) {
+                showSpeechBubble();
+            }
+        });
+        
+        // 吹き出しを表示する関数
+        async function showSpeechBubble() {
+            const speechBubble = document.getElementById('speechBubble');
+            const speechText = document.getElementById('speechText');
+            const secretaryTan = document.getElementById('assistantImage');
+            
+            if (speechBubble && speechText && secretaryTan) {
+                // ランダムなセリフと表情を選択
+                const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+                
+                // テキストを設定
+                speechText.textContent = greeting.text;
+                
+                // 吹き出しを表示
+                speechBubble.classList.add('active');
+                
+                // 秘書たん画像の表情に応じた画像に変更
+                let imagePath = `/assets/images/secretary_${greeting.emotion}.png`;
+                
+                // Electron API が利用可能な場合は画像パスを解決
+                if (isElectron && window.electronAPI.resolveAssetPath) {
+                    try {
+                        const resolvedPath = await window.electronAPI.resolveAssetPath(`assets/images/secretary_${greeting.emotion}.png`);
+                        if (resolvedPath) {
+                            imagePath = resolvedPath;
+                        }
+                    } catch (error) {
+                        console.error('画像パス解決エラー:', error);
+                    }
+                }
+                
+                secretaryTan.src = imagePath;
+                secretaryTan.style.opacity = '1';
+                secretaryTan.classList.add('active');
+                
+                // 音声合成API呼び出し
+                if (isElectron && window.electronAPI.speakText) {
+                    window.electronAPI.speakText(greeting.text, greeting.emotion)
+                        .then(result => {
+                            console.log('音声合成結果:', result);
+                        })
+                        .catch(error => {
+                            console.error('音声合成エラー:', error);
+                        });
+                }
+                
+                // 表情を変更
+                if (isElectron && window.electronAPI.changeSecretaryExpression) {
+                    window.electronAPI.changeSecretaryExpression(greeting.emotion);
+                }
+                
+                // 5秒後に自動で閉じる
+                setTimeout(() => {
+                    hideBubble();
+                }, 5000);
+            }
+        }
+        
+        // 吹き出しを非表示にする関数
+        function hideBubble() {
+            const speechBubble = document.getElementById('speechBubble');
+            const secretaryTan = document.getElementById('assistantImage');
+            
+            if (speechBubble) {
+                speechBubble.classList.remove('active');
+            }
+            
+            if (secretaryTan) {
+                secretaryTan.classList.remove('active');
+                // アニメーション終了後に非表示
+                setTimeout(() => {
+                    secretaryTan.style.opacity = '0';
+                }, 300);
+            }
+        }
+        
+        // 終了ボタンのクリックイベント
+        document.getElementById('quit-button').addEventListener('click', async (e) => {
+            e.stopPropagation(); // イベントの伝播を停止
+            if (isElectron) {
+                console.log('🚨 終了ボタンがクリックされました');
+                
+                // 終了確認の吹き出しを表示
+                const speechBubble = document.getElementById('speechBubble');
+                const speechText = document.getElementById('speechText');
+                const secretaryTan = document.getElementById('assistantImage');
+                
+                if (speechBubble && speechText) {
+                    // テキストを設定
+                    speechText.textContent = "本当に終了するの？またね〜！";
+                    
+                    // 吹き出しを表示
+                    speechBubble.classList.add('active');
+                    
+                    // 秘書たん画像を表示
+                    if (secretaryTan) {
+                        // 画像パスを解決
+                        let imagePath = "/assets/images/secretary_sad.png";
+                        
+                        // Electron API が利用可能な場合は画像パスを解決
+                        if (window.electronAPI.resolveAssetPath) {
+                            try {
+                                const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_sad.png');
+                                if (resolvedPath) {
+                                    imagePath = resolvedPath;
+                                }
+                            } catch (error) {
+                                console.error('画像パス解決エラー:', error);
+                            }
+                        }
+                        
+                        secretaryTan.src = imagePath;
+                        secretaryTan.style.opacity = '1';
+                        secretaryTan.classList.add('active');
+                    }
+                    
+                    // 音声合成API呼び出し
+                    if (isElectron && window.electronAPI.speakText) {
+                        window.electronAPI.speakText("本当に終了するの？またね〜！", "sad")
+                            .catch(error => {
+                                console.error('音声合成エラー:', error);
+                            });
+                    }
+                }
+                
+                // 1.5秒後にアプリを終了
+                setTimeout(() => {
+                    if (secretaryTan) {
+                        // フェードアウトアニメーション
+                        secretaryTan.style.transition = 'opacity 0.5s ease';
+                        secretaryTan.style.opacity = '0';
+                    }
+                    
+                    if (speechBubble) {
+                        speechBubble.classList.remove('active');
+                    }
+                    
+                    // さらに0.5秒後に実際に終了
+                    setTimeout(() => {
+                        window.electronAPI.quitApp();
+                    }, 500);
+                }, 1500);
+            }
+        });
+        
+        // 肉球ボタンのドラッグ機能
+        const pawButton = document.getElementById('paw-button');
+        const wrapper = document.querySelector('.paw-button-wrapper');
+        let isDragging = false;
+        let offsetX = 0, offsetY = 0;
+        
+        // ドラッグ可能領域を拡大（肉球ボタンだけでなくラッパー全体）
+        wrapper.style.pointerEvents = 'auto';
+        
+        // マウスダウンイベント - ドラッグ開始
+        wrapper.addEventListener('mousedown', (e) => {
+            // 終了ボタンをクリックした場合はドラッグを開始しない
+            if (e.target.closest('#quit-button') || e.target.closest('.bubble-close')) return;
+            
+            // ドラッグ中はアニメーションを一時停止
+            pawButton.style.animationPlayState = 'paused';
+            
+            // ウィンドウの現在位置を取得してオフセットを計算
+            if (isElectron && window.electronAPI) {
+                window.electronAPI.getWindowPosition().then(position => {
+                    // マウスカーソルとウィンドウ左上の相対位置（オフセット）を計算
+                    offsetX = e.screenX - position.x;
+                    offsetY = e.screenY - position.y;
+                    isDragging = true;
+                });
+            }
+            
+            // イベントの伝播を防止（テキスト選択を防止）
+            e.preventDefault();
+        });
+        
+        // マウス移動イベント - ドラッグ中
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            // マウス位置からオフセットを引いて新しいウィンドウ位置を計算
+            const newX = e.screenX - offsetX;
+            const newY = e.screenY - offsetY;
+            
+            // 絶対位置をウィンドウに設定
+            if (isElectron && window.electronAPI) {
+                window.electronAPI.setWindowPosition(newX, newY);
+            }
+        });
+        
+        // マウスアップイベント - ドラッグ終了
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            
+            // ドラッグ終了後、アニメーションを再開
+            pawButton.style.animationPlayState = '';
+        });
+        
+        // マウスがウィンドウ外に出た時もドラッグ終了
+        document.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                pawButton.style.animationPlayState = '';
+            }
+        });
+        
+        // テスト用の設定トグル表示関数
+        function testSettingToggle() {
+            // スピーチマネージャーからインポートした関数を使用
+            const { speakWithObject } = window.speechManager;
+            
+            if (!speakWithObject) {
+                console.error('speakWithObject関数が見つかりません');
+                return;
+            }
+            
+            // 設定UIを含むセリフオブジェクトを作成
+            const settingSpeech = {
+                id: 'setting_test',
+                type: 'setting',
+                text: 'この設定を変更しますか？',
+                emotion: 'normal',
+                uiPayload: {
+                    type: 'toggle',
+                    label: 'テスト設定を有効にする',
+                    value: false,
+                    onChange: (newValue) => {
+                        console.log(`設定が変更されました: ${newValue}`);
+                        // 設定変更後のフィードバック
+                        setTimeout(() => {
+                            window.speechManager.speak(
+                                newValue ? 'テスト設定を有効にしました！' : 'テスト設定を無効にしました',
+                                newValue ? 'happy' : 'normal',
+                                5000,
+                                null,
+                                'setting_feedback'
+                            );
+                        }, 500);
+                    }
+                }
+            };
+            
+            // 設定UIを表示
+            speakWithObject(settingSpeech);
+        }
+
+        // グローバルオブジェクトに追加（開発者ツールからアクセスできるように）
+        if (typeof window !== 'undefined') {
+            window.testSettingToggle = testSettingToggle;
+        }
+    </script>
+
+    <!-- 右クリックメニュー用の専用スクリプト（Viteパスエイリアス非依存） -->
+    <script src="paw-context-menu.js"></script>
+
+    <!-- IPCメッセージハンドラ -->
+    <script>
+        // 吹き出し表示リクエストを受け取るリスナー
+        window.electron.ipcRenderer.on('display-settings-bubble', () => {
+            console.log('🎯 設定UI表示イベントを受信しました');
+            
+            // window.speechManagerが利用可能な場合はそれを使用
+            if (window.speechManager && window.speechManager.speakWithObject) {
+                console.log('speechManager.speakWithObjectを使用します');
+                
+                // 現在の状態を取得
+                const currentState = window.speechManager.getHordeModeState ? 
+                    window.speechManager.getHordeModeState() : false;
+                
+                // 設定UI表示用のペイロードを作成
+                const settingSpeech = {
+                    id: "setting_horde_mode",
+                    type: "setting",
+                    text: "今夜はホード夜モードにする…？",
+                    emotion: "gentle",
+                    uiPayload: {
+                        type: "toggle",
+                        label: "ホード夜モード",
+                        value: currentState,
+                        onChange: (newValue) => {
+                            console.log(`ホード夜モードが${newValue ? 'オン' : 'オフ'}に変更されました`);
+                            
+                            // 状態を保存
+                            if (window.speechManager.setHordeModeState) {
+                                window.speechManager.setHordeModeState(newValue);
+                            }
+                            
+                            // 変更後のフィードバックセリフ
+                            const feedbackMessage = newValue 
+                                ? "ホード夜モードをオンにしたよ。怖いけど一緒に頑張ろうね…" 
+                                : "ホード夜モードをオフにしたよ。ほっとした～";
+                            
+                            const feedbackEmotion = newValue ? "serious" : "relieved";
+                            
+                            // 少し遅延させてフィードバックを表示
+                            setTimeout(() => {
+                                if (window.speechManager.speak) {
+                                    window.speechManager.speak(
+                                        feedbackMessage,
+                                        feedbackEmotion,
+                                        5000,
+                                        null,
+                                        "horde_mode_feedback"
+                                    );
+                                }
+                            }, 500);
+                        }
+                    }
+                };
+                
+                // 設定UIを表示
+                window.speechManager.speakWithObject(settingSpeech);
+            } else {
+                // フォールバック：テスト用設定UIを表示
+                console.log('speechManagerが利用できないため、テスト用設定UIを表示します');
+                if (typeof createTestSettingsUI === 'function') {
+                    createTestSettingsUI();
+                } else {
+                    console.error('設定UI表示機能が利用できません');
+                }
+            }
+        });
+        
+        // SpeechManager操作を受け取るリスナー
+        window.electron.ipcRenderer.on('speech-manager-operation', (data) => {
+            console.log('🎯 SpeechManager操作イベントを受信:', data);
+            
+            if (!window.speechManager) {
+                console.error('speechManagerが利用できません');
+                return;
+            }
+            
+            const { method, args } = data;
+            
+            // メソッドが存在するか確認
+            if (typeof window.speechManager[method] === 'function') {
+                // メソッドを呼び出す
+                try {
+                    window.speechManager[method](...args);
+                } catch (error) {
+                    console.error(`speechManager.${method}の呼び出しエラー:`, error);
+                }
+            } else {
+                console.error(`speechManagerに${method}メソッドが存在しません`);
+            }
+        });
+    </script>
+
+    <!-- ES Modules サポート -->
+    <script type="module">
+        // 設定APIクライアントの初期化
+        import apiClient from './apiClient.js';
+        
+        // グローバルアクセス用に設定
+        window.settingsApi = apiClient;
+        
+        console.log('🔌 ES Modules サポート初期化完了');
+    </script>
+</body>
+</html> 
