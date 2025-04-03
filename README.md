@@ -86,6 +86,113 @@ npm start
 
 アプリケーションの起動時に自動的にバックエンド（Python FastAPI）が起動します。通常は手動でバックエンドを起動する必要はありません。
 
+## 開発環境のセットアップ（リファクタリング後）
+
+> **注意**: 従来の `start.ps1` スクリプトは非推奨となりました。以下の新しいnpm/pnpmコマンドを使用してください。
+
+### 開発モードでの起動方法
+
+開発環境では、フロントエンド（Vite）、バックエンド（FastAPI）、Electron アプリを個別に、または同時に起動できます。
+
+#### 個別起動
+
+1. **バックエンドのみ起動**:
+   ```bash
+   npm run dev:backend
+   # または
+   pnpm dev:backend
+   ```
+
+2. **フロントエンドのみ起動**:
+   ```bash
+   npm run dev:frontend
+   # または
+   pnpm dev:frontend
+   ```
+
+3. **Electronのみ起動**:
+   ```bash
+   npm run dev:electron
+   # または
+   pnpm dev:electron
+   ```
+
+#### 一括起動
+
+すべてのサービスを一度に起動するには：
+
+```bash
+npm run dev:all
+# または
+pnpm dev:all
+```
+
+### 開発時のデバッグ
+
+デバッグモードで起動するには：
+
+```bash
+npm run dev:debug
+# または
+pnpm dev:debug
+```
+
+### ビルドと配布
+
+```bash
+# ビルドのみ
+npm run build
+# または
+pnpm build
+
+# ビルドして配布用パッケージを作成
+npm run dist
+# または
+pnpm dist
+```
+
+## 環境変数
+
+開発時に使用される主な環境変数：
+
+- `ELECTRON_CSP_DEV=true`: 開発モードでCSP制限を一時的に緩和
+- `DEBUG_MODE=true`: バックエンドをデバッグモードで起動
+- `VITE_DEV_SERVER_URL`: ViteサーバーのURL（デフォルト: http://localhost:5173/）
+
+## 🔧 インストールと設定
+
+### 前提条件
+
+- **フロントエンド**：
+  - [Node.js](https://nodejs.org/) v14以上
+  - npm（Node.jsに含まれています）
+
+- **バックエンド**：
+  - [Python](https://www.python.org/) 3.9以上（推奨：3.10）
+  - [VOICEVOX](https://voicevox.hiroshiba.jp/) のインストール（音声合成エンジン）
+
+### インストール手順
+
+```bash
+# リポジトリのクローン
+git clone https://github.com/yourusername/hisyotan-desktop.git
+cd hisyotan-desktop
+
+# フロントエンド依存関係のインストール
+npm install
+
+# バックエンド依存関係のインストール
+pip install -r requirements.txt
+
+# 機械学習モジュールの依存関係（オプション、ゾンビ検出機能を使用する場合）
+pip install -r backend/ml/requirements.txt
+
+# アプリケーションの起動
+npm start
+```
+
+アプリケーションの起動時に自動的にバックエンド（Python FastAPI）が起動します。通常は手動でバックエンドを起動する必要はありません。
+
 ### Windows向け便利な起動方法
 
 #### 簡単な起動方法
