@@ -1,7 +1,11 @@
-// Electronの必要なモジュールをインポート
-const { contextBridge, ipcRenderer } = require('electron');
-const fs = require('fs');
-const path = require('path');
+import { contextBridge, ipcRenderer } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ESモジュールでの__dirnameの代替
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * CSSをメインプロセスに注入する関数（必要な場合に使用）
@@ -43,6 +47,33 @@ injectCSS();
 
 // Electronの機能をブラウザウィンドウで使えるようにする
 contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: {
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+    send: (channel, ...args) => ipcRenderer.send(channel, ...args),
+    on: (channel, func) => {
+      const subscription = (event, ...args) => func(...args);
+      ipcRenderer.on(channel, subscription);
+      return () => ipcRenderer.removeListener(channel, subscription);
+    },
+    once: (channel, func) => {
+      ipcRenderer.once(channel, (event, ...args) => func(...args));
+    }
+  },
+  fs: {
+    readFile: (path) => fs.readFileSync(path, 'utf8'),
+    writeFile: (path, data) => fs.writeFileSync(path, data, 'utf8'),
+    exists: (path) => fs.existsSync(path)
+  },
+  path: {
+    join: (...args) => path.join(...args),
+    dirname: (p) => path.dirname(p),
+    basename: (p) => path.basename(p)
+  },
+  platform: process.platform,
+  showYesNoDialog: (message) => ipcRenderer.invoke('show-yes-no-dialog', message),
+  showTextInputDialog: (message, defaultValue) => ipcRenderer.invoke('show-text-input-dialog', message, defaultValue),
+  playSound: (name) => ipcRenderer.invoke('play-sound', name),
+  
   // 必要なIPC通信メソッドを追加
   getAssetPath: (relativePath) => ipcRenderer.invoke('resolve-asset-path', relativePath),
   

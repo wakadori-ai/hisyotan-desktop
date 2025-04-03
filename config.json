@@ -1,0 +1,5 @@
+{
+  "app": { "name": "ふにゃ秘書たん", "version": "1.0.0" },
+  "window": { "width": 400, "height": 600, "transparent": true, "frame": false, "alwaysOnTop": true },
+  "voicevox": { "host": "http://127.0.0.1:50021", "speaker_id": 8 }
+} 

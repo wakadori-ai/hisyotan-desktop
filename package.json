@@ -3,16 +3,20 @@
   "version": "1.0.0",
   "description": "ふにゃ秘書たん - かわいいAI秘書アプリ",
   "main": "frontend/src/main/index.js",
+  "type": "module",
   "scripts": {
-    "start": "electron . --app-name=hisyotan",
+    "start": "electron .",
     "dev": "vite --port 5173",
-    "dev:electron": "concurrently \"vite --host --port 5173\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173/ electron . --app-name=hisyotan\"",
+    "dev:frontend": "vite --port 5173 --host",
+    "dev:backend": "cross-env DEBUG_MODE=true python -m uvicorn backend.main:app --reload --port 8000",
+    "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173/ ELECTRON_CSP_DEV=true electron .",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "build": "vite build && node copy-preload.js",
     "build:electron": "vite build && node copy-preload.js && electron-builder",
     "pack": "vite build && node copy-preload.js && electron-builder --dir",
     "dist": "vite build && node copy-preload.js && electron-builder",
-    "dev:debug": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173/ electron . --debug --app-name=hisyotan",
-    "dev:log": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173/ electron . --app-name=hisyotan > debug-log.txt 2>&1",
+    "dev:debug": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173/ ELECTRON_CSP_DEV=true electron . --debug",
+    "dev:log": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173/ electron . > debug-log.txt 2>&1",
     "copy-preload": "node copy-preload.js"
   },
   "author": "",
@@ -22,7 +26,8 @@
     "axios": "^1.8.4",
     "electron-log": "^5.3.3",
     "electron-store": "^8.1.0",
-    "iconv-lite": "^0.6.3"
+    "iconv-lite": "^0.6.3",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

@@ -1,12 +1,18 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
-const fetch = require('node-fetch');
-const iconv = require('iconv-lite');
+import { app, BrowserWindow, ipcMain, shell, session } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { spawn, exec } from 'child_process';
+import fetch from 'node-fetch';
+import iconv from 'iconv-lite';
+
+// ESモジュールでの__dirnameの代替
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 開発モードかどうかを判定
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDevCSP = process.env.ELECTRON_CSP_DEV === 'true';
 
 // 環境変数からアプリ名を取得
 const appNameFromEnv = process.env.HISYOTAN_APP_NAME || null;
@@ -42,6 +48,20 @@ let currentEmotion = 0; // -100〜100の範囲で感情を管理
 // バックエンドサーバー起動管理
 let backendProcess = null;
 let isBackendInitialized = false;
+
+// CSP設定を開発モードで無効化する処理（開発時のみ）
+function setupDevCSP() {
+  if (isDevCSP) {
+    console.log('🔓 開発モード: CSP制限を一時的に緩和します');
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      delete details.responseHeaders['content-security-policy'];
+      callback({ 
+        cancel: false, 
+        responseHeaders: details.responseHeaders 
+      });
+    });
+  }
+}
 
 // バックエンドサーバーの起動
 async function startBackendServer() {
@@ -118,24 +138,32 @@ async function checkBackendConnection() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
-    const response = await fetch('http://127.0.0.1:8000/api/status', {
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('バックエンド接続成功:', data);
-      isBackendInitialized = true;
-      return true;
-    } else {
-      console.error('バックエンド接続エラー:', response.status);
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/status', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('バックエンド接続成功:', data);
+        isBackendInitialized = true;
+        return true;
+      } else {
+        console.error('バックエンド接続エラー:', response.status);
+        isBackendInitialized = false;
+        return false;
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('バックエンド接続確認エラー:', fetchError);
+      console.log('バックエンドが起動していない可能性があります。再試行するか、別途バックエンドを起動してください。');
       isBackendInitialized = false;
       return false;
     }
   } catch (error) {
-    console.error('バックエンド接続確認エラー:', error);
+    console.error('バックエンド接続確認エラー (外部):', error);
     isBackendInitialized = false;
     return false;
   }
@@ -318,28 +346,44 @@ function setupIPC() {
   });
 }
 
-// アプリケーションの初期化
+// グローバルショートカットの登録
+function registerGlobalShortcuts() {
+  // ショートカットキーの登録処理
+  console.log('📝 グローバルショートカットを登録します');
+  // 実装はあとで追加
+}
+
+// アプリケーションの初期化後に実行
 app.whenReady().then(async () => {
+  console.log('🌸 Electronアプリケーションが初期化されました');
+  
+  // 開発モード用のCSP設定
+  setupDevCSP();
+  
   // 文字化け対策の設定を追加
   app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
-  app.commandLine.appendSwitch('force-color-profile', 'srgb');
   
-  // バックエンドサーバーを起動
-  await startBackendServer();
+  // コンテンツセキュリティポリシーの警告を無効化
+  process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
   
-  // メインウィンドウ作成
+  // メインウィンドウの作成
   createWindow();
   
   // IPC通信の設定
   setupIPC();
   
+  // バックエンドサーバーを起動
+  try {
+    await startBackendServer();
+  } catch (error) {
+    console.error('バックエンドサーバー起動エラー:', error);
+  }
+  
   // グローバルショートカットの登録
   registerGlobalShortcuts();
   
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+  app.on('activate', function () {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
   
   // クラッシュレポート機能
@@ -368,7 +412,6 @@ app.on('window-all-closed', () => {
   try {
     console.log('🛑 すべてのウィンドウ終了時にstop_hisyotan.ps1スクリプトを実行します');
     const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
-    const { exec } = require('child_process');
     
     // PowerShellスクリプトを実行
     exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
@@ -409,11 +452,32 @@ function createWindow() {
 
   // CSPヘッダーを設定
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    // 環境変数からCSPを取得
+    // 開発モードでCSP無効化が指定されている場合は、制限を緩和する
+    if (isDevCSP) {
+      // 開発モード用に緩和されたCSP
+      const devCsp = [
+        "default-src 'self' 'unsafe-inline' 'unsafe-eval';",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval';",
+        "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*;",
+        "style-src 'self' 'unsafe-inline';",
+        "img-src 'self' data: blob:;",
+        "media-src 'self' data: blob:;"
+      ].join(' ');
+      
+      console.log("🔓 開発モード: 緩和されたCSPを適用します");
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [devCsp]
+        }
+      });
+      return;
+    }
+    
+    // 通常モード: 環境変数からCSPを取得
     const cspFromEnv = process.env.ELECTRON_CSP;
     
     // 環境変数からCSPを取得できなかった場合の初期値を設定
-    // URLの記述方法を * からポート指定形式に変更
     const csp = cspFromEnv || [
       "default-src 'self';",
       "script-src 'self' 'unsafe-eval' 'unsafe-inline';",
@@ -496,7 +560,6 @@ function createWindow() {
     try {
       console.log('🛑 ウィンドウ終了時にstop_hisyotan.ps1スクリプトを実行します');
       const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
-      const { exec } = require('child_process');
       
       // PowerShellスクリプトを実行
       exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
