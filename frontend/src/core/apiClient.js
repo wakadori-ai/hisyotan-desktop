@@ -6,7 +6,11 @@
 import axios from 'axios';
 
 // APIクライアントの設定
-const BASE_URL = 'http://localhost:8000';
+// 環境変数からAPIのベースURLを取得（デフォルトは127.0.0.1）
+const API_HOST = window.electron?.apiHost || '127.0.0.1';
+const BASE_URL = `http://${API_HOST}:8000`;
+
+console.log(`🔌 API接続先: ${BASE_URL}`);
 
 // axiosインスタンスの作成
 const apiClient = axios.create({

@@ -1,0 +1,24 @@
+{
+  "app": {
+    "name": "秘書たん",
+    "version": "1.0.0",
+    "debug": true
+  },
+  "window": {
+    "width": 1280,
+    "height": 720,
+    "transparent": true,
+    "frame": false,
+    "alwaysOnTop": true
+  },
+  "api": {
+    "baseUrl": "http://localhost:8000",
+    "timeout": 5000
+  },
+  "paths": {
+    "static": "./backend/data/static",
+    "temp": "./backend/data/temp",
+    "shared": "./backend/data/shared",
+    "models": "./backend/models"
+  }
+} 

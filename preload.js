@@ -42,13 +42,20 @@ function injectCSS() {
 injectCSS();
 
 // Electronの機能をブラウザウィンドウで使えるようにする
-contextBridge.exposeInMainWorld('electronAPI', {
+contextBridge.exposeInMainWorld('electron', {
   // 必要なIPC通信メソッドを追加
   getAssetPath: (relativePath) => ipcRenderer.invoke('resolve-asset-path', relativePath),
+  
+  // API接続先の設定（環境変数から取得、デフォルトは127.0.0.1）
+  apiHost: process.env.API_HOST || '127.0.0.1',
   
   // 他のIPC通信関数をここに追加していく
   speakText: (text, emotion) => ipcRenderer.invoke('speak-text', text, emotion),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
-  quitApp: () => ipcRenderer.invoke('quit-app')
+  quitApp: () => ipcRenderer.invoke('quit-app'),
+  
+  // クリックスルーとアニメーション準備のイベントハンドラを追加
+  onClickThroughChanged: (callback) => ipcRenderer.on('click-through-changed', callback),
+  onPrepareShowAnimation: (callback) => ipcRenderer.on('prepare-show-animation', callback)
 }); 

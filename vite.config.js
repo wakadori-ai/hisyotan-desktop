@@ -18,7 +18,7 @@ export default defineConfig({
   
   // 静的アセット用のパブリックディレクトリを設定
   // frontend/ui/public が実際のパブリックフォルダになります
-  publicDir: 'ui/public',
+  publicDir: 'src/ui/public',
   
   // Electron統合のためのサーバー設定
   server: {

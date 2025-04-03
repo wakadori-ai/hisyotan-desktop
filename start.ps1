@@ -121,9 +121,14 @@ if ($ElectronOnly) {
     # 環境変数を設定
     $env:HISYOTAN_APP_NAME = "hisyotan"
     
-    # 新しいプリロードパスを指定
-    $env:HISYOTAN_PRELOAD_PATH = "./dist/preload.js"
-    $env:HISYOTAN_PAW_PRELOAD_PATH = "./dist/paw-preload.js"
+    # 新しいプリロードパスを指定（開発モードと本番モードで分岐）
+    if ($Dev) {
+        $env:HISYOTAN_PRELOAD_PATH = "./frontend/src/main/preload/preload.js"
+        $env:HISYOTAN_PAW_PRELOAD_PATH = "./frontend/src/main/preload/paw-preload.js"
+    } else {
+        $env:HISYOTAN_PRELOAD_PATH = "./dist/preload.js"
+        $env:HISYOTAN_PAW_PRELOAD_PATH = "./dist/paw-preload.js"
+    }
     
     # 直接実行することでCtrl+Cで停止できるようにする
     npx electron .
@@ -300,9 +305,25 @@ if ($Dev) {
         $env:VITE_DEV_SERVER_URL = "http://localhost:5173/"
         $env:HISYOTAN_APP_NAME = "hisyotan"  # 環境変数として渡す
         
-        # 新しいpreloadパスを設定
+        # 新しいpreloadパスを設定（開発モード用）
         $env:HISYOTAN_PRELOAD_PATH = "./frontend/src/main/preload/preload.js"
         $env:HISYOTAN_PAW_PRELOAD_PATH = "./frontend/src/main/preload/paw-preload.js"
+        
+        # APIホスト設定（両方の形式をサポート）
+        $env:API_HOST = "127.0.0.1"
+        
+        # CSP設定を追加（開発モード用）
+        $env:ELECTRON_DISABLE_SECURITY_WARNINGS = "true"
+        $env:ELECTRON_CSP = @"
+default-src 'self' 'unsafe-inline' 'unsafe-eval';
+connect-src 'self' 
+    http://localhost:5173 http://127.0.0.1:5173 
+    http://localhost:8000 http://127.0.0.1:8000 
+    ws://localhost:5173 ws://127.0.0.1:5173 
+    ws://localhost:8000 ws://127.0.0.1:8000;
+img-src 'self' data: blob:;
+media-src 'self' data: blob:;
+"@ -replace "`n", " "
         
         # 引数なしで単純に起動する（すべての情報は環境変数経由で）
         $electronProcess = Start-Process -FilePath "pwsh" -ArgumentList "-Command", "npx electron ." -WindowStyle Hidden -PassThru
@@ -333,6 +354,20 @@ if ($Dev) {
     # 新しいpreloadパスを設定（本番ビルド用）
     $env:HISYOTAN_PRELOAD_PATH = "./dist/preload.js"
     $env:HISYOTAN_PAW_PRELOAD_PATH = "./dist/paw-preload.js"
+    
+    # APIホスト設定（両方の形式をサポート）
+    $env:API_HOST = "127.0.0.1"
+    
+    # CSP設定を追加（本番モード用）
+    $env:ELECTRON_DISABLE_SECURITY_WARNINGS = "true"
+    $env:ELECTRON_CSP = @"
+default-src 'self' 'unsafe-inline' 'unsafe-eval';
+connect-src 'self' 
+    http://localhost:8000 http://127.0.0.1:8000 
+    ws://localhost:8000 ws://127.0.0.1:8000;
+img-src 'self' data: blob:;
+media-src 'self' data: blob:;
+"@ -replace "`n", " "
     
     $electronProcess = Start-Process -FilePath "pwsh" -ArgumentList "-Command", "npx electron ." -WindowStyle Hidden -PassThru
     $procInfo["Electron"] = $electronProcess.Id

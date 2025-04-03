@@ -409,16 +409,25 @@ function createWindow() {
 
   // CSPヘッダーを設定
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    // 環境変数からCSPを取得
+    const cspFromEnv = process.env.ELECTRON_CSP;
+    
+    // 環境変数からCSPを取得できなかった場合の初期値を設定
+    // URLの記述方法を * からポート指定形式に変更
+    const csp = cspFromEnv || [
+      "default-src 'self';",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline';",
+      "connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 ws://localhost:8000 ws://127.0.0.1:8000;",
+      "style-src 'self' 'unsafe-inline';",
+      "img-src 'self' data:;"
+    ].join(' ');
+    
+    console.log("🔒 適用するCSP:", csp);
+    
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self' http://localhost:* http://127.0.0.1:*;",
-          "script-src 'self' 'unsafe-eval' 'unsafe-inline' http://localhost:* http://127.0.0.1:*;",
-          "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*;",
-          "style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:*;",
-          "img-src 'self' data: http://localhost:* http://127.0.0.1:*;"
-        ].join(' ')
+        'Content-Security-Policy': [csp]
       }
     });
   });

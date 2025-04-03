@@ -185,7 +185,15 @@ try {
 }
 
 # 従来のキーワード検索も残しておく
-$keywords = @("hisyotan", "frontend/src/main/index.js", "frontend/core/main.js")
+$keywords = @(
+    "hisyotan",
+    "frontend/src/main/index.js",
+    "frontend/core/main.js",
+    "frontend/src/main/preload/preload.js",
+    "frontend/src/main/preload/paw-preload.js",
+    "dist/preload.js",
+    "dist/paw-preload.js"
+)
 $targetProcs = @()
 
 foreach ($keyword in $keywords) {
