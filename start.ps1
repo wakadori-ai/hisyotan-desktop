@@ -148,10 +148,10 @@ if ($Dev) {
     Start-Sleep -Seconds 5
     
     # 開発モード用Electronを独立プロセスとして起動
-    $env:VITE_DEV_SERVER_URL = "http://localhost:3000/"
+    $env:VITE_DEV_SERVER_URL = "http://localhost:5173/"
     Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npx electron ." -WindowStyle Hidden
 
-    Write-Log "`n🌐 Vite: http://localhost:3000/ にアクセスできます" "Info"
+    Write-Log "`n🌐 Vite: http://localhost:5173/ にアクセスできます" "Info"
     Write-Log "🌐 API: http://localhost:8000/ で起動しています" "Info" 
     Write-Log "🛠️ 変更は自動で反映されます（HMR有効）" "Info"
 } else {

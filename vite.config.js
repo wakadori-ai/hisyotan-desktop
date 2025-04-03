@@ -12,7 +12,7 @@ export default defineConfig({
   
   // Electron統合のためのサーバー設定
   server: {
-    port: 3000,
+    port: 5173,
     strictPort: true,
     hmr: {
       overlay: false, // HMRオーバーレイを無効化（Electronウィンドウで表示崩れを防ぐ）
