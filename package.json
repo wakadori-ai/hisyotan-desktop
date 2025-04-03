@@ -2,13 +2,12 @@
   "name": "hisyotan-desktop",
   "version": "1.0.0",
   "description": "ふにゃ秘書たん - かわいいAI秘書アプリ",
-  "main": "frontend/src/main/index.js",
-  "type": "module",
+  "main": "frontend/src/main/es-module-loader.cjs",
   "scripts": {
     "start": "electron .",
     "dev": "vite --port 5173",
     "dev:frontend": "vite --port 5173 --host",
-    "dev:backend": "cross-env DEBUG_MODE=true python -m uvicorn backend.main:app --reload --port 8000",
+    "dev:backend": "cross-env DEBUG_MODE=true python -m uvicorn backend.main:app --reload --port 8000 --reload-exclude node_modules",
     "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173/ ELECTRON_CSP_DEV=true electron .",
     "dev:all": "concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\" \"wait-on http://localhost:8000 && wait-on http://localhost:5173 && pnpm run dev:electron\"",
     "build": "vite build && node copy-preload.js",
@@ -17,13 +16,15 @@
     "dist": "vite build && node copy-preload.js && electron-builder",
     "dev:debug": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173/ ELECTRON_CSP_DEV=true electron . --debug",
     "dev:log": "cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173/ electron . > debug-log.txt 2>&1",
-    "copy-preload": "node copy-preload.js"
+    "copy-preload": "node copy-preload.js",
+    "postinstall": "node node_modules/electron/install.js"
   },
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@electron/remote": "^2.1.2",
     "axios": "^1.8.4",
+    "electron": "^24.8.8",
     "electron-log": "^5.3.3",
     "electron-store": "^8.1.0",
     "iconv-lite": "^0.6.3",
@@ -33,7 +34,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
     "vite": "^6.2.4",
     "wait-on": "^8.0.3"

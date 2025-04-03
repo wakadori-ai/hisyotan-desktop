@@ -653,7 +653,7 @@ def react_to_zombie(count: int, distance: float = 0.0, reaction_type: str = "con
             play_preset_voice("altu")
         elif count > 0:
             # 少数ゾンビ（即時反応）
-            play_preset_voice("hmm")
+            play_preset_voice("sigh")
     
     # 補足リアクション（ResNet補正後）
     elif reaction_type == "followup":
@@ -695,7 +695,7 @@ def react_to_zombie(count: int, distance: float = 0.0, reaction_type: str = "con
             text = random.choice(texts)
             safe_speak_with_preset(
                 text=text,
-                preset_name="hmm",
+                preset_name="sigh",
                 emotion="normal",
                 force=True
             )
@@ -709,7 +709,7 @@ def react_to_zombie(count: int, distance: float = 0.0, reaction_type: str = "con
             text = random.choice(texts)
             safe_speak_with_preset(
                 text=text,
-                preset_name="hmm",
+                preset_name="sigh",
                 emotion="囁き",
                 force=True
             )
@@ -777,7 +777,7 @@ def react_to_zombie(count: int, distance: float = 0.0, reaction_type: str = "con
             text = random.choice(texts)
             safe_speak_with_preset(
                 text=text,
-                preset_name="hmm",
+                preset_name="sigh",
                 emotion="囁き",
                 force=True
             )

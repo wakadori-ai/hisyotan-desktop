@@ -145,7 +145,7 @@ async function checkBackendConnection() {
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/status', {
+      const response = await fetch('http://127.0.0.1:8000/', {
         signal: controller.signal
       });
       

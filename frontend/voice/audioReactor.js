@@ -21,7 +21,10 @@ const presetNameMap = {
   "gasp": "assets/sounds/presets/gasp.wav",       // 息を飲む（緊張）
   "kya": "assets/sounds/presets/kya.wav",         // 軽く叫ぶ（驚き）
   "scream": "assets/sounds/presets/scream.wav",   // 大声（襲撃時）
-  "sigh": "assets/sounds/presets/sigh.wav"        // 安堵、落ち着いたとき
+  "sigh": "assets/sounds/presets/sigh.wav",       // 安堵、落ち着いたとき
+  "hmm": "assets/sounds/presets/sigh.wav",        // うーん（考え中）- hmm.wavがないのでsigh.wavを代用
+  "appear": "assets/sounds/presets/appear.wav",   // 出現
+  "disappear": "assets/sounds/presets/disapper.wav" // 消失
 };
 
 // VOICEVOX生成音声ファイルのマッピング定義

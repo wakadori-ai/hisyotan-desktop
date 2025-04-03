@@ -82,6 +82,23 @@ async def shutdown(force: bool = Body(False)):
     
     return {"message": "アプリケーションをシャットダウンしています"}
 
+# ルートエンドポイント（ステータスチェック用）
+@app.head("/")
+@app.get("/")
+def read_root():
+    """
+    ルートエンドポイント - アプリケーションの稼働状態を確認する
+    
+    Returns:
+        dict: ステータス情報
+    """
+    return {
+        "status": "ok",
+        "service": "hisyotan-backend",
+        "version": "1.0.0", 
+        "message": "秘書たんバックエンドサーバーが正常に動作しています"
+    }
+
 # メイン関数（初期化処理用）
 async def main():
     """

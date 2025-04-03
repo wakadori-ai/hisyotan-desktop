@@ -88,6 +88,19 @@ class Settings:
             "cpu_threshold": float(os.environ.get('CPU_THRESHOLD', "80.0"))
         }
         
+        # 様々な状況に対応したプリセット音声設定
+        self.PRESET_SOUNDS = {
+            "驚き": "kya.wav",        # 驚いたとき
+            "心配": "sigh.wav",       # 心配なとき
+            "恐怖": "scream.wav",     # 恐怖を感じたとき
+            "ふにゃ": "funya.wav",    # ふにゃっとなるとき
+            "小さな驚き": "altu.wav", # 小さく驚いたとき
+            "安堵": "sigh.wav",       # ほっとしたとき
+            "うーん": "sigh.wav",     # 考え中（hmm.wavがない場合はsigh.wavに変更）
+            "出現": "appear.wav",     # 出現時
+            "消失": "disapper.wav"    # 消失時
+        }
+        
         self._initialized = True
         logger.info("アプリケーション設定を初期化しました")
     

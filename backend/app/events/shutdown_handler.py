@@ -6,7 +6,7 @@
 
 import logging
 import asyncio
-from typing import Optional
+from typing import Optional, List, Any
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -68,9 +68,14 @@ async def cleanup_resources() -> None:
         # 一時ファイルの削除など、必要に応じてクリーンアップ処理を実装
         
         # WebSocketの接続クローズ
-        from ..routers.ws_router import close_all_connections
-        await close_all_connections()
-        logger.info("WebSocket接続をクローズしました")
+        try:
+            from ..ws.manager import manager
+            # マネージャーインスタンスから接続を取得してクローズ
+            for connection in manager.active_connections.copy():
+                manager.disconnect(connection)
+            logger.info("WebSocket接続をクローズしました")
+        except (ImportError, Exception) as e:
+            logger.warning(f"WebSocket接続クローズ中にエラーが発生: {e}")
         
         # 非同期タスクの完了を待機
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]

@@ -1,40 +1,35 @@
 """
-ゾンビ検出コールバックモジュール
+ゾンビ検出のコールバック処理
 
-ゾンビが検出された際のコールバック関数と通知処理を実装
+ゾンビ検出イベントに対する反応処理を管理
 """
 
+import asyncio
 import logging
 import time
+import os
 import random
+from typing import Dict, Any, Optional, List, Set, Tuple, Callable, Union, TypeVar, Coroutine
 import threading
-from typing import Dict, Any, Optional, TypeVar, Callable, Coroutine, Union, List, Set, Tuple
-import asyncio
 from datetime import datetime, timedelta
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
 
-# 型変数の定義（リンターエラー修正用）
+# ジェネリック型定義
 T = TypeVar('T')
 
-# 最後のコールバック実行時刻を記録する辞書
-last_callback_times: Dict[str, float] = {
-    "zombie_alert": 0.0,  # 大量ゾンビアラート
-    "zombie_few": 0.0,    # 少数ゾンビアラート
-    "zombie_warning": 0.0  # 警戒レベルゾンビアラート
+# 最後のコールバック実行時刻
+_last_callback_times = {
+    "zombie_alert": 0.0,
+    "zombie_few_alert": 0.0,
+    "zombie_warning": 0.0
 }
 
-# コールバックのデバウンス時間（秒）
-DEBOUNCE_TIMES: Dict[str, float] = {
-    "zombie_alert": 60.0,   # 大量ゾンビアラートは60秒間隔
-    "zombie_few": 30.0,     # 少数ゾンビアラートは30秒間隔
-    "zombie_warning": 30.0  # 警戒レベルゾンビアラートは30秒間隔
-}
-
-# ③ 閾値（confidence threshold）のデバッグ用変数
-# この値を調整することでモデルの検出感度を変更できる
-DEBUG_CONFIDENCE_THRESHOLD = 0.45  # デフォルト値
+# デバウンス間隔（秒）
+DEFAULT_DEBOUNCE_TIME = 10.0  # デフォルト10秒
+ALERT_DEBOUNCE_TIME = 30.0    # アラートは30秒
+WARNING_DEBOUNCE_TIME = 20.0  # 警告は20秒
 
 def is_callback_throttled(callback_type: str) -> bool:
     """
@@ -47,15 +42,15 @@ def is_callback_throttled(callback_type: str) -> bool:
         bool: デバウンス中の場合はTrue
     """
     current_time = time.time()
-    last_time = last_callback_times.get(callback_type, 0)
-    debounce_time = DEBOUNCE_TIMES.get(callback_type, 30.0)
+    last_time = _last_callback_times.get(callback_type, 0)
+    debounce_time = ALERT_DEBOUNCE_TIME if callback_type == "zombie_alert" else WARNING_DEBOUNCE_TIME if callback_type == "zombie_warning" else DEFAULT_DEBOUNCE_TIME
     
     # デバウンス期間中かチェック
     if current_time - last_time < debounce_time:
         return True
     
     # 最終実行時刻を更新
-    last_callback_times[callback_type] = current_time
+    _last_callback_times[callback_type] = current_time
     return False
 
 def _zombie_alert_callback(count: int, frame_data: Optional[Any] = None, additional_data: Optional[Dict[str, Any]] = None) -> None:
@@ -227,7 +222,7 @@ async def zombie_few_alert(count: int, frame_data: Optional[Any] = None, additio
     print(f"[BACKEND] 少数のゾンビを検出: {count}体, ResNet結果: {resnet_result}({resnet_prob:.2f})")
     
     # デバウンスチェック（強制フラグがない場合）
-    if not force and is_callback_throttled("zombie_few"):
+    if not force and is_callback_throttled("zombie_few_alert"):
         logger.debug("少数ゾンビアラートはデバウンス中のためスキップ")
         print("[BACKEND] 少数ゾンビアラートはデバウンス中のためスキップ")
         return {"status": "throttled", "message": "デバウンス中のためスキップされました"}
@@ -303,9 +298,10 @@ async def zombie_warning(count: int, frame_data: Optional[Any] = None, additiona
         play_audio: 音声を再生するかどうか
         force: 強制的に実行するかどうか
     """
-    from ..ws.manager import send_notification
-    from ..voice.engine import react_to_zombie
+    from ..ws.manager import send_notification, manager
+    from ..voice.engine import react_to_zombie, safe_play_voice
     from ..config.settings import Settings
+    import random
     
     # 設定を取得
     settings = Settings()

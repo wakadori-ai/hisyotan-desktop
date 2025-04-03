@@ -83,7 +83,7 @@ contextBridge.exposeInMainWorld('electron', {
   // バックエンド接続確認
   checkBackendConnection: async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/status', {
+      const response = await fetch('http://127.0.0.1:8000/', {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
         timeout: 5000
