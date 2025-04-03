@@ -129,6 +129,148 @@ async function checkBackendConnection() {
   }
 }
 
+/**
+ * IPC通信の設定
+ * レンダラープロセスとの通信を処理
+ */
+function setupIPC() {
+  // 設定情報取得
+  ipcMain.handle('get-settings', async () => {
+    return config;
+  });
+  
+  // 設定情報保存
+  ipcMain.handle('save-settings', async (event, newSettings) => {
+    try {
+      config = { ...config, ...newSettings };
+      fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+      return { success: true };
+    } catch (error) {
+      console.error('設定保存エラー:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ウィンドウ位置設定
+  ipcMain.handle('set-window-position', (event, x, y) => {
+    if (mainWindow) {
+      mainWindow.setPosition(x, y);
+      return { success: true };
+    }
+    return { success: false, error: 'ウィンドウが存在しません' };
+  });
+
+  // ウィンドウ位置取得
+  ipcMain.handle('get-window-position', () => {
+    if (mainWindow) {
+      return { x: mainWindow.getPosition()[0], y: mainWindow.getPosition()[1] };
+    }
+    return { x: 0, y: 0 };
+  });
+
+  // 音声合成リクエスト
+  ipcMain.handle('speak-text', async (event, text, emotion) => {
+    try {
+      // バックエンドAPIを呼び出して音声合成を実行
+      const response = await fetch('http://127.0.0.1:8000/api/voice/speak', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text: text,
+          emotion: emotion || 'normal',
+          speaker_id: config.voicevox?.speaker_id || 8
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`音声合成エラー: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('音声合成リクエストエラー:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // アプリ終了
+  ipcMain.handle('quit-app', () => {
+    app.quit();
+  });
+  
+  // 画像パス解決
+  ipcMain.handle('resolve-asset-path', (event, relativePath) => {
+    // 開発環境と本番環境でのパス解決
+    if (isDev) {
+      return path.join(__dirname, relativePath);
+    } else {
+      return path.join(process.resourcesPath, 'app', relativePath);
+    }
+  });
+  
+  // 秘書たんの表情変更
+  ipcMain.handle('change-secretary-expression', (event, emotion) => {
+    // 感情に応じて内部状態を更新
+    switch (emotion) {
+      case 'happy':
+        currentEmotion = 50;
+        break;
+      case 'sad':
+        currentEmotion = -50;
+        break;
+      case 'surprised':
+        currentEmotion = 30;
+        break;
+      case 'fearful':
+        currentEmotion = -70;
+        break;
+      case 'relieved':
+        currentEmotion = 20;
+        break;
+      case 'serious':
+        currentEmotion = -20;
+        break;
+      case 'normal':
+      default:
+        currentEmotion = 0;
+        break;
+    }
+    
+    return { success: true, emotion: emotion, value: currentEmotion };
+  });
+  
+  // 📝 新機能: 設定UI表示IPC - webContentsを使ってレンダラープロセスの関数を呼び出す
+  ipcMain.handle('show-settings-ui', (event) => {
+    if (mainWindow && mainWindow.webContents) {
+      // レンダラープロセスでspeechManager.showHordeModeToggleを実行
+      mainWindow.webContents.executeJavaScript(`
+        if (window.speechManager && window.speechManager.showHordeModeToggle) {
+          const currentState = window.speechManager.getHordeModeState ? window.speechManager.getHordeModeState() : false;
+          window.speechManager.showHordeModeToggle(currentState);
+          true;
+        } else if (typeof createTestSettingsUI === 'function') {
+          createTestSettingsUI();
+          true;
+        } else {
+          console.error('設定UI表示機能が利用できません');
+          false;
+        }
+      `).then(result => {
+        console.log(`設定UI表示リクエスト結果: ${result ? '成功' : '失敗'}`);
+      }).catch(err => {
+        console.error('設定UI表示JavaScript実行エラー:', err);
+      });
+      
+      return { success: true };
+    }
+    
+    return { success: false, error: 'ウィンドウが利用できません' };
+  });
+}
+
 // アプリケーションの初期化
 app.whenReady().then(async () => {
   // 文字化け対策の設定を追加
@@ -140,6 +282,9 @@ app.whenReady().then(async () => {
   
   // メインウィンドウ作成
   createWindow();
+  
+  // IPC通信の設定
+  setupIPC();
   
   // グローバルショートカットの登録
   registerGlobalShortcuts();
