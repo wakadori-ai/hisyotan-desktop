@@ -397,14 +397,58 @@ function createWindow() {
 
   // 開発モードの場合
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000/');
+    mainWindow.loadURL('http://localhost:5173/');
     
     // デバッグフラグがある場合は別ウィンドウでDevToolsを開く
     if (isDebugging) {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+    // 本番モードの場合、ファイルプロトコルでロードする前に少し待機して
+    // レンダリングプロセスが準備できるようにする
+    // これにより、CSSやその他のリソースが確実に読み込まれる
+    setTimeout(() => {
+      // loadFileの代わりにloadURLを使用してfile:プロトコルを明示的に指定
+      const indexHtmlPath = path.join(__dirname, 'dist/index.html');
+      const fileUrl = `file://${indexHtmlPath}`;
+      mainWindow.loadURL(fileUrl);
+      
+      // CSSが適用されない問題をデバッグするために、条件付きでDevToolsを開く
+      if (isDebugging) {
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
+      }
+      
+      // ロード完了時の処理を追加
+      mainWindow.webContents.on('did-finish-load', () => {
+        console.log('✅ メインウィンドウのロードが完了しました');
+        
+        // CSSインジェクションを試行（もしCSSが正しく読み込まれない場合のバックアップ）
+        const cssPath = path.join(__dirname, 'dist', 'assets');
+        // CSSファイル名が動的に生成される場合は、ディレクトリから探す
+        fs.readdir(cssPath, (err, files) => {
+          if (err) {
+            console.error('CSSディレクトリ読み取りエラー:', err);
+            return;
+          }
+          
+          const cssFile = files.find(file => file.endsWith('.css'));
+          if (cssFile) {
+            const fullCssPath = path.join(cssPath, cssFile);
+            fs.readFile(fullCssPath, 'utf8', (err, data) => {
+              if (err) {
+                console.error('CSSファイル読み取りエラー:', err);
+                return;
+              }
+              
+              // CSSを直接インジェクト
+              mainWindow.webContents.insertCSS(data).catch(err => {
+                console.error('CSSインジェクトエラー:', err);
+              });
+            });
+          }
+        });
+      });
+    }, 500);
   }
 
   // ウィンドウが閉じられる前に実行
@@ -425,139 +469,8 @@ function createWindow() {
           console.log(`✅ 停止スクリプト出力:\n${stdout}`);
         }
       });
-    } catch (stopScriptError) {
-      console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
+    } catch (error) {
+      console.error('stop_hisyotan.ps1実行エラー:', error);
     }
   });
 }
-
-// IPC通信ハンドラ（音声キャッシュ関連）
-// ファイルの存在確認
-ipcMain.handle('check-file-exists', async (event, filePath) => {
-  try {
-    // 相対パスを絶対パスに変換
-    const absolutePath = path.resolve(__dirname, filePath);
-    return fs.existsSync(absolutePath);
-  } catch (error) {
-    console.error('ファイル存在確認エラー:', error);
-    return false;
-  }
-});
-
-// アプリケーション終了ハンドラ
-ipcMain.on('app:quit', () => {
-  console.log('🌸 アプリケーションの終了を開始します...');
-  
-  // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる
-  try {
-    console.log('🛑 アプリケーション終了時にstop_hisyotan.ps1スクリプトを実行します');
-    const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
-    const { exec } = require('child_process');
-    
-    // PowerShellスクリプトを実行
-    exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`⚠️ 停止スクリプトエラー: ${error.message}`);
-      } else {
-        console.log(`✅ 停止スクリプト出力:\n${stdout}`);
-      }
-    });
-  } catch (stopScriptError) {
-    console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
-  }
-  
-  // バックエンドサーバーの終了
-  if (backendProcess) {
-    console.log('バックエンドサーバーを終了します...');
-    backendProcess.kill();
-    backendProcess = null;
-  }
-  
-  // その他起動している子プロセスを終了（もし存在すれば）
-  
-  // Electronアプリを終了
-  console.log('さようなら、また会いましょう！');
-  app.quit();
-});
-
-// ファイル保存
-ipcMain.handle('save-voice-file', async (event, filePath, uint8Array) => {
-  try {
-    // 相対パスを絶対パスに変換
-    const absolutePath = path.resolve(__dirname, filePath);
-    
-    // ディレクトリが存在しない場合は作成
-    const dirPath = path.dirname(absolutePath);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-    }
-    
-    // Uint8Arrayをバッファに変換してファイルに書き込み
-    fs.writeFileSync(absolutePath, Buffer.from(uint8Array));
-    console.log(`🎵 音声ファイル保存成功: ${filePath}`);
-    return true;
-  } catch (error) {
-    console.error('ファイル保存エラー:', error);
-    return false;
-  }
-});
-
-// JSONファイル読み込み
-ipcMain.handle('read-json-file', async (event, filePath) => {
-  try {
-    // 相対パスを絶対パスに変換
-    const absolutePath = path.resolve(__dirname, filePath);
-    
-    // ファイルが存在しない場合は空のオブジェクトを返す
-    if (!fs.existsSync(absolutePath)) {
-      return {};
-    }
-    
-    // ファイルを読み込んでJSONとしてパース
-    const data = fs.readFileSync(absolutePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('JSONファイル読み込みエラー:', error);
-    return {};
-  }
-});
-
-// JSONファイル書き込み
-ipcMain.handle('write-json-file', async (event, filePath, jsonData) => {
-  try {
-    // 相対パスを絶対パスに変換
-    const absolutePath = path.resolve(__dirname, filePath);
-    
-    // ディレクトリが存在しない場合は作成
-    const dirPath = path.dirname(absolutePath);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-    }
-    
-    // JSONデータを文字列に変換して書き込み
-    fs.writeFileSync(absolutePath, JSON.stringify(jsonData, null, 2), 'utf8');
-    console.log(`📝 JSONファイル保存成功: ${filePath}`);
-    return true;
-  } catch (error) {
-    console.error('JSONファイル書き込みエラー:', error);
-    return false;
-  }
-});
-
-// アプリケーション終了直前の処理
-app.on('will-quit', () => {
-  console.log('🌸 アプリケーション終了直前: will-quit');
-  
-  // stop_hisyotan.ps1を実行して全プロセスを確実に終了させる（同期実行）
-  try {
-    console.log('🛑 アプリケーション終了直前にstop_hisyotan.ps1スクリプトを実行します');
-    const scriptPath = path.resolve(__dirname, 'tools', 'stop_hisyotan.ps1');
-    
-    // PowerShellスクリプトを同期的に実行して確実に処理を完了させる
-    const { execSync } = require('child_process');
-    const result = execSync(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`);
-    console.log(`✅ 停止スクリプト出力:\n${result.toString()}`);
-  } catch (stopScriptError) {
-    console.error('stop_hisyotan.ps1実行エラー:', stopScriptError);
-  }
-}); 

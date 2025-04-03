@@ -3,12 +3,12 @@ import { resolve } from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  root: 'frontend/ui', // 開発サーバーのルートディレクトリを指定
+  root: 'frontend', // 開発サーバーのルートディレクトリを変更
   base: './', // 相対パスでビルドするために必要
   
   // 静的アセット用のパブリックディレクトリを設定
   // frontend/ui/public が実際のパブリックフォルダになります
-  publicDir: 'public',
+  publicDir: 'ui/public',
   
   // Electron統合のためのサーバー設定
   server: {
@@ -22,10 +22,10 @@ export default defineConfig({
   // エイリアスの設定（相対パスを@付きのパスで置き換え可能に）
   resolve: {
     alias: {
-      '@core': resolve(__dirname, 'frontend/core'),
-      '@ui': resolve(__dirname, 'frontend/ui'),
+      '@core': resolve(__dirname, 'frontend/src/core'),
+      '@ui': resolve(__dirname, 'frontend/src/ui'),
       '@emotion': resolve(__dirname, 'frontend/emotion'),
-      '@assets': resolve(__dirname, 'frontend/ui/public/assets'), // 新しいパスに修正
+      '@assets': resolve(__dirname, 'frontend/ui/public/assets'),
       '@config': resolve(__dirname, 'frontend/config'),
       '@voice': resolve(__dirname, 'frontend/voice')
     }
@@ -33,13 +33,12 @@ export default defineConfig({
   
   // Electronでの使用に適した設定
   build: {
-    outDir: '../../dist', // rootからの相対パスになるため調整
+    outDir: 'dist', // ルートからの相対パスになるよう調整
     emptyOutDir: true,
-    // preloadスクリプトをコピーしてdistに含める
+    // ビルド設定
     rollupOptions: {
       input: {
-        index: resolve(__dirname, 'frontend/ui/index.html'),
-        paw: resolve(__dirname, 'frontend/ui/paw.html')
+        index: resolve(__dirname, 'frontend/index.html')
       }
     }
   }

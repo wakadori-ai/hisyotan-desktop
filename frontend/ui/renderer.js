@@ -2,7 +2,7 @@
 // 秘書たんのUI制御用エントリポイント
 
 // スタイルシートをインポート
-import '../styles.css';
+import '@ui/styles.css';
 
 // コア機能のインポート
 import { logDebug, logError, saveErrorLog } from '@core/logger.js';

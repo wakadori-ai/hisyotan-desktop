@@ -163,10 +163,14 @@ function createPawWindow() {
   
   // 肉球ボタンページの読み込み
   const pawPath = process.env.VITE_DEV_SERVER_URL
-    ? path.join(__dirname, '..', 'ui', 'paw.html') // 開発モード
-    : path.join(app.getAppPath(), 'dist', 'paw.html'); // 本番モード
+    ? `${process.env.VITE_DEV_SERVER_URL}` // 開発モード - Viteサーバー経由
+    : path.join(app.getAppPath(), 'dist', 'index.html'); // 本番モード - ビルド済みindexを使用
   
-  pawWindow.loadFile(pawPath);
+  if (process.env.VITE_DEV_SERVER_URL) {
+    pawWindow.loadURL(pawPath); // 開発サーバーのURLをロード
+  } else {
+    pawWindow.loadFile(pawPath); // ビルド済みファイルをロード
+  }
 
   pawWindow.webContents.once('did-finish-load', () => {
     pawWindow.setIgnoreMouseEvents(false);
