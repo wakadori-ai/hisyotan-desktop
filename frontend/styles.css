@@ -863,7 +863,6 @@ body.mouse-active .speech-bubble.show {
 
 /* 設定UI用のスタイル */
 .speech-setting-ui {
-  display: block;
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px dashed rgba(139, 69, 19, 0.3);

@@ -203,15 +203,117 @@ function handleRightClick(event) {
   }
   
   // 2. window.speechManagerが利用可能な場合（renderer.js読み込み済みの場合）
-  if (window.speechManager && window.speechManager.showHordeModeToggle) {
-    console.log('speechManager経由で設定UIを表示します');
-    const currentState = window.speechManager.getHordeModeState && window.speechManager.getHordeModeState() || false;
-    window.speechManager.showHordeModeToggle(currentState);
+  if (window.speechManager) {
+    if (window.speechManager.speakWithObject) {
+      console.log('speechManager.speakWithObjectを直接使用して設定UIを表示します');
+      
+      // 現在の状態を取得（利用可能な場合）
+      const currentState = window.speechManager.getHordeModeState && window.speechManager.getHordeModeState() || false;
+      
+      // 設定UI表示用のペイロードを作成
+      const settingSpeech = {
+        id: "setting_horde_mode",
+        type: "setting",
+        text: "今夜はホード夜モードにする…？",
+        emotion: "gentle",
+        uiPayload: {
+          type: "toggle",
+          label: "ホード夜モード",
+          value: currentState,
+          onChange: (newValue) => {
+            console.log(`ホード夜モードが${newValue ? 'オン' : 'オフ'}に変更されました`);
+            
+            // 状態を保存（可能な場合）
+            if (window.speechManager.setHordeModeState) {
+              window.speechManager.setHordeModeState(newValue);
+            }
+            
+            // 変更後のフィードバックセリフ
+            const feedbackMessage = newValue 
+              ? "ホード夜モードをオンにしたよ。怖いけど一緒に頑張ろうね…" 
+              : "ホード夜モードをオフにしたよ。ほっとした～";
+            
+            const feedbackEmotion = newValue ? "serious" : "relieved";
+            
+            // 少し遅延させてフィードバックを表示
+            setTimeout(() => {
+              if (window.speechManager.speak) {
+                window.speechManager.speak(
+                  feedbackMessage,
+                  feedbackEmotion,
+                  5000,
+                  null,
+                  "horde_mode_feedback"
+                );
+              }
+            }, 500);
+          }
+        }
+      };
+      
+      window.speechManager.speakWithObject(settingSpeech);
+      return;
+    }
+  }
+  
+  // 3. speechManagerProxyが利用可能な場合（preloadスクリプト経由で公開されている場合）
+  if (window.speechManagerProxy && window.speechManagerProxy.speakWithObject) {
+    console.log('speechManagerProxyを使用して設定UIを表示します');
+    
+    // 現在の状態を取得
+    window.speechManagerProxy.getHordeModeState()
+      .then(currentState => {
+        // 設定UI表示用のペイロードを作成
+        const settingSpeech = {
+          id: "setting_horde_mode",
+          type: "setting",
+          text: "今夜はホード夜モードにする…？",
+          emotion: "gentle",
+          uiPayload: {
+            type: "toggle",
+            label: "ホード夜モード",
+            value: currentState,
+            onChange: (newValue) => {
+              console.log(`ホード夜モードが${newValue ? 'オン' : 'オフ'}に変更されました`);
+              
+              // 状態を保存
+              window.speechManagerProxy.setHordeModeState(newValue);
+              
+              // 変更後のフィードバックセリフ
+              const feedbackMessage = newValue 
+                ? "ホード夜モードをオンにしたよ。怖いけど一緒に頑張ろうね…" 
+                : "ホード夜モードをオフにしたよ。ほっとした～";
+              
+              const feedbackEmotion = newValue ? "serious" : "relieved";
+              
+              // 少し遅延させてフィードバックを表示
+              setTimeout(() => {
+                window.speechManagerProxy.speak(
+                  feedbackMessage,
+                  feedbackEmotion,
+                  5000,
+                  null,
+                  "horde_mode_feedback"
+                );
+              }, 500);
+            }
+          }
+        };
+        
+        // 設定UIを表示
+        window.speechManagerProxy.speakWithObject(settingSpeech);
+      })
+      .catch(error => {
+        console.error('状態取得エラー:', error);
+        // エラーの場合はテスト用UIを表示
+        createTestSettingsUI();
+      });
+    
     return;
   }
   
-  // 3. フォールバック：独自の設定UI表示
-  console.log('フォールバック: 独自の設定UIを表示します');
+  // 4. フォールバック：テスト用設定UIを表示
+  console.log('speechManagerが利用できないため、テスト用設定UIを表示します');
   createTestSettingsUI();
 }
 

@@ -65,4 +65,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // 設定を保存する
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings)
+});
+
+// speechManagerへのアクセスを提供する
+// メインプロセス経由でspeechManagerの機能を利用できるようにする
+contextBridge.exposeInMainWorld('speechManagerProxy', {
+  speakWithObject: (speechObj) => ipcRenderer.invoke('speech-manager-speak-with-object', speechObj),
+  speak: (message, emotion, displayTime, animation, eventType, presetSound) => 
+    ipcRenderer.invoke('speech-manager-speak', message, emotion, displayTime, animation, eventType, presetSound),
+  getHordeModeState: () => ipcRenderer.invoke('speech-manager-get-horde-mode'),
+  setHordeModeState: (enabled) => ipcRenderer.invoke('speech-manager-set-horde-mode', enabled)
 }); 

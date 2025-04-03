@@ -178,8 +178,24 @@ export function speakWithObject(speechObj) {
       // 通常のテキスト設定（uiPayloadとともに）
       setText(formattedMessage);
       
+      // setText後のDOM状態をチェック
+      console.log('🔍 setText()後の吹き出し状態:', {
+        speechBubble: document.getElementById('speechBubble'),
+        speechText: document.getElementById('speechText'),
+        speechSettingUI: document.getElementById('speechSettingUI'),
+        bubbleHTML: document.getElementById('speechBubble')?.innerHTML || '存在しません'
+      });
+      
       // 設定UI要素をレンダリング
       renderSettingUI(speechObj.uiPayload);
+      
+      // renderSettingUI後の最終状態確認
+      console.log('🏁 renderSettingUI()後の最終状態:', {
+        speechBubble: document.getElementById('speechBubble'),
+        speechText: document.getElementById('speechText'),
+        speechSettingUI: document.getElementById('speechSettingUI'),
+        bubbleHTML: document.getElementById('speechBubble')?.innerHTML || '存在しません'
+      });
       
       // 設定UIの場合は自動非表示しない
       return;

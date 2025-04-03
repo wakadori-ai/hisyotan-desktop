@@ -242,32 +242,67 @@ function setupIPC() {
     return { success: true, emotion: emotion, value: currentEmotion };
   });
   
-  // 📝 新機能: 設定UI表示IPC - webContentsを使ってレンダラープロセスの関数を呼び出す
-  ipcMain.handle('show-settings-ui', (event) => {
-    if (mainWindow && mainWindow.webContents) {
-      // レンダラープロセスでspeechManager.showHordeModeToggleを実行
-      mainWindow.webContents.executeJavaScript(`
-        if (window.speechManager && window.speechManager.showHordeModeToggle) {
-          const currentState = window.speechManager.getHordeModeState ? window.speechManager.getHordeModeState() : false;
-          window.speechManager.showHordeModeToggle(currentState);
-          true;
-        } else if (typeof createTestSettingsUI === 'function') {
-          createTestSettingsUI();
-          true;
-        } else {
-          console.error('設定UI表示機能が利用できません');
-          false;
-        }
-      `).then(result => {
-        console.log(`設定UI表示リクエスト結果: ${result ? '成功' : '失敗'}`);
-      }).catch(err => {
-        console.error('設定UI表示JavaScript実行エラー:', err);
-      });
-      
-      return { success: true };
+  // 設定UIを表示する
+  ipcMain.handle('show-settings-ui', async () => {
+    if (mainWindow) {
+      console.log('設定UIの表示をリクエストします');
+      mainWindow.webContents.send('display-settings-bubble');
+      return true;
     }
-    
-    return { success: false, error: 'ウィンドウが利用できません' };
+    return false;
+  });
+  
+  // SpeechManager関連のIPCハンドラ
+  // これらのハンドラはmainプロセスからrendererプロセスにメッセージを転送します
+  
+  // speakWithObject機能
+  ipcMain.handle('speech-manager-speak-with-object', async (event, speechObj) => {
+    if (mainWindow) {
+      console.log('SpeechManager: speakWithObject呼び出し転送');
+      mainWindow.webContents.send('speech-manager-operation', {
+        method: 'speakWithObject',
+        args: [speechObj]
+      });
+      return true;
+    }
+    return false;
+  });
+  
+  // speak機能
+  ipcMain.handle('speech-manager-speak', async (event, message, emotion, displayTime, animation, eventType, presetSound) => {
+    if (mainWindow) {
+      console.log('SpeechManager: speak呼び出し転送');
+      mainWindow.webContents.send('speech-manager-operation', {
+        method: 'speak',
+        args: [message, emotion, displayTime, animation, eventType, presetSound]
+      });
+      return true;
+    }
+    return false;
+  });
+  
+  // getHordeModeState機能
+  ipcMain.handle('speech-manager-get-horde-mode', async () => {
+    if (mainWindow) {
+      console.log('SpeechManager: getHordeModeState呼び出し転送');
+      // 注意: 本来はIPC経由で結果を取得する必要がありますが、簡略化のためfalseを返します
+      // 実際の実装では結果を待機する仕組みが必要です
+      return false;
+    }
+    return false;
+  });
+  
+  // setHordeModeState機能
+  ipcMain.handle('speech-manager-set-horde-mode', async (event, enabled) => {
+    if (mainWindow) {
+      console.log('SpeechManager: setHordeModeState呼び出し転送');
+      mainWindow.webContents.send('speech-manager-operation', {
+        method: 'setHordeModeState',
+        args: [enabled]
+      });
+      return true;
+    }
+    return false;
   });
 }
 

@@ -45,15 +45,22 @@ export function initUIElements() {
   // 設定UI用のコンテナ作成（なければ）
   if (!document.getElementById('speechSettingUI')) {
     if (speechBubble) {
+      console.log('🏗 initUIElements: speechSettingUIを新規作成します');
       speechSettingUI = document.createElement('div');
       speechSettingUI.id = 'speechSettingUI';
       speechSettingUI.className = 'speech-setting-ui';
       speechSettingUI.style.display = 'none';
       speechBubble.appendChild(speechSettingUI);
+      console.log('🏗 speechSettingUI作成完了:', speechSettingUI);
+      console.log('🏗 親要素:', speechBubble);
       logDebug('設定UI要素を作成しました');
+    } else {
+      console.log('❌ initUIElements: speechBubbleが存在しないためspeechSettingUIを作成できません');
     }
   } else {
+    console.log('🏗 initUIElements: 既存のspeechSettingUIを取得します');
     speechSettingUI = document.getElementById('speechSettingUI');
+    console.log('🏗 取得結果:', speechSettingUI);
   }
   
   // 必須要素の存在チェック
@@ -294,141 +301,64 @@ export function setText(text) {
     logDebug('既存のMutationObserverをリセットしました');
   }
   
-  // 再取得を試みる
-  if (!speechText) {
-    logDebug('speechText要素が見つかりません。再取得を試みます');
-    speechText = document.getElementById('speechText');
-    
-    if (!speechText) {
-      logDebug('speechText要素が見つからないため、吹き出し全体を確認します');
-      
-      // 吹き出し要素自体の確認
-      const bubble = document.getElementById('speechBubble');
-      if (bubble) {
-        // 吹き出し内にテキスト要素がない場合は作成
-        speechText = document.createElement('span');
-        speechText.id = 'speechText';
-        speechText.className = 'bubble-text';
-        
-        // 既存の内容をクリア
-        while (bubble.firstChild) {
-          bubble.removeChild(bubble.firstChild);
-        }
-        
-        // アイコン要素を追加
-        const icon = document.createElement('span');
-        icon.className = 'bubble-icon';
-        icon.textContent = '💭';
-        bubble.appendChild(icon);
-        
-        // テキスト要素を追加
-        bubble.appendChild(speechText);
-        
-        // 閉じるボタンを追加
-        const closeBtn = document.createElement('div');
-        closeBtn.className = 'bubble-close-button';
-        closeBtn.id = 'bubbleCloseButton';
-        closeBtn.textContent = '×';
-        closeBtn.onclick = function() { hideBubble(); };
-        bubble.appendChild(closeBtn);
-        
-        logDebug('吹き出し内の要素を再構築しました');
-      } else {
-        logError('speechBubble要素も見つかりません。表示できません');
-        return;
-      }
-    }
+  // 吹き出し要素の取得
+  const bubble = document.getElementById('speechBubble');
+  if (!bubble) {
+    logError('speechBubble要素が見つかりません。表示できません');
+    return;
   }
   
-  // 複数の方法でテキスト設定を試みる
-  if (speechText) {
-    // 方法1: 直接プロパティ設定
-    speechText.textContent = text;
-    speechText.innerText = text;
+  // speechText要素の取得または作成
+  let speechText = document.getElementById('speechText');
+  
+  if (!speechText) {
+    logDebug('speechText要素が見つかりません。新規作成します');
     
-    // 強制再描画トリガー
-    void speechText.offsetHeight;
-    speechText.style.transform = 'scale(1.00001)';
+    // 新しいspeechText要素を作成
+    speechText = document.createElement('span');
+    speechText.id = 'speechText';
+    speechText.className = 'bubble-text';
     
-    // 方法2: innerHTML経由で設定（HTMLエスケープに注意）
-    const safeText = text.replace(/&/g, '&amp;')
-                          .replace(/</g, '&lt;')
-                          .replace(/>/g, '&gt;')
-                          .replace(/"/g, '&quot;')
-                          .replace(/'/g, '&#039;');
-    speechText.innerHTML = safeText;
-    
-    // 方法3: 子要素として設定
-    requestAnimationFrame(() => {
-      if (speechText) {
-        // 既存の内容をクリア
-        while (speechText.firstChild) {
-          speechText.removeChild(speechText.firstChild);
-        }
-        
-        // テキストノードを作成して追加
-        const textNode = document.createTextNode(text);
-        speechText.appendChild(textNode);
-        
-        // 設定後の状態確認
-        logDebug(`テキスト設定後の内容確認: "${speechText.textContent || '空'}"`);
-        
-        // innerTextで再設定
-        if (!speechText.textContent || speechText.textContent === '') {
-          speechText.innerText = text;
-          logDebug('textContentが空のため、innerTextで再設定しました');
-        }
-        
-        // 強制的にリフローさせて確実に反映
-        void speechText.offsetHeight;
-        
-        // 1フレーム遅延で確認・再設定（表示タイミング競合対策）
-        setTimeout(() => {
-          if (!speechText.textContent.trim()) {
-            logZombieWarning('💥 再描画後も空だったので再設定を試みます');
-            // 根本的に作り直す
-            const parent = speechText.parentNode;
-            if (parent) {
-              const newText = document.createElement('span');
-              newText.id = 'speechText';
-              newText.className = 'bubble-text';
-              newText.textContent = text;
-              newText.innerText = text;
-              parent.replaceChild(newText, speechText);
-              speechText = newText;
-              logDebug('テキスト要素を作り直しました');
-            } else {
-              speechText.textContent = text;
-              speechText.innerText = text;
-              logDebug('親要素なし。textContent/innerTextで再設定しました');
-            }
-          }
-        }, 16);
-      }
-    });
-    
-    // 必要に応じて保険設定（Electron特有の問題対策）
-    setTimeout(() => {
-      if (speechText && speechText.textContent.trim() === '') {
-        logZombieWarning('直接設定後もテキストが空です。強制再設定します');
-        
-        // データ属性に保存して復元を確実に
-        speechText.dataset.originalText = text;
-        speechText.innerHTML = safeText;
-        speechText.innerText = text;
-        
-        // 強制再描画のためにCSSプロパティを一時的に変更
-        const originalDisplay = speechText.style.display;
-        speechText.style.display = 'inline-block';
-        void speechText.offsetHeight;
-        speechText.style.display = originalDisplay;
-      }
-    }, 0);
-    
-    logDebug(`テキスト設定完了: "${text}"`);
-  } else {
-    logError(`setText: speechText要素取得失敗。テキスト "${text}" を設定できません`);
+    // 適切な位置に挿入（アイコンやUIの前に配置）
+    // 通常、テキストは最初の要素なので、最初の子要素として挿入
+    bubble.insertBefore(speechText, bubble.firstChild);
+    logDebug('新しいspeechText要素を作成して吹き出しに挿入しました');
   }
+  
+  // テキストを設定
+  speechText.textContent = text;
+  
+  // 強制再描画トリガー
+  void speechText.offsetHeight;
+  speechText.style.transform = 'scale(1.00001)';
+  
+  // HTMLエスケープして設定（念のため）
+  const safeText = text.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+  speechText.innerHTML = safeText;
+  
+  // 必要に応じて保険設定（Electron特有の問題対策）
+  setTimeout(() => {
+    if (speechText && speechText.textContent.trim() === '') {
+      logZombieWarning('テキストが空です。強制再設定します');
+      
+      // データ属性に保存して復元を確実に
+      speechText.dataset.originalText = text;
+      speechText.innerHTML = safeText;
+      speechText.innerText = text;
+      
+      // 強制再描画のためにCSSプロパティを一時的に変更
+      const originalDisplay = speechText.style.display;
+      speechText.style.display = 'inline-block';
+      void speechText.offsetHeight;
+      speechText.style.display = originalDisplay;
+    }
+  }, 0);
+  
+  logDebug(`テキスト設定完了: "${text}"`);
 }
 
 /**
@@ -645,12 +575,17 @@ export function updateConnectionStatus(status, reconnectAttempts = 0, maxReconne
  * @param {Object|Array} uiPayload - UI表示用のペイロード（単一オブジェクトまたは配列）
  */
 export function renderSettingUI(uiPayload) {
+  console.log('🛠 renderSettingUI() が呼ばれました！');
+  console.log('payload:', uiPayload);
+  
   logDebug(`設定UI表示: ${Array.isArray(uiPayload) ? `${uiPayload.length}個の項目` : `タイプ=${uiPayload.type}`}`);
   
   if (!speechSettingUI) {
+    console.log('💭 speechSettingUIが存在しないので取得または作成します');
     speechSettingUI = document.getElementById('speechSettingUI');
     if (!speechSettingUI) {
       logError('speechSettingUI要素が見つかりません');
+      console.log('💭 speechSettingUI要素が見つからないため新規作成します');
       
       // 吹き出し内に作成
       if (speechBubble) {
@@ -658,16 +593,24 @@ export function renderSettingUI(uiPayload) {
         speechSettingUI.id = 'speechSettingUI';
         speechSettingUI.className = 'speech-setting-ui';
         speechBubble.appendChild(speechSettingUI);
+        console.log('🧱 DOMに追加しました！', speechSettingUI);
+        console.log('親の speechBubble:', speechBubble);
         logDebug('設定UI要素を動的に作成しました');
       } else {
+        console.log('❌ speechBubble要素が存在しません！', speechBubble);
         logError('speechBubble要素も見つかりません。設定UIを表示できません');
         return;
       }
+    } else {
+      console.log('💭 既存のspeechSettingUIを取得しました', speechSettingUI);
     }
+  } else {
+    console.log('💭 speechSettingUIは既に存在します', speechSettingUI);
   }
   
   // 内容をクリア
   speechSettingUI.innerHTML = '';
+  console.log('💭 speechSettingUIの内容をクリアしました');
   
   // 複数のUIペイロードに対応（配列の場合）
   const payloads = Array.isArray(uiPayload) ? uiPayload : [uiPayload];
@@ -676,14 +619,16 @@ export function renderSettingUI(uiPayload) {
   payloads.forEach((payload, index) => {
     // UIタイプに応じたコンテンツを作成
     if (payload.type === 'toggle') {
+      console.log(`💭 トグルUI(${index})を描画します:`, payload);
       renderToggleSwitch(payload, index);
     } else {
+      console.log(`❌ 未対応のUIタイプ: ${payload.type}`);
       logError(`未対応の設定UIタイプ: ${payload.type}`);
     }
   });
-  
   // 設定UI要素を表示
-  speechSettingUI.style.display = 'block';
+  speechSettingUI.style.setProperty('display', 'block', 'important');
+  console.log('💭 speechSettingUIを表示に設定しました');
   
   // 吹き出しにマウスイベントリスナーを追加（設定UI表示中はマウスフォーカス中に表示を維持）
   if (speechBubble) {
@@ -694,8 +639,12 @@ export function renderSettingUI(uiPayload) {
     // 新しいリスナーを追加
     speechBubble.addEventListener('mouseenter', keepBubbleVisible);
     speechBubble.addEventListener('mouseleave', allowBubbleHide);
+    console.log('💭 吹き出しのマウスイベントリスナーを設定しました');
+  } else {
+    console.log('❌ マウスイベント追加時にspeechBubbleが存在しません');
   }
   
+  console.log('💬 最終的な speechBubble の中身:', speechBubble?.innerHTML || '存在しません');
   logDebug('設定UI表示完了');
 }
 

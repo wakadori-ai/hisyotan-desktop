@@ -289,6 +289,16 @@
             color: #555;
         }
     </style>
+    <!-- speechManager.js をグローバルに利用できるようにするためのスクリプト -->
+    <script type="module">
+        import * as SpeechManagerModule from '../emotion/speechManager.js';
+        
+        // グローバルに公開するためwindowオブジェクトに登録
+        window.speechManager = SpeechManagerModule;
+        
+        // 初期化完了時にログ出力
+        console.log('💬 speechManagerをグローバルに初期化しました');
+    </script>
 </head>
 <body>
     <div class="paw-button-wrapper">
@@ -737,5 +747,98 @@
 
     <!-- 右クリックメニュー用の専用スクリプト（Viteパスエイリアス非依存） -->
     <script src="paw-context-menu.js"></script>
+
+    <!-- IPCメッセージハンドラ -->
+    <script>
+        // 吹き出し表示リクエストを受け取るリスナー
+        window.electron.ipcRenderer.on('display-settings-bubble', () => {
+            console.log('🎯 設定UI表示イベントを受信しました');
+            
+            // window.speechManagerが利用可能な場合はそれを使用
+            if (window.speechManager && window.speechManager.speakWithObject) {
+                console.log('speechManager.speakWithObjectを使用します');
+                
+                // 現在の状態を取得
+                const currentState = window.speechManager.getHordeModeState ? 
+                    window.speechManager.getHordeModeState() : false;
+                
+                // 設定UI表示用のペイロードを作成
+                const settingSpeech = {
+                    id: "setting_horde_mode",
+                    type: "setting",
+                    text: "今夜はホード夜モードにする…？",
+                    emotion: "gentle",
+                    uiPayload: {
+                        type: "toggle",
+                        label: "ホード夜モード",
+                        value: currentState,
+                        onChange: (newValue) => {
+                            console.log(`ホード夜モードが${newValue ? 'オン' : 'オフ'}に変更されました`);
+                            
+                            // 状態を保存
+                            if (window.speechManager.setHordeModeState) {
+                                window.speechManager.setHordeModeState(newValue);
+                            }
+                            
+                            // 変更後のフィードバックセリフ
+                            const feedbackMessage = newValue 
+                                ? "ホード夜モードをオンにしたよ。怖いけど一緒に頑張ろうね…" 
+                                : "ホード夜モードをオフにしたよ。ほっとした～";
+                            
+                            const feedbackEmotion = newValue ? "serious" : "relieved";
+                            
+                            // 少し遅延させてフィードバックを表示
+                            setTimeout(() => {
+                                if (window.speechManager.speak) {
+                                    window.speechManager.speak(
+                                        feedbackMessage,
+                                        feedbackEmotion,
+                                        5000,
+                                        null,
+                                        "horde_mode_feedback"
+                                    );
+                                }
+                            }, 500);
+                        }
+                    }
+                };
+                
+                // 設定UIを表示
+                window.speechManager.speakWithObject(settingSpeech);
+            } else {
+                // フォールバック：テスト用設定UIを表示
+                console.log('speechManagerが利用できないため、テスト用設定UIを表示します');
+                if (typeof createTestSettingsUI === 'function') {
+                    createTestSettingsUI();
+                } else {
+                    console.error('設定UI表示機能が利用できません');
+                }
+            }
+        });
+        
+        // SpeechManager操作を受け取るリスナー
+        window.electron.ipcRenderer.on('speech-manager-operation', (data) => {
+            console.log('🎯 SpeechManager操作イベントを受信:', data);
+            
+            if (!window.speechManager) {
+                console.error('speechManagerが利用できません');
+                return;
+            }
+            
+            const { method, args } = data;
+            
+            // メソッドが存在するか確認
+            if (typeof window.speechManager[method] === 'function') {
+                // メソッドを呼び出す
+                try {
+                    window.speechManager[method](...args);
+                } catch (error) {
+                    console.error(`speechManager.${method}の呼び出しエラー:`, error);
+                }
+            } else {
+                console.error(`speechManagerに${method}メソッドが存在しません`);
+            }
+        });
+    </script>
 </body>
 </html> 
