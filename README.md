@@ -144,10 +144,29 @@ python backend/main.py --debug
 
 ```json
 {
+  "app": {
+    "name": "ふにゃ秘書たん",
+    "version": "1.0.0"
+  },
   "window": {
     "width": 400,
     "height": 600,
-    "opacity": 0.9
+    "transparent": true,
+    "frame": false,
+    "alwaysOnTop": true,
+    "backgroundColor": "#00000000"
+  },
+  "emotions": {
+    "states": [
+      {
+        "name": "normal",
+        "display_name": "通常",
+        "threshold": 0,
+        "expression": "normal",
+        "decay_rate": 0.5
+      },
+      // 他の感情状態...
+    ]
   },
   "voicevox": {
     "host": "http://127.0.0.1:50021",
@@ -165,6 +184,8 @@ python backend/main.py --debug
   }
 }
 ```
+
+フロントエンド設定はViteを使用する新しい構造に更新され、`configLoader.js`と`config.js`によってロードされます。設定ファイルは感情状態、トリガー、ゲーム内の健康状態に対する反応など、より詳細な設定が含まれるようになりました。
 
 ### バックエンド設定 (`backend/app/config.py`)
 
@@ -195,6 +216,12 @@ npm run dev
 
 # 開発モードで実行（Vite + Electron）
 npm run dev:electron
+
+# デバッグモードで実行
+npm run dev:debug
+
+# ログ出力モードで実行
+npm run dev:log
 ```
 
 ### アプリケーションのビルド
@@ -205,6 +232,12 @@ npm run build
 
 # Electronアプリケーションビルド
 npm run build:electron
+
+# パッケージング（ビルドのみ）
+npm run pack
+
+# ディストリビューション（ビルド＋パッケージング）
+npm run dist
 
 # Windows用ビルド
 npm run dist -- --win
@@ -218,9 +251,9 @@ npm run dist -- --linux
 
 ビルド設定は`package.json`の`build`セクションで定義されています。
 
-### Vite導入について
+### Vite構成
 
-プロジェクトにViteを導入し、以下の機能が利用可能になりました：
+プロジェクトはVite v6.2.4を使用しており、高速な開発環境と効率的なビルドを実現しています。Viteの設定は`vite.config.js`で管理されています。
 
 #### パスエイリアス
 相対パスの代わりに、以下のエイリアスが使用できます：
@@ -335,6 +368,32 @@ import { logger } from '@core/logger.js';
 .\test_zombie_voice.ps1 -help
 ```
 
+## 🔍 デバッグ
+
+ゾンビ検出機能やその他の問題が発生した場合のデバッグ方法については、`README-debug.md`に詳細な情報が記載されています。
+
+### デバッグモードの起動
+
+```bash
+# デバッグモードでバックエンドを起動
+python backend/debug_start.py
+
+# 検出閾値を変更してデバッグ起動
+python backend/debug_start.py --threshold 0.2
+
+# 詳細ログを有効にして起動
+python backend/debug_start.py --verbose
+```
+
+### デバッグログ
+
+デバッグログはElectronとバックエンドの両方で記録されます：
+
+- Electronログ: アプリのユーザーデータディレクトリ内の`logs`フォルダ
+- バックエンドログ: `backend/logs`ディレクトリ
+
+詳細なトラブルシューティングやデバッグ情報については、`README-debug.md`を参照してください。
+
 ## 📦 プロジェクト構造
 
 ```
@@ -365,7 +424,10 @@ hisyotan-desktop/
 │   │   └── config/       # 設定
 │   ├── ml/               # 機械学習モジュール
 │   ├── data/             # データ保存・キャッシュ
+│   ├── models/           # モデルファイル
 │   └── main.py           # バックエンドエントリーポイント
+├── dist/                  # ビルド済みアプリケーション
+├── docs/                  # ドキュメント
 ├── logs/                  # ログファイル格納ディレクトリ
 ├── main.js               # Electronエントリーポイント
 ├── package.json          # npm設定とスクリプト
@@ -373,7 +435,7 @@ hisyotan-desktop/
 ├── requirements.txt      # Pythonパッケージ依存
 ├── .python-version       # Pythonバージョン指定
 ├── start.ps1             # 起動スクリプト
-├── diagnose.ps1          # 診断スクリプト
+├── README-debug.md       # デバッグ用ドキュメント
 ├── copy-preload.js       # プリロードスクリプトコピー用
 └── README.md             # プロジェクト説明
 ```
@@ -411,4 +473,4 @@ MIT License
 
 ## 📅 最終更新日
 
-2023年4月2日
+2024年4月3日
