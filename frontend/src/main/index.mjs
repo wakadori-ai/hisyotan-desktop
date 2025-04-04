@@ -37,6 +37,25 @@ const __dirname = path.dirname(__filename);
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const isDevCSP = process.env.ELECTRON_CSP_DEV === 'true';
 
+// セキュリティポリシーの設定
+const setContentSecurityPolicy = (win) => {
+  // 開発モードと本番モードでCSPを分ける
+  const csp = isDev ? 
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:;" :
+    "default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:;";
+  
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp]
+      }
+    });
+  });
+  
+  console.log(`🔒 Content-Security-Policyを設定しました (${isDev ? '開発モード' : '本番モード'})`);
+};
+
 // 環境変数からアプリ名を取得
 const appNameFromEnv = process.env.HISYOTAN_APP_NAME || null;
 if (appNameFromEnv) {
@@ -324,14 +343,7 @@ function createWindow() {
   console.log('🪟 メインウィンドウを作成します');
   
   // CSP設定
-  const csp = `
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval';
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' file: data: blob:;
-    connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:*;
-    media-src 'self' file: data: blob:;
-  `;
+  setContentSecurityPolicy(mainWindow);
   
   // メインウィンドウの設定
   mainWindow = new BrowserWindow({
@@ -349,16 +361,6 @@ function createWindow() {
     resizable: false,
     alwaysOnTop: true,
     icon: path.join(__dirname, '../assets/icon.ico')
-  });
-  
-  // CSPを設定
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [csp]
-      }
-    });
   });
   
   // 開発モードでの設定

@@ -6,12 +6,13 @@ const url = require('url');
 // デバッグログを追加
 console.log('🔍 preload.js が読み込まれました');
 console.log(`🔧 実行環境: ${process.env.NODE_ENV || 'production'}`);
-console.log(`📁 現在の作業ディレクトリ: ${process.cwd()}`);
+// 安全にprocess.cwdを呼び出し
+console.log(`📁 現在の作業ディレクトリ: ${process.cwd?.() ?? '.'}`);
 
-// ESモジュール互換の__dirname定義
+// ESモジュール互換の__dirname定義（より安全に）
 const __dirname = process.env.NODE_ENV === 'development' 
-  ? path.resolve(process.cwd())
-  : path.dirname(process.execPath);
+  ? path.resolve(process.cwd?.() ?? '.')
+  : path.dirname(process.execPath || '.');
 
 console.log(`📂 __dirnameの値: ${__dirname}`);
 

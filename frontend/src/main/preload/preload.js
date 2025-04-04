@@ -1,9 +1,33 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// デバッグログを追加
+// 実行パスやディレクトリ関連の出力を安全に行う
 console.log('🔍 preload.js が読み込まれました');
 console.log(`🔧 実行環境: ${process.env.NODE_ENV || 'production'}`);
-console.log(`📁 現在の作業ディレクトリ: ${process.cwd()}`);
+
+// process.cwdを安全に呼び出し
+try {
+  // Object.prototype.toString.call(process.cwd)が"[object Function]"の場合のみ呼び出し
+  const cwd = (typeof process.cwd === 'function') ? process.cwd() : '.';
+  console.log(`📁 現在の作業ディレクトリ: ${cwd}`);
+} catch (error) {
+  console.log(`📁 現在の作業ディレクトリの取得に失敗しました: ${error.message}`);
+}
+
+// ESモジュール互換の__dirname定義（より安全に）
+let __dirname;
+try {
+  if (typeof process.cwd === 'function') {
+    __dirname = process.env.NODE_ENV === 'development' 
+      ? process.cwd()
+      : require('path').dirname(process.execPath || '.');
+  } else {
+    __dirname = '.';
+  }
+  console.log(`📂 __dirnameの値: ${__dirname}`);
+} catch (error) {
+  console.log(`📂 __dirnameの設定に失敗しました: ${error.message}`);
+  __dirname = '.';
+}
 
 // メインプロセスにアクセスするためのAPIを公開
 contextBridge.exposeInMainWorld('electron', {

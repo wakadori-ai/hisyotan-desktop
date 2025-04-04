@@ -80,29 +80,46 @@ export function initUIElements() {
 
 // イベントリスナーの設定を分離
 function setupEventListeners() {
-  if (window.pawButton) {
+  // pawButton
+  const pawBtn = document.getElementById('paw-button') || pawButton;
+  if (pawBtn) {
     console.log('🐾 pawButtonにイベントリスナーを設定します');
-    setupPawButtonEvents(window.pawButton);
+    setupPawButtonEvents(pawBtn);
+  } else {
+    console.warn('⚠️ pawButtonが見つかりません');
   }
   
-  if (window.quitButton) {
+  // quitButton
+  const quitBtn = document.getElementById('quit-button') || quitButton;
+  if (quitBtn) {
     console.log('🚪 quitButtonにイベントリスナーを設定します');
-    setupQuitButtonEvents(window.quitButton);
+    setupQuitButtonEvents(quitBtn);
+  } else {
+    console.warn('⚠️ quitButtonが見つかりません');
   }
   
   // 立ち絵と吹き出しのイベント設定
-  if (window.assistantImage) {
-    window.assistantImage.addEventListener('contextmenu', (event) => {
+  const imgElement = document.getElementById('assistantImage') || assistantImage;
+  if (imgElement instanceof HTMLElement) {
+    console.log('🖼️ assistantImageにイベントリスナーを設定します');
+    imgElement.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       console.log('🖼️ 立ち絵が右クリックされました - 右クリックメニューを無効化');
     });
+  } else {
+    console.warn('⚠️ assistantImage要素が見つからないか、HTML要素ではありません');
   }
   
-  if (window.speechBubble) {
-    window.speechBubble.addEventListener('contextmenu', (event) => {
+  // 吹き出し
+  const bubble = document.getElementById('speechBubble') || speechBubble;
+  if (bubble instanceof HTMLElement) {
+    console.log('💬 speechBubbleにイベントリスナーを設定します');
+    bubble.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       console.log('💬 吹き出しが右クリックされました - 右クリックメニューを無効化');
     });
+  } else {
+    console.warn('⚠️ speechBubble要素が見つからないか、HTML要素ではありません');
   }
 }
 
@@ -242,35 +259,93 @@ function directWindowDragHandler(initialEvent) {
 export function showBubble(type = 'default', text = 'こんにちは！何かお手伝いしましょうか？') {
   console.log('🔍 showBubble関数が呼び出されました', { type, text });
   
-  if (!speechBubble || !speechText) {
-    console.error('💔 speechBubbleまたはspeechTextが見つかりません');
-    return;
+  // 吹き出し要素を取得（グローバル変数かDOM直接取得）
+  const bubble = speechBubble || document.getElementById('speechBubble');
+  const textElem = speechText || document.getElementById('speechText');
+  
+  if (!bubble || !textElem) {
+    console.error('💔 speechBubbleまたはspeechTextが見つかりません。要素作成を試みます...');
+    
+    // 要素が存在しない場合は動的に作成
+    try {
+      // 既存のコンテナを探す
+      let container = document.querySelector('.assistant-container');
+      
+      // コンテナがなければ作成
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'assistant-container';
+        container.style.position = 'fixed';
+        container.style.bottom = '20px';
+        container.style.right = '20px';
+        container.style.zIndex = '1000';
+        document.body.appendChild(container);
+      }
+      
+      // 吹き出しが見つからなければ作成
+      if (!bubble) {
+        const newBubble = document.createElement('div');
+        newBubble.id = 'speechBubble';
+        newBubble.className = 'speech-bubble';
+        newBubble.style.display = 'block';
+        newBubble.style.position = 'absolute';
+        newBubble.style.top = '-80px';
+        newBubble.style.background = 'rgba(255, 255, 255, 0.9)';
+        newBubble.style.padding = '10px';
+        newBubble.style.borderRadius = '15px';
+        newBubble.style.zIndex = '3';
+        container.appendChild(newBubble);
+        
+        // グローバル変数を更新
+        speechBubble = newBubble;
+      }
+      
+      // テキスト要素が見つからなければ作成
+      if (!textElem) {
+        const newTextElem = document.createElement('div');
+        newTextElem.id = 'speechText';
+        newTextElem.className = 'speech-text';
+        newTextElem.style.fontSize = '14px';
+        newTextElem.style.color = '#333';
+        
+        // 吹き出しに追加
+        (speechBubble || document.getElementById('speechBubble')).appendChild(newTextElem);
+        
+        // グローバル変数を更新
+        speechText = newTextElem;
+      }
+      
+      console.log('✅ 不足していた吹き出し要素の作成が完了しました');
+      
+      // 再帰的に呼び出し（ただ一度だけ）
+      return showBubble(type, text);
+    } catch (error) {
+      console.error('💔 吹き出し要素の動的作成に失敗しました:', error);
+      return;
+    }
   }
   
   // 要素のスタイル情報をログ出力
   console.log('🎨 speechBubbleの現在のスタイル:', {
-    display: speechBubble.style.display,
-    className: speechBubble.className,
-    computedStyle: window.getComputedStyle(speechBubble)
+    display: bubble.style.display,
+    className: bubble.className
   });
   
   // テキスト設定
-  if (type === 'default') {
-    if (!text || text === 'default') {
-      text = 'こんにちは！何かお手伝いしましょうか？';
-    }
+  if (type === 'default' && (!text || text === 'default')) {
+    text = 'こんにちは！何かお手伝いしましょうか？';
   }
   
   // テキストを設定
-  speechText.textContent = text;
+  textElem.textContent = text;
   
   // 吹き出しを表示
-  speechBubble.style.display = 'block';
+  bubble.style.display = 'block';
   
   // 表示状態をログ出力
   console.log('✅ 吹き出しを表示しました', { 
-    text: speechText.textContent,
-    display: speechBubble.style.display 
+    text: textElem.textContent,
+    display: bubble.style.display 
   });
 }
 
@@ -414,9 +489,27 @@ export function createUI() {
   // コンテナをドキュメントに追加
   document.body.appendChild(container);
   
-  // イベントリスナーの設定
-  setupEventListeners();
-  
+  // グローバル変数に要素を割り当て（参照をセット）
+  window.pawButton = pawButton;
+  window.quitButton = quitButton;
+  window.speechBubble = speechBubble;
+  window.speechText = speechText;
+  window.assistantImage = assistantImage;
+
+  // モジュール内グローバル変数にも割り当て
+  this.pawButton = pawButton;
+  this.quitButton = quitButton;
+  this.speechBubble = speechBubble;
+  this.speechText = speechText;
+  this.assistantImage = assistantImage;
+
+  // イベントリスナーの設定（DOM要素を直接渡す）
+  setTimeout(() => {
+    console.log('🔄 イベントリスナーを設定します');
+    // DOMツリーに追加されたことを確認した上で設定
+    setupEventListeners();
+  }, 50);
+
   console.log('✨ UI要素の作成が完了しました');
 }
 

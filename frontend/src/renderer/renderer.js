@@ -29,35 +29,45 @@ console.log('🎤 SpeechManager をグローバルに登録しました');
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🌟 UIの初期化を開始します');
   
-  // UIを生成
-  assistantUI.createUI();
-  
-  // 設定読み込み
-  try {
-    const config = await apiClient.getSettings();
-    console.log('⚙️ 設定をロードしました', config);
-
-    // SpeechManagerに設定をセット
-    if (window.speechManager) {
-      speechManager.setConfig(config.settings);
-      console.log('🎤 SpeechManagerに設定をセットしました');
+  // 少し遅延を入れてDOM要素が完全に読み込まれるのを確保
+  setTimeout(async () => {
+    try {
+      // UIを生成
+      assistantUI.createUI();
       
-      // VOICEVOX接続確認
-      speechManager.checkVoicevoxConnection()
-        .then(connected => {
-          console.log(`🎙️ VOICEVOX接続確認結果: ${connected ? '接続成功' : '接続失敗'}`);
-        })
-        .catch(err => {
-          console.error('🎙️ VOICEVOX接続確認エラー:', err);
-        });
+      // 設定読み込み
+      try {
+        const config = await apiClient.getSettings();
+        console.log('⚙️ 設定をロードしました', config);
+
+        // SpeechManagerに設定をセット
+        if (window.speechManager) {
+          speechManager.setConfig(config.settings);
+          console.log('🎤 SpeechManagerに設定をセットしました');
+          
+          // VOICEVOX接続確認
+          speechManager.checkVoicevoxConnection()
+            .then(connected => {
+              console.log(`🎙️ VOICEVOX接続確認結果: ${connected ? '接続成功' : '接続失敗'}`);
+            })
+            .catch(err => {
+              console.error('🎙️ VOICEVOX接続確認エラー:', err);
+            });
+        }
+      } catch (error) {
+        console.error('⚠️ 設定のロードに失敗しました:', error);
+      }
+      
+      // デバッグ用：UI要素の存在確認
+      checkUIElements();
+      
+      // 歓迎メッセージを表示
+      assistantUI.showBubble('default');
+    } catch (err) {
+      console.error('💔 UI初期化中にエラーが発生しました:', err);
     }
-  } catch (error) {
-    console.error('⚠️ 設定のロードに失敗しました:', error);
-  }
-  
-  // 歓迎メッセージを表示
-  assistantUI.showBubble('default');
-  
+  }, 100); // 100ms遅延
+
   // スタイル適用確認
   setTimeout(() => {
     console.log('⏱️ タイムアウト後のスタイル確認:');
@@ -69,9 +79,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         visibility: window.getComputedStyle(bubbleElement).visibility,
         opacity: window.getComputedStyle(bubbleElement).opacity
       });
+    } else {
+      console.warn('⚠️ speechBubble要素が見つかりません（1秒後）');
     }
   }, 1000);
 });
+
+// デバッグ用：UI要素の存在確認
+function checkUIElements() {
+  const elements = [
+    'paw-button', 'quit-button', 'speechBubble', 
+    'speechText', 'assistantImage', 'errorBubble'
+  ];
+  
+  console.log('🔍 UI要素チェック結果:');
+  elements.forEach(id => {
+    const el = document.getElementById(id);
+    console.log(`${id}: ${el ? '✅ 存在します' : '❌ 見つかりません'}`);
+  });
+}
 
 // Electronからのイベントを処理するためのリスナー
 if (window.electron && window.electron.ipcRenderer) {
