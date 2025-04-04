@@ -70,7 +70,6 @@ contextBridge.exposeInMainWorld('electron', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   quitApp: () => ipcRenderer.invoke('quit-app'),
-  startWindowDrag: () => ipcRenderer.invoke('start-window-drag'),
   showRandomMessage: () => ipcRenderer.invoke('show-random-message'),
   
   // クリックスルーとアニメーション準備のイベントハンドラを追加

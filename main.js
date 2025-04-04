@@ -7,6 +7,7 @@
 const path = require('path');
 const { app } = require('electron');
 const { execSync } = require('child_process');
+const { ipcMain } = require('electron');
 
 // Windows環境での日本語コンソール出力のために文字コードを設定
 if (process.platform === 'win32') {
@@ -44,3 +45,50 @@ try {
   console.error('❌ ブリッジ処理エラー:', error);
   process.exit(1);
 }
+
+// IPCイベントハンドラを設定する関数
+function setupIPCHandlers() {
+  // 既存のハンドラ...
+  
+  // バックエンドを含めて完全に終了するハンドラ
+  ipcMain.on('quit-app-with-backend', (event) => {
+    console.log('⚠️ バックエンドを含む完全終了を要求されました');
+    
+    try {
+      // バックエンドプロセスを確実に終了
+      const { exec } = require('child_process');
+      
+      // Pythonプロセスを強制終了（uvicornに関連するものを優先）
+      exec('taskkill /F /IM python.exe /FI "WINDOWTITLE eq uvicorn*"', (err) => {
+        if (err) console.error('uvicornプロセス終了エラー:', err);
+        
+        // 一般的なPythonプロセスも終了
+        exec('taskkill /F /IM python.exe', (err) => {
+          if (err) console.error('Pythonプロセス終了エラー:', err);
+          
+          // 念のためVOICEVOXも終了
+          exec('taskkill /F /IM voicevox_engine.exe', (err) => {
+            if (err) console.error('VOICEVOXプロセス終了エラー:', err);
+            
+            // 最後にアプリを終了
+            console.log('🚪 アプリを終了します');
+            setTimeout(() => {
+              app.exit(0);
+            }, 500);
+          });
+        });
+      });
+    } catch (error) {
+      console.error('終了処理中にエラーが発生しました:', error);
+      app.exit(0);
+    }
+  });
+  
+  // 他のハンドラ...
+}
+
+// アプリの初期化時にIPCハンドラを設定
+app.whenReady().then(() => {
+  setupIPCHandlers();
+  // 既存の初期化コード...
+});
