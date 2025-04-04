@@ -22,6 +22,8 @@
   right: 10px;
   height: 80vh;
   max-height: 600px;
+  width: auto; /* 幅を自動調整して縦横比を維持 */
+  object-fit: contain; /* 縦横比を維持して表示 */
   opacity: 0;
   transition: opacity 0.5s ease-in-out;
   user-select: none;
@@ -73,6 +75,7 @@
   .assistant-image {
     max-width: 120px;
     max-height: 240px;
+    width: auto; /* 幅を自動調整して縦横比を維持 */
   }
 }
 

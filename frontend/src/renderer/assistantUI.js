@@ -34,6 +34,9 @@ export function initUIElements() {
   if (pawButton) {
     console.log('🐾 pawButtonにイベントリスナーを設定します');
     
+    // ドラッグ可能設定を無効化（クリックイベントを優先）
+    pawButton.style.webkitAppRegion = 'no-drag';
+    
     // 左クリック - ランダムセリフ表示（クールタイム付き）
     pawButton.addEventListener('click', (event) => {
       console.log('🐾 肉球ボタンがクリックされました');
@@ -55,35 +58,37 @@ export function initUIElements() {
       lastClickTime = currentTime;
       
       // ランダムセリフ表示（マルチレベルフォールバック付き）
+      if (window.speechManager && window.speechManager.speak) {
+        // 1. SpeechManagerで再生
+        const messages = [
+          'こんにちは！何かお手伝いしましょうか？',
+          'お疲れ様です！休憩も大切ですよ✨',
+          '何か質問があればいつでも声をかけてくださいね',
+          'お仕事頑張ってますね！素敵です',
+          'リラックスタイムも必要ですよ〜',
+          'デスクの整理、手伝いましょうか？'
+        ];
+        
+        const randomIndex = Math.floor(Math.random() * messages.length);
+        const message = messages[randomIndex];
+        
+        window.speechManager.speak(message, 'normal', 5000);
+        return;
+      }
+      
+      // 2. フォールバック: IPCメッセージ
       if (window.electron && window.electron.ipcRenderer) {
         try {
           // 第1手段: send (より確実なのでsendを先に試す)
           console.log('🔄 sendメソッドでランダムメッセージを要求します');
           window.electron.ipcRenderer.send('show-random-message');
-          
-          // 保険としてローカルのメッセージも表示（並行処理）
-          setTimeout(() => {
-            const messages = [
-              'こんにちは！何かお手伝いしましょうか？',
-              'お疲れ様です！休憩も大切ですよ✨',
-              '何か質問があればいつでも声をかけてくださいね',
-              'お仕事頑張ってますね！素敵です',
-              'リラックスタイムも必要ですよ〜',
-              'デスクの整理、手伝いましょうか？'
-            ];
-            
-            const randomIndex = Math.floor(Math.random() * messages.length);
-            const message = messages[randomIndex];
-            
-            showBubble('default', message);
-          }, 200);
         } catch (error) {
           // エラー発生時は直接メッセージを表示
           console.error('IPC呼び出しエラー:', error);
           showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
         }
       } else {
-        // electronが使用できない場合は直接メッセージを表示
+        // 3. 最終フォールバック: 直接表示
         console.warn('electron IPCが利用できません。直接メッセージを表示します');
         showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
       }
@@ -99,7 +104,11 @@ export function initUIElements() {
         createTestSettingsUI();
         
         // フォールバックとして直接メッセージも表示
-        showBubble('default', '設定メニューを開きますね');
+        if (window.speechManager && window.speechManager.speak) {
+          window.speechManager.speak('設定メニューを開きますね', 'normal', 3000);
+        } else {
+          showBubble('default', '設定メニューを開きますね');
+        }
       } catch (error) {
         console.error('設定UI表示エラー:', error);
         showBubble('warning', '設定を開けませんでした');

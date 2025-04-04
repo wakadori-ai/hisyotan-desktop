@@ -6,6 +6,63 @@ $procInfoFile = "$env:TEMP\hisyotan_processes.json"
 $vitePidFile = "$env:TEMP\hisyotan_vite_pid.txt"
 $viteInfoFile = "$env:TEMP\hisyotan_vite_info.json"
 
+# Pythonプロセスをエラーなく終了させるためには、
+# まずSIGINT（Ctrl+C相当）を送ってから、必要に応じてKillする
+function Stop-ProcessGracefully {
+    param(
+        [Parameter(Mandatory=$true)]
+        [int]$ProcessId,
+        [string]$ProcessName = "不明",
+        [bool]$TryGraceful = $true
+    )
+    
+    try {
+        $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+        if ($proc) {
+            # uvicornプロセスを特別扱い
+            if ($proc.Name -match "python" -and $TryGraceful) {
+                Write-Host "   💫 $ProcessName プロセス (PID: $ProcessId) をCtrl+Cで優しく終了を試みるよ"
+                
+                # SIGINT (Ctrl+C) を送信する - uvicornに対してはこれが最適
+                $closeResult = Add-Type -AssemblyName System.Windows.Forms -PassThru
+                try {
+                    [void][System.Windows.Forms.SendKeys]::SendWait("^C")
+                    Start-Sleep -Milliseconds 500
+                    
+                    # プロセスがまだ生きているか確認
+                    $procCheck = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+                    if (-not $procCheck) {
+                        Write-Host "   ✨ $ProcessName プロセス (PID: $ProcessId) は正常終了したよ"
+                        return $true
+                    }
+                } catch {
+                    Write-Host "   💭 SendKeys失敗、別の方法を試すね: $_"
+                }
+            }
+            
+            # SIGTERM (通常終了) を試す
+            Write-Host "   🧸 $ProcessName プロセス (PID: $ProcessId) を通常終了させるよ"
+            $proc.CloseMainWindow() | Out-Null
+            if (!$proc.HasExited) {
+                Start-Sleep -Milliseconds 500
+                if (!$proc.HasExited) {
+                    # それでも終了しなければ強制終了
+                    Write-Host "   🔪 $ProcessName プロセス (PID: $ProcessId) を強制終了するよ"
+                    Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+                }
+            }
+            Write-Host "   ✅ $ProcessName プロセス (PID: $ProcessId) を終了したよ"
+            return $true
+        } else {
+            Write-Host "   ℹ️ $ProcessName プロセス (PID: $ProcessId) はもう存在しないみたい"
+            return $false
+        }
+    } catch {
+        Write-Host "   ⚠️ $ProcessName プロセス (PID: $ProcessId) の終了に失敗したの... $_"
+        return $false
+    }
+}
+
 # プロセスツリーを終了する関数
 function Stop-ProcessTree {
     param(
@@ -27,14 +84,14 @@ function Stop-ProcessTree {
         }
         
         # 親プロセスを終了
-        $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-        if ($proc) {
-            Stop-Process -Id $ProcessId -Force -ErrorAction Stop
-            Write-Host "   ✅ $ProcessName プロセス (PID: $ProcessId) を終了したよ"
-            return $true
+        $isPython = $ProcessName -match "python"
+        $isUvicorn = $ProcessName -match "uvicorn" -or $ProcessName -match "fastapi"
+        
+        # Python/uvicornプロセスは特別扱い
+        if ($isPython -or $isUvicorn) {
+            return Stop-ProcessGracefully -ProcessId $ProcessId -ProcessName $ProcessName -TryGraceful $true
         } else {
-            Write-Host "   ℹ️ $ProcessName プロセス (PID: $ProcessId) はもう存在しないみたい"
-            return $false
+            return Stop-ProcessGracefully -ProcessId $ProcessId -ProcessName $ProcessName -TryGraceful $false
         }
     } catch {
         Write-Host "   ⚠️ $ProcessName プロセス (PID: $ProcessId) の終了に失敗したの... $_"
@@ -53,7 +110,7 @@ if (Test-Path $procInfoFile) {
         Write-Host "📅 起動日時: $($procInfo.StartTime)"
         
         # 各プロセスIDを確認して終了
-        @("Vite", "Backend", "Electron") | ForEach-Object {
+        @("Backend", "Vite", "Electron") | ForEach-Object {
             $procType = $_
             $VitePID = $procInfo.$procType
             
@@ -184,9 +241,10 @@ try {
     Write-Host "⚠️ ウィンドウタイトルによる検索でエラーが発生したの... $_"
 }
 
-# 従来のキーワード検索も残しておく
+# キーワード検索
 $keywords = @(
     "hisyotan",
+    "uvicorn",
     "frontend/src/main/index.js",
     "frontend/core/main.js",
     "frontend/src/main/preload/preload.js",
@@ -194,8 +252,30 @@ $keywords = @(
     "dist/preload.js",
     "dist/paw-preload.js"
 )
-$targetProcs = @()
 
+# Python.exeおよびuvicornプロセスを検索して終了
+$pythonProcs = Get-Process -Name "python" -ErrorAction SilentlyContinue
+foreach ($pythonProc in $pythonProcs) {
+    try {
+        $cmdLine = (Get-CimInstance Win32_Process -Filter "ProcessId = $($pythonProc.Id)").CommandLine
+        if ($cmdLine -match "uvicorn" -or $cmdLine -match "fastapi") {
+            Write-Host "`n🧹 終了対象: uvicorn/fastapi (Python)"
+            Write-Host "   PID: $($pythonProc.Id)"
+            Write-Host "   コマンド: $cmdLine"
+            
+            # uvicorn/FastAPIプロセスを優しく終了
+            $success = Stop-ProcessGracefully -ProcessId $pythonProc.Id -ProcessName "uvicorn (Python)" -TryGraceful $true
+            if ($success) {
+                $processesTerminated++
+            }
+        }
+    } catch {
+        Write-Host "⚠️ Pythonプロセス解析エラー: $_"
+    }
+}
+
+# キーワード検索による終了処理
+$targetProcs = @()
 foreach ($keyword in $keywords) {
     $keywordProcs = Get-CimInstance Win32_Process | Where-Object {
         $_.CommandLine -ne $null -and
@@ -204,10 +284,10 @@ foreach ($keyword in $keywords) {
     $targetProcs += $keywordProcs
 }
 
-# キーワード検索とタイトル検索の結果を統合
-$targetProcs = $targetProcs + $targetProcsVite + $titleProcs | Select-Object -Unique ProcessId, Name, CommandLine
+# キーワード検索結果の重複を除去
+$targetProcs = $targetProcs | Select-Object -Unique ProcessId, Name, CommandLine
 
-# キーワード検索による終了処理
+# 検索結果に基づく終了処理
 if ($targetProcs.Count -eq 0) {
     if ($processesTerminated -eq 0) {
         Write-Host "`n✨ クリーンだよ！秘書たんはもういないの"
@@ -234,3 +314,6 @@ if ($targetProcs.Count -eq 0) {
 }
 
 Write-Host "`n🐱 合計 $processesTerminated 個のプロセスを終了したよ！"
+
+# 正常終了を返す
+exit 0
