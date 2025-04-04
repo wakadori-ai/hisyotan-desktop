@@ -25,6 +25,41 @@
         #paw-button, #quit-button, .speech-bubble, #assistantImage {
             pointer-events: auto;
         }
+        
+        /* 立ち絵の直接スタイル（CSSロード前の保険） */
+        #assistantImage {
+            width: 256px !important;
+            height: auto !important;
+            min-height: 250px !important;
+            max-height: 400px !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            object-fit: contain !important;
+            position: fixed !important;
+            bottom: 124px !important;
+            right: 5px !important;
+            z-index: 101 !important;
+            image-rendering: auto !important;
+        }
+        
+        /* 吹き出しの直接スタイル（CSSロード前の保険） */
+        #speechBubble {
+            width: 250px !important;
+            max-width: 300px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: fixed !important;
+            bottom: 300px !important;
+            right: 5px !important;
+            z-index: 9999 !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            border-radius: 20px !important;
+            padding: 15px !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+        }
     </style>
     <!-- speechManager.js をグローバルに利用できるようにするためのスクリプト -->
     <script type="module">
@@ -484,12 +519,11 @@
                 // 設定UIを表示
                 window.speechManager.speakWithObject(settingSpeech);
             } else {
-                // フォールバック：テスト用設定UIを表示
-                console.log('speechManagerが利用できないため、テスト用設定UIを表示します');
-                if (typeof createTestSettingsUI === 'function') {
-                    (async () => {
-                        await createTestSettingsUI();
-                    })();
+                // フォールバック：新しい設定UIを表示
+                console.log('speechManagerが利用できないため、設定UIを表示します');
+                // 新しい設定UI関数を使用
+                if (typeof showSettingsInBubble === 'function') {
+                    showSettingsInBubble();
                 } else {
                     console.error('設定UI表示機能が利用できません');
                 }
@@ -525,9 +559,12 @@
     <script type="module">
         // 設定APIクライアントの初期化
         import apiClient from './apiClient.js';
+        // 設定UI関数のインポート
+        import { showSettingsInBubble } from '../renderer/assistantUI.js';
         
         // グローバルアクセス用に設定
         window.settingsApi = apiClient;
+        window.showSettingsInBubble = showSettingsInBubble;
         
         console.log('🔌 ES Modules サポート初期化完了');
     </script>

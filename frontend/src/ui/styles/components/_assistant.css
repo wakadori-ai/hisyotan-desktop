@@ -13,6 +13,8 @@
   justify-content: flex-end !important;
   overflow: visible !important;
   padding: var(--spacing-md) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: none !important;
 }
 
 /* 立ち絵 */
@@ -20,18 +22,27 @@
   position: absolute;
   bottom: 0;
   right: 10px;
-  height: var(--assistant-image-height);
-  max-height: 600px;
-  width: auto; /* 幅を自動調整して縦横比を維持 */
-  object-fit: contain; /* 縦横比を維持して表示 */
-  opacity: 1;
-  transition: opacity var(--transition-duration) ease-in-out, 
-              transform var(--transition-duration) ease;
+  width: 256px !important; /* 固定幅を明示的に指定 */
+  height: auto !important; /* 高さは比率を維持 */
+  max-height: 400px; /* 最大高さを制限 */
+  min-height: 250px; /* 最小高さを設定 */
+  max-width: 100% !important; /* 最大幅を制限 */
+  object-fit: contain !important; /* 縦横比を維持して表示 */
+  image-rendering: auto !important; /* 高品質レンダリング */
+  -ms-interpolation-mode: bicubic !important; /* IE向け高品質設定 */
+  backface-visibility: hidden !important; /* GPU描画時の裏面を非表示 */
+  transform: translateZ(0) !important; /* GPU描画を強制 */
+  transform-origin: bottom center !important;
+  opacity: 1 !important;
+  transition: opacity var(--transition-duration, 0.3s) ease-in-out, 
+              transform var(--transition-duration, 0.3s) ease;
   user-select: none;
   pointer-events: auto;
   -webkit-app-region: drag; /* ドラッグ可能にする */
-  z-index: var(--z-index-base);
-  transform-origin: bottom center;
+  z-index: calc(var(--z-index-base, 100) + 1) !important;
+  overflow: visible;
+  display: block !important; /* 必ず表示 */
+  visibility: visible !important; /* 必ず可視 */
 }
 
 /* 立ち絵アクティブ状態 */
@@ -69,18 +80,23 @@
 
 /* 吹き出し */
 .speech-bubble {
-  position: absolute !important;
-  top: -120px !important;
-  left: 0 !important;
+  position: fixed !important;
+  top: auto !important;
+  bottom: 300px !important;
+  left: auto !important;
+  right: 10px !important;
   width: 250px !important;
   max-width: 300px !important;
   background: rgba(255, 255, 255, 0.95) !important;
   border-radius: 20px !important;
   padding: 15px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
-  z-index: 999 !important;
+  z-index: 9999 !important;
   transition: opacity 0.3s ease, transform 0.3s ease !important;
   pointer-events: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  visibility: visible !important;
 }
 
 .speech-bubble.show {
@@ -88,11 +104,28 @@
   transform: translateY(0) !important;
   display: flex !important;
   flex-direction: column !important;
+  visibility: visible !important;
 }
 
 .speech-bubble.hide {
   opacity: 0 !important;
   transform: translateY(-10px) !important;
+  display: flex !important;
+  visibility: hidden !important;
+}
+
+/* 吹き出し用の疑似要素（三角形の尻尾部分） */
+.speech-bubble:after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  right: 30px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid rgba(255, 255, 255, 0.95);
+  z-index: 9998 !important;
 }
 
 /* UI ボタンコンテナ */

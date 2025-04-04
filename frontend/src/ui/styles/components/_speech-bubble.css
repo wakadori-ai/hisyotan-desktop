@@ -6,10 +6,12 @@
   width: var(--bubble-min-width);
   max-width: var(--bubble-max-width);
   min-height: var(--bubble-min-height);
-  background: var(--color-bubble);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-md);
-  font-size: 14px;
+  background: rgba(255, 255, 255, 0.26);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 1.05rem;
   color: var(--color-text);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   border: 1.5px solid rgba(255, 200, 220, 0.7);
@@ -46,7 +48,9 @@
   right: 30px; /* 矢印の位置を調整して立ち絵に合わせる */
   width: 20px;
   height: 20px;
-  background-color: var(--color-bubble);
+  background-color: rgba(255, 255, 255, 0.26);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border-right: 1.5px solid rgba(255, 200, 220, 0.7);
   border-bottom: 1.5px solid rgba(255, 200, 220, 0.7);
   transform: rotate(45deg);
@@ -54,12 +58,24 @@
 
 /* 吹き出しテキスト */
 .speech-text {
-  font-size: 14px;
+  font-size: 1.05rem;
   color: var(--color-text);
-  line-height: 1.4;
+  line-height: 1.6;
   overflow-wrap: break-word;
   word-break: break-word;
+  display: block;
+  width: 100%;
   padding-right: 10px;
+}
+
+/* 吹き出しテキスト内容 */
+.speech-text-content {
+  display: block;
+  width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  visibility: visible;
+  opacity: 1;
 }
 
 /* 警告吹き出し */
@@ -275,4 +291,17 @@ body.mouse-active .speech-bubble.active {
   font-size: 14px;
   line-height: 1.5;
   color: var(--color-text);
+}
+
+/* 吹き出し固定表示位置 */
+.speech-bubble.fixed-position {
+  position: fixed !important;
+  z-index: 9999 !important;
+  bottom: 300px !important;
+  right: 10px !important;
+  width: 280px !important;
+  max-width: 320px !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 } 

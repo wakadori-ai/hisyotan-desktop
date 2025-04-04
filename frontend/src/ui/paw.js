@@ -7,7 +7,6 @@
 // import './styles.css'; // 相対パス
 // import '/src/ui/styles.css'; // 絶対パス
 
-import { createTestSettingsUI } from '@ui/paw-context-menu.js';
 import { hideBubble } from '@ui/handlers/bubbleManager.js';
 import apiClient from '@core/apiClient.js';
 import { setupMouseEventHandling } from '@ui/handlers/setupMouseEvents.js';
@@ -19,7 +18,6 @@ console.log('📁 現在の実行パス:', import.meta.env.BASE_URL);
 
 // グローバルアクセス用に設定
 window.settingsApi = apiClient;
-window.createTestSettingsUI = createTestSettingsUI;
 window.hideBubble = hideBubble;
 
 // DOM構築後の初期化
@@ -82,6 +80,5 @@ console.log(`🔧 現在の実行環境: ${import.meta.env.MODE}`);
 // エクスポート
 export default {
   apiClient,
-  createTestSettingsUI,
   hideBubble
 }; 

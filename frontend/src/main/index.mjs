@@ -413,6 +413,8 @@ function createWindow() {
     },
     frame: false,
     transparent: true,
+    backgroundColor: '#26ffffff', // 白色の透明度15%（HEX表記）
+    hasShadow: false,
     resizable: false,
     alwaysOnTop: true,
     icon: path.join(__dirname, '../frontend/public/assets/icon.ico')

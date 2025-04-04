@@ -41,7 +41,6 @@ import {
 
 // 追加の依存関係
 import { hideBubble } from '@ui/handlers/bubbleManager.js';
-import { createTestSettingsUI } from '@ui/paw-context-menu.js';
 
 /**
  * 全てのUI要素を初期化する
@@ -88,10 +87,7 @@ export {
   updateConnectionStatus,
   
   // settingPanel
-  renderSettingUI,
-  
-  // 追加機能
-  createTestSettingsUI
+  renderSettingUI
 };
 
 // モジュールオブジェクトをまとめて定義（完全性のため）

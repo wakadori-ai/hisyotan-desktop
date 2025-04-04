@@ -23,6 +23,8 @@ let apiClient = null;
 
 // bubbleManager.jsからhideBubbleをインポート
 import { hideBubble } from './handlers/bubbleManager.js';
+// assistantUI.jsからshowSettingsInBubble関数を名前付きインポート
+import { showSettingsInBubble } from '../renderer/assistantUI.js';
 
 /**
  * 設定項目のデータを取得する
@@ -61,6 +63,8 @@ async function getSettingsData() {
  * テスト用の設定UIを作成する
  * @returns {Promise<HTMLElement>} 設定UI要素
  */
+/* 
+// 古い設定UI - 非推奨のため無効化
 async function createTestSettingsUI() {
   // 設定データを取得
   const settings = await getSettingsData();
@@ -262,6 +266,7 @@ async function createTestSettingsUI() {
   
   return settingsContainer;
 }
+*/
 
 /**
  * 設定を更新する
@@ -285,6 +290,13 @@ async function updateSetting(key, value) {
  * 右クリックメニューのイベントを設定する
  */
 function setupContextMenuEvents() {
+  // 古い設定UIが存在していたら削除
+  const oldSettingsUI = document.querySelector('.paw-settings-container');
+  if (oldSettingsUI && oldSettingsUI.parentNode) {
+    console.log('🧹 古い設定UIを削除します');
+    oldSettingsUI.parentNode.removeChild(oldSettingsUI);
+  }
+  
   // 右クリックイベントを監視
   document.addEventListener('contextmenu', handleRightClick);
   
@@ -293,7 +305,8 @@ function setupContextMenuEvents() {
     // Ctrl+Shift+S で設定を表示
     if (event.ctrlKey && event.shiftKey && event.key === 'S') {
       event.preventDefault();
-      showSettings();
+      // 設定表示関数を新しいものに変更
+      showSettingsInBubble();
     }
     
     // Esc で設定を閉じる
@@ -322,7 +335,7 @@ function handleRightClick(event) {
   
   // メニュー項目を定義
   const menuItems = [
-    { label: '設定を開く', action: showSettings },
+    { label: '設定を開く', action: showSettingsInBubble },
     { label: '吹き出しを非表示', action: hideBubble },
     { label: 'デバッグ情報', action: showDebugInfo }
   ];
@@ -391,6 +404,8 @@ function handleRightClick(event) {
 /**
  * 設定UIを表示する
  */
+/*
+// 古い設定UI表示関数 - 非推奨のため無効化
 async function showSettings() {
   // 既存の設定UIがあれば削除
   const existingSettings = document.querySelector('.paw-settings-container');
@@ -403,6 +418,7 @@ async function showSettings() {
   const settingsUI = await createTestSettingsUI();
   document.body.appendChild(settingsUI);
 }
+*/
 
 /**
  * デバッグ情報を表示する
@@ -419,4 +435,4 @@ function showDebugInfo() {
 setupContextMenuEvents(); 
 
 // 必要な関数をエクスポート
-export { createTestSettingsUI, showSettings, showDebugInfo }; 
+export { showDebugInfo }; 

@@ -159,9 +159,9 @@ export function showBubble(eventType = 'default', text) {
  * @param {string} text - 表示するテキスト
  */
 export function setText(text) {
-  if (!text) {
-    logError('setText: テキストが空です');
-    return;
+  if (!text || text.trim() === '') {
+    logError('setText: テキストが空です。フォールバックテキストを使用します');
+    text = '...'; // フォールバックメッセージを設定
   }
 
   logDebug(`テキスト設定開始: "${text}"`);
@@ -213,13 +213,20 @@ export function setText(text) {
   void textElement.offsetHeight;
   textElement.style.transform = 'scale(1.00001)';
   
+  // テキスト要素の表示を確保
+  textElement.style.cssText = `
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  `;
+  
   // 必要に応じて保険設定（Electron特有の問題対策）
   setTimeout(() => {
     if (textElement && textElement.textContent.trim() === '') {
       logZombieWarning('テキストが空です。強制再設定します');
       
       // データ属性から復元を試みる
-      const originalText = textElement.dataset.originalText || text;
+      const originalText = textElement.dataset.originalText || text || '...';
       
       // すべての方法で再設定
       textElement.textContent = originalText;
@@ -230,7 +237,7 @@ export function setText(text) {
       const originalDisplay = textElement.style.display;
       textElement.style.display = 'inline-block';
       void textElement.offsetHeight;
-      textElement.style.display = originalDisplay;
+      textElement.style.display = originalDisplay || 'block';
     }
   }, 0);
   

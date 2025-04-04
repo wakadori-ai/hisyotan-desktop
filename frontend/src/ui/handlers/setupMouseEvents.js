@@ -3,7 +3,7 @@
 
 import { logDebug } from '@core/logger.js';
 import { showRandomLine } from '@emotion/emotionHandler.js';
-import { createTestSettingsUI } from '@ui/paw-context-menu.js';
+import { showSettingsInBubble } from '@renderer/assistantUI.js';
 
 // マウス操作検出のための変数
 let mouseTimer;
@@ -185,16 +185,12 @@ function setupPawEvents() {
         window.speechManager.speakWithObject(settingSpeech);
       } catch (error) {
         logDebug(`設定UI表示エラー: ${error.message}`);
-        // フォールバック: 古い関数を使用
-        if (typeof createTestSettingsUI === 'function') {
-          createTestSettingsUI();
-        }
+        // 新しい設定UI関数を使用
+        showSettingsInBubble();
       }
-    } else if (typeof createTestSettingsUI === 'function') {
-      // バックアップ: 古い関数を使用
-      createTestSettingsUI();
     } else {
-      logDebug('設定UI機能が利用できません');
+      // 新しい設定UI関数を使用
+      showSettingsInBubble();
     }
   });
 }

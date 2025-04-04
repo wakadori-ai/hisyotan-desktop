@@ -9,3 +9,15 @@
 
 /* アニメーションのインポート */
 @import './animations/_keyframes.css'; 
+
+/* 全体の背景をうっすら白く透過させる */
+body, html {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#assistant-container {
+  background-color: rgba(255, 255, 255, 0) !important;
+} 
