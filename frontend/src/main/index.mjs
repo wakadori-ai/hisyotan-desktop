@@ -400,8 +400,26 @@ function createWindow() {
   const viteDevServerUrl = process.env.VITE_DEV_SERVER_URL;
   
   // preloadスクリプトのパスを解決
-  // ESモジュールパスを使用
-  const preloadPath = preloadPathFromEnv || fileURLToPath(new URL('../../../preload.js', import.meta.url));
+  let preloadPath;
+  
+  if (isDev) {
+    // 開発モードの場合は現在のディレクトリからの相対パス
+    preloadPath = fileURLToPath(new URL('../preload/preload.js', import.meta.url));
+  } else {
+    // 本番モードの場合はdistフォルダ内のファイル
+    preloadPath = fileURLToPath(new URL('../../../dist/preload.js', import.meta.url));
+  }
+  
+  // パスの存在確認
+  if (!fs.existsSync(preloadPath)) {
+    console.error(`❌ preloadパスが見つかりません: ${preloadPath}`);
+    // フォールバック
+    const fallbackPath = fileURLToPath(new URL('../../../dist/preload.js', import.meta.url));
+    if (fs.existsSync(fallbackPath)) {
+      console.log(`✅ フォールバックpreloadパスを使用します: ${fallbackPath}`);
+      preloadPath = fallbackPath;
+    }
+  }
   
   console.log(`プリロードスクリプトパス: ${preloadPath}`);
   console.log(`開発モード: ${isDev}, Vite URL: ${viteDevServerUrl || 'なし'}`);

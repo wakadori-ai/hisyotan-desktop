@@ -5,6 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>秘書たん呼び出しボタン</title>
     <link rel="stylesheet" href="styles/main.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: transparent !important;
+        }
+        .app-container {
+            width: auto;
+            height: auto;
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            background-color: transparent;
+            pointer-events: none;
+        }
+        /* ボタン要素を除いて全てのエリアは透過させる */
+        #paw-button, #quit-button, .speech-bubble, #assistantImage {
+            pointer-events: auto;
+        }
+    </style>
     <!-- speechManager.js をグローバルに利用できるようにするためのスクリプト -->
     <script type="module">
         import * as SpeechManagerModule from '../emotion/speechManager.js';
@@ -21,7 +42,7 @@
 <body>
     <div id="app" class="app-container">
         <div class="assistant-container">
-            <img id="assistantImage" src="/assets/images/secretary_normal.png" alt="秘書たん" />
+            <img id="assistantImage" class="assistant-image" src="/assets/images/secretary_normal.png" alt="秘書たん" />
             
             <div id="speechBubble" class="speech-bubble">
                 <span id="speechText">「こんにちは！何かお手伝いしましょうか？」</span>
@@ -125,16 +146,16 @@
         window.addEventListener('DOMContentLoaded', async () => {
             console.log('🐾 UI初期化完了');
             
-            // レイアウト調整関数を初期化と保存（一時的にコメントアウト）
+            // レイアウト調整関数を初期化と保存
             updateLayoutPositions = initLayoutPositions;
             
-            // 初期レイアウト設定（一時的にコメントアウト）
-            // updateLayoutPositions();
+            // 初期レイアウト設定
+            updateLayoutPositions();
             
-            // リサイズイベントのリスナーを設定（一時的にコメントアウト）
-            // window.addEventListener('resize', () => {
-            //     updateLayoutPositions();
-            // });
+            // リサイズイベントのリスナーを設定
+            window.addEventListener('resize', () => {
+                updateLayoutPositions();
+            });
             
             // 秘書たん画像を非表示に初期化
             const secretaryTan = document.getElementById('assistantImage');

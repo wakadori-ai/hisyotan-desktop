@@ -13,6 +13,8 @@ const __dirname = path.dirname(__filename);
 // 開発モードかどうかを判定
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const isDevCSP = process.env.ELECTRON_CSP_DEV === 'true';
+// デバッグモードを強制的に有効化
+const isDebugging = true; // 常にデバッグモードをオンにする
 
 // 環境変数からアプリ名を取得
 const appNameFromEnv = process.env.HISYOTAN_APP_NAME || null;
@@ -191,6 +193,52 @@ function setupIPC() {
       console.error('設定保存エラー:', error);
       return { success: false, error: error.message };
     }
+  });
+
+  // ファイル操作のIPC通信ハンドラ
+  // ファイル読み込み
+  ipcMain.handle('fs-read-file', async (event, filePath) => {
+    try {
+      const data = await fs.promises.readFile(filePath, 'utf8');
+      return { success: true, data };
+    } catch (error) {
+      console.error('ファイル読み込みエラー:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ファイル書き込み
+  ipcMain.handle('fs-write-file', async (event, filePath, data) => {
+    try {
+      await fs.promises.writeFile(filePath, data, 'utf8');
+      return { success: true };
+    } catch (error) {
+      console.error('ファイル書き込みエラー:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ファイル存在確認
+  ipcMain.handle('fs-exists', async (event, filePath) => {
+    try {
+      return fs.existsSync(filePath);
+    } catch (error) {
+      console.error('ファイル存在確認エラー:', error);
+      return false;
+    }
+  });
+
+  // path操作のIPC通信ハンドラ
+  ipcMain.handle('path-join', (event, ...args) => {
+    return path.join(...args);
+  });
+
+  ipcMain.handle('path-dirname', (event, p) => {
+    return path.dirname(p);
+  });
+
+  ipcMain.handle('path-basename', (event, p) => {
+    return path.basename(p);
   });
 
   // ウィンドウ位置設定
@@ -449,12 +497,28 @@ function createWindow() {
   // デバッグ用の別ウィンドウ設定
   const isDebugging = process.argv.includes('--debug');
   
-  // preload.jsのパスを決定
-  let preloadPath = preloadPathFromEnv 
-    ? path.resolve(__dirname, preloadPathFromEnv) 
-    : path.join(__dirname, 'preload.js');
+  // preload.jsのパスを修正
+  let preloadPath;
+  if (isDev) {
+    // 開発モードの場合はfrontend/src/main/preload/preload.jsを使用
+    preloadPath = path.join(__dirname, 'frontend', 'src', 'main', 'preload', 'preload.js');
+  } else {
+    // 本番モードの場合はdist/preload.jsを使用
+    preloadPath = path.join(__dirname, 'dist', 'preload.js');
+  }
   
-  console.log(`使用するpreloadパス: ${preloadPath}`);
+  // パスの存在確認
+  if (!fs.existsSync(preloadPath)) {
+    console.error(`❌ preloadパスが見つかりません: ${preloadPath}`);
+    // フォールバックとしてdistフォルダ内のpreload.jsを試す
+    const fallbackPath = path.join(__dirname, 'dist', 'preload.js');
+    if (fs.existsSync(fallbackPath)) {
+      console.log(`✅ フォールバックpreloadパスを使用します: ${fallbackPath}`);
+      preloadPath = fallbackPath;
+    }
+  }
+  
+  console.log(`🔧 使用するpreloadパス: ${preloadPath}`);
   
   mainWindow = new BrowserWindow({
     width: config.window.width || 400,
@@ -527,6 +591,7 @@ function createWindow() {
     // デバッグフラグがある場合は別ウィンドウでDevToolsを開く
     if (isDebugging) {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
+      console.log('🔍 開発者ツールを開きました');
     }
   } else {
     // 本番モードの場合、ファイルプロトコルでロードする前に少し待機して

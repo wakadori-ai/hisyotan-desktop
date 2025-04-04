@@ -78,9 +78,9 @@ body.mouse-active .assistant-image {
   background-color: #fff5e0 !important; /* より明るく不透明な背景 */
   border: 3px solid #8B4513 !important; /* 太く暗いボーダー */
   border-radius: 18px !important;
-  padding: 14px 18px !important;
+  padding: 14px 20px !important; /* 横パディングを増やす */
   margin-bottom: 20px !important;
-  max-width: 280px !important;
+  max-width: 350px !important; /* 幅を広げる */
   min-height: 60px !important;
   min-width: 200px !important; /* 最小幅を設定 */
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important; /* より強いシャドウ */
@@ -152,6 +152,7 @@ body.mouse-active .speech-bubble.show {
   font-weight: bold !important; /* 太字にする */
   line-height: 1.5 !important;
   letter-spacing: 0.03em !important;
+  word-break: break-word !important; /* 適切な改行 */
 }
 
 /* アニメーション */

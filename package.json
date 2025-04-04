@@ -2,7 +2,7 @@
   "name": "hisyotan-desktop",
   "version": "1.0.0",
   "description": "ふにゃ秘書たん - かわいいAI秘書アプリ",
-  "main": "main.js",
+  "main": "frontend/src/main/es-module-loader.cjs",
   "type": "module",
   "scripts": {
     "start": "electron .",

@@ -1,48 +1,19 @@
 // ESモジュールの代わりにCommonJSを使用
 const { contextBridge, ipcRenderer } = require('electron');
-const fs = require('fs');
 const path = require('path');
+const url = require('url');
 
-// __dirnameはCommonJSで直接使用可能
-const __dirname = __dirname;
+// デバッグログを追加
+console.log('🔍 preload.js が読み込まれました');
+console.log(`🔧 実行環境: ${process.env.NODE_ENV || 'production'}`);
+console.log(`📁 現在の作業ディレクトリ: ${process.cwd()}`);
 
-/**
- * CSSをメインプロセスに注入する関数（必要な場合に使用）
- */
-function injectCSS() {
-  try {
-    const distPath = path.join(__dirname, 'dist');
-    const assetsPath = path.join(distPath, 'assets');
-    
-    // assetsディレクトリが存在するか確認
-    if (fs.existsSync(assetsPath)) {
-      // CSSファイルを検索
-      const files = fs.readdirSync(assetsPath);
-      const cssFile = files.find(file => file.endsWith('.css'));
-      
-      if (cssFile) {
-        console.log(`🎨 CSSファイルを発見: ${cssFile}`);
-        const cssContent = fs.readFileSync(path.join(assetsPath, cssFile), 'utf8');
-        
-        // レンダラープロセスに後からCSSを注入するための準備
-        contextBridge.exposeInMainWorld('cssInjector', {
-          getCssContent: () => cssContent
-        });
-        
-        return true;
-      }
-    }
-    
-    console.log('❌ CSSファイルが見つかりませんでした');
-    return false;
-  } catch (error) {
-    console.error('CSS注入エラー:', error);
-    return false;
-  }
-}
+// ESモジュール互換の__dirname定義
+const __dirname = process.env.NODE_ENV === 'development' 
+  ? path.resolve(process.cwd())
+  : path.dirname(process.execPath);
 
-// CSS注入処理を実行
-injectCSS();
+console.log(`📂 __dirnameの値: ${__dirname}`);
 
 // Electronの機能をブラウザウィンドウで使えるようにする
 contextBridge.exposeInMainWorld('electron', {
@@ -58,15 +29,16 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.once(channel, (event, ...args) => func(...args));
     }
   },
+  // ファイル操作はメインプロセス経由で実行するように修正
   fs: {
-    readFile: (path) => fs.readFileSync(path, 'utf8'),
-    writeFile: (path, data) => fs.writeFileSync(path, data, 'utf8'),
-    exists: (path) => fs.existsSync(path)
+    readFile: (path) => ipcRenderer.invoke('fs-read-file', path),
+    writeFile: (path, data) => ipcRenderer.invoke('fs-write-file', path, data),
+    exists: (path) => ipcRenderer.invoke('fs-exists', path)
   },
   path: {
-    join: (...args) => path.join(...args),
-    dirname: (p) => path.dirname(p),
-    basename: (p) => path.basename(p)
+    join: (...args) => ipcRenderer.invoke('path-join', ...args),
+    dirname: (p) => ipcRenderer.invoke('path-dirname', p),
+    basename: (p) => ipcRenderer.invoke('path-basename', p)
   },
   platform: process.platform,
   showYesNoDialog: (message) => ipcRenderer.invoke('show-yes-no-dialog', message),

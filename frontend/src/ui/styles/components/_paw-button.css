@@ -8,72 +8,61 @@
 
 /* 肉球アイコン */
 .paw-icon {
-  font-size: 38px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1000;
+  font-size: 30px;
+  color: rgba(255, 120, 160, 0.9);
   pointer-events: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  opacity: 0.9;
-  animation: 
-    floaty 3s ease-in-out infinite,
-    fuwafuwa 2s ease-in-out infinite;
-  filter: 
-    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2))
-    drop-shadow(0 0 8px rgba(255, 192, 203, 0.6));
-  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 2px 3px rgba(255, 255, 255, 0.7);
+  animation: pulsePaw 3s ease-in-out infinite;
 }
 
 /* 肉球ボタンの背景 */
 .paw-background {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 60px;
-  height: 60px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
-  background: rgba(80, 20, 80, 0.15);
-  backdrop-filter: blur(2px);
-  box-shadow: 0 0 15px rgba(255, 192, 203, 0.3);
-  transition: all 0.3s ease;
+  background: radial-gradient(circle, rgba(255, 230, 240, 0.8) 0%, rgba(255, 200, 220, 0) 70%);
   z-index: 998;
+  pointer-events: none;
+  opacity: 0.7;
+  animation: pulseBg 4s ease-in-out infinite;
 }
 
 /* 肉球ボタン */
 #paw-button {
-  width: 64px;
-  height: 64px;
   position: relative;
-  z-index: 999;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #ffd1e0, #ffb6c9);
+  box-shadow: 0 4px 10px rgba(255, 150, 180, 0.4),
+              inset 0 -2px 5px rgba(255, 120, 160, 0.2),
+              inset 0 2px 5px rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  z-index: 999;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: floatPaw 4s ease-in-out infinite;
 }
 
 /* ホバー時のスタイル */
-#paw-button:hover .paw-icon {
-  transform: translate(-50%, -50%) scale(1.2);
-  opacity: 1;
-  filter: 
-    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25))
-    drop-shadow(0 0 12px rgba(255, 192, 203, 0.9))
-    drop-shadow(0 0 5px white);
-  animation-play-state: paused;
+#paw-button:hover {
+  transform: scale(1.1) translateY(-5px);
+  box-shadow: 0 8px 20px rgba(255, 150, 180, 0.6),
+              inset 0 -2px 5px rgba(255, 120, 160, 0.2),
+              inset 0 2px 5px rgba(255, 255, 255, 0.7);
 }
 
-#paw-button:hover .paw-background {
-  width: 70px;
-  height: 70px;
-  background: rgba(100, 30, 100, 0.2);
-  box-shadow: 0 0 20px rgba(255, 192, 203, 0.5);
-}
-
-#paw-button:active .paw-icon {
-  transform: translate(-50%, -50%) scale(0.9);
-  filter: drop-shadow(0 0 15px rgba(255, 130, 180, 1));
+/* クリック時のスタイル */
+#paw-button:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 10px rgba(255, 150, 180, 0.3),
+              inset 0 -1px 3px rgba(255, 120, 160, 0.1),
+              inset 0 1px 3px rgba(255, 255, 255, 0.5);
 }
 
 /* 終了ボタン */
@@ -149,12 +138,20 @@
   visibility: visible;
 }
 
-/* ふわふわアニメーション */
-@keyframes fuwafuwa {
-  0%, 100% {
-    transform: translate(-50%, -50%) rotate(-3deg);
-  }
-  50% {
-    transform: translate(-50%, -50%) rotate(3deg);
-  }
+/* 肉球ふわふわアニメーション */
+@keyframes floatPaw {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* 肉球の鼓動アニメーション */
+@keyframes pulsePaw {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* 背景の輝きアニメーション */
+@keyframes pulseBg {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 0.8; }
 } 
