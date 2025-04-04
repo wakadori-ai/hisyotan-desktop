@@ -1,5 +1,5 @@
 /**
- * uiHelper.js
+ * assistantUI.js
  * UI操作関連の機能を集約したヘルパーモジュール
  */
 
@@ -17,7 +17,7 @@ let assistantImage;
  * UI要素の初期化
  */
 export function initUIElements() {
-  console.log('🌸 uiHelper: UI要素を初期化します');
+  console.log('🌸 assistantUI: UI要素を初期化します');
   
   // 肉球UIの要素を取得
   pawButton = document.getElementById('paw-button');
@@ -190,7 +190,7 @@ export function initUIElements() {
     console.error('❌ assistantImageが見つかりません');
   }
   
-  console.log('✨ uiHelper: UI要素の初期化が完了しました');
+  console.log('✨ assistantUI: UI要素の初期化が完了しました');
 }
 
 /**
