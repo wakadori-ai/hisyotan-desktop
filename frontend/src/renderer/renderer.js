@@ -12,6 +12,7 @@ console.log('✅ styles.cssの読み込み完了');
 // ヘルパーモジュールをインポート
 import * as uiHelper from './uiHelper.js';
 import apiClient from '../core/apiClient.js';
+import speechManager from '../emotion/speechManager.js';
 
 // デバッグ情報
 console.log('🌸 renderer.js が読み込まれました');
@@ -21,13 +22,38 @@ console.log('📁 現在の実行パス:', import.meta.env.BASE_URL);
 // グローバルアクセス用に設定
 window.uiHelper = uiHelper;
 window.settingsApi = apiClient;
+window.speechManager = speechManager;
+console.log('🎤 SpeechManager をグローバルに登録しました');
 
 // DOM構築後の初期化
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('🌟 UIの初期化を開始します');
   
   // UIを生成
   uiHelper.createUI();
+  
+  // 設定読み込み
+  try {
+    const config = await apiClient.getSettings();
+    console.log('⚙️ 設定をロードしました', config);
+
+    // SpeechManagerに設定をセット
+    if (window.speechManager) {
+      speechManager.setConfig(config.settings);
+      console.log('🎤 SpeechManagerに設定をセットしました');
+      
+      // VOICEVOX接続確認
+      speechManager.checkVoicevoxConnection()
+        .then(connected => {
+          console.log(`🎙️ VOICEVOX接続確認結果: ${connected ? '接続成功' : '接続失敗'}`);
+        })
+        .catch(err => {
+          console.error('🎙️ VOICEVOX接続確認エラー:', err);
+        });
+    }
+  } catch (error) {
+    console.error('⚠️ 設定のロードに失敗しました:', error);
+  }
   
   // 歓迎メッセージを表示
   uiHelper.showBubble('default');
@@ -80,5 +106,6 @@ console.log(`🔧 現在の実行環境: ${import.meta.env.MODE}`);
 // エクスポート
 export default {
   uiHelper,
-  apiClient
+  apiClient,
+  speechManager
 }; 

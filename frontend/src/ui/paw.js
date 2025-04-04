@@ -9,6 +9,7 @@
 
 import { createTestSettingsUI, hideBubble } from './paw-context-menu.js';
 import apiClient from '@core/apiClient.js';
+import { setupMouseEventHandling } from './handlers/setupMouseEvents.js';
 
 // デバッグ情報
 console.log('🌸 paw.js が読み込まれました');
@@ -28,37 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const appDiv = document.getElementById('app');
   if (appDiv) {
     appDiv.innerHTML = `
-      <div class="paw-button-wrapper">
-        <div id="paw-button">🐾</div>
-        <div class="paw-background"></div>
+      <div class="paw-button-wrapper draggable">
+        <div id="paw-button" class="draggable nodrag">🐾</div>
+        <div class="paw-background draggable"></div>
       </div>
-      <div id="quit-button">×</div>
-      <div class="quit-bubble">アプリを終了しますか？</div>
-      <div id="speechBubble" class="speech-bubble">
+      <div id="quit-button" class="nodrag">×</div>
+      <div class="quit-bubble nodrag">アプリを終了しますか？</div>
+      <div id="speechBubble" class="speech-bubble draggable">
         <div id="speechText" class="speech-text">「こんにちは！何かお手伝いしましょうか？」</div>
-        <img id="assistantImage" class="assistant-image" src="/assets/secretary.png" alt="秘書たん">
+        <img id="assistantImage" class="assistant-image draggable" src="/assets/secretary.png" alt="秘書たん">
       </div>
     `;
     
-    // 終了ボタンのイベント設定
-    const quitButton = document.getElementById('quit-button');
-    if (quitButton) {
-      quitButton.addEventListener('click', () => {
-        if (window.electron && window.electron.ipcRenderer) {
-          window.electron.ipcRenderer.send('quit-app');
-        } else {
-          console.error('Electron IPCが利用できません');
-        }
-      });
-    }
+    // マウスイベント処理のセットアップ
+    setupMouseEventHandling();
     
-    // 肉球ボタンのイベント設定
-    const pawButton = document.getElementById('paw-button');
-    if (pawButton) {
-      pawButton.addEventListener('click', async () => {
-        await createTestSettingsUI();
-      });
-    }
+    console.log('🐾 マウスイベント処理がセットアップされました');
   }
 });
 

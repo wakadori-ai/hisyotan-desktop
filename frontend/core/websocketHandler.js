@@ -1,7 +1,7 @@
 // websocketHandler.js
 // WebSocket接続管理用のモジュール
 
-import { logDebug, logError, logZombieWarning } from '../core/logger.js';
+import { logDebug, logError, logZombieWarning } from '@core/logger.js';
 import { showError, shouldShowError } from '../ui/uiHelper.js';
 import { updateConnectionStatus } from '../ui/uiHelper.js';
 import { speak, speakWithPreset } from '../emotion/speechManager.js';

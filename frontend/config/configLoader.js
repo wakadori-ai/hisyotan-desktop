@@ -1,7 +1,7 @@
 // configLoader.js
 // 設定読み込み用のモジュール
 
-import { logDebug, logError } from '../core/logger.js';
+import { logDebug, logError } from '@core/logger.js';
 import { showError } from '../ui/uiHelper.js';
 
 // デフォルト設定

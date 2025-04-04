@@ -1,7 +1,7 @@
 // expressionManager.js
 // 表情変更・アニメーション制御用のモジュール
 
-import { logDebug } from '../core/logger.js';
+import { logDebug } from '@core/logger.js';
 
 // DOM要素
 let assistantImage;

@@ -1,7 +1,7 @@
 // emotionHandler.js
 // 感情反応・ランダムメッセージ生成用のモジュール
 
-import { logDebug } from '../core/logger.js';
+import { logDebug } from '@core/logger.js';
 import { speak } from '../emotion/speechManager.js';
 import { reactWithVoice } from '../voice/audioReactor.js';
 

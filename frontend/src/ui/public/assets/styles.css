@@ -29,7 +29,64 @@ body, html {
   width: 100vw;
   height: 100vh;
   position: relative;
-  -webkit-app-region: drag; /* ウィンドウのドラッグを有効にする */
+}
+
+/* ドラッグ可能領域の設定 */
+.draggable {
+  -webkit-app-region: drag;
+}
+
+/* ドラッグ不可領域の設定（インタラクティブ要素用） */
+.nodrag {
+  -webkit-app-region: no-drag !important;
+}
+
+/* 肉球ボタンのスタイル */
+#paw-button {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  width: 40px;
+  height: 40px;
+  background-color: #ffcccb;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+#paw-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 閉じるボタンのスタイル */
+#quit-button {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  background-color: #ffe0e0;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+#quit-button:hover {
+  background-color: #ffaaaa;
+  color: #fff;
 }
 
 .assistant-container {
@@ -88,7 +145,6 @@ body.mouse-active .assistant-image {
   display: none;
   align-items: center !important;
   pointer-events: auto !important; /* 吹き出しだけはクリック可能に */
-  -webkit-app-region: no-drag !important;
   transition: opacity 0.3s ease, visibility 0.3s ease !important;
 }
 

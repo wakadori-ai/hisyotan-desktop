@@ -53,17 +53,38 @@ export function initUIElements() {
       // クールタイム更新
       lastClickTime = currentTime;
       
-      // ランダムセリフ表示
+      // ランダムセリフ表示（マルチレベルフォールバック付き）
       if (window.electron && window.electron.ipcRenderer) {
-        window.electron.ipcRenderer.invoke('show-random-message')
-          .then(message => {
-            if (message) {
-              console.log(`🗨️ ランダムメッセージ: ${message}`);
-            }
-          })
-          .catch(err => {
-            console.error('ランダムメッセージ表示エラー:', err);
-          });
+        try {
+          // 第1手段: send (より確実なのでsendを先に試す)
+          console.log('🔄 sendメソッドでランダムメッセージを要求します');
+          window.electron.ipcRenderer.send('show-random-message');
+          
+          // 保険としてローカルのメッセージも表示（並行処理）
+          setTimeout(() => {
+            const messages = [
+              'こんにちは！何かお手伝いしましょうか？',
+              'お疲れ様です！休憩も大切ですよ✨',
+              '何か質問があればいつでも声をかけてくださいね',
+              'お仕事頑張ってますね！素敵です',
+              'リラックスタイムも必要ですよ〜',
+              'デスクの整理、手伝いましょうか？'
+            ];
+            
+            const randomIndex = Math.floor(Math.random() * messages.length);
+            const message = messages[randomIndex];
+            
+            showBubble('default', message);
+          }, 200);
+        } catch (error) {
+          // エラー発生時は直接メッセージを表示
+          console.error('IPC呼び出しエラー:', error);
+          showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
+        }
+      } else {
+        // electronが使用できない場合は直接メッセージを表示
+        console.warn('electron IPCが利用できません。直接メッセージを表示します');
+        showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
       }
     });
     
@@ -74,46 +95,11 @@ export function initUIElements() {
       createTestSettingsUI();
     });
     
-    // 左ドラッグ - ウィンドウ移動
+    // 左ドラッグ - ウィンドウ移動（シンプル版）
     pawButton.addEventListener('mousedown', (event) => {
       if (event.button === 0) { // 左クリック
-        // マウスの移動距離を計測するための初期位置
-        const startX = event.clientX;
-        const startY = event.clientY;
-        
-        // マウスムーブイベント
-        const handleMouseMove = (moveEvent) => {
-          // 少し動いたらドラッグと判定
-          const deltaX = Math.abs(moveEvent.clientX - startX);
-          const deltaY = Math.abs(moveEvent.clientY - startY);
-          
-          if (deltaX > 5 || deltaY > 5) {
-            // ドラッグと判定
-            window._wasDragging = true;
-            
-            // ウィンドウドラッグ開始
-            if (window.electron && window.electron.ipcRenderer) {
-              window.electron.ipcRenderer.invoke('start-window-drag')
-                .catch(err => {
-                  console.error('ウィンドウドラッグエラー:', err);
-                });
-            }
-            
-            // イベントリスナーを削除
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-          }
-        };
-        
-        // マウスアップイベント
-        const handleMouseUp = () => {
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        };
-        
-        // イベントリスナーを追加
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        // ドラッグ処理
+        directWindowDragHandler(event);
       }
     });
   } else {
@@ -125,13 +111,40 @@ export function initUIElements() {
     console.log('🚪 quitButtonにイベントリスナーを設定します');
     quitButton.addEventListener('click', () => {
       console.log('🚪 終了ボタンがクリックされました');
+      
+      // マルチレベルフォールバック
       if (window.electron && window.electron.ipcRenderer) {
-        window.electron.ipcRenderer.invoke('quit-app')
-          .catch(err => {
-            console.error('アプリ終了エラー:', err);
-          });
+        try {
+          // 第1手段: send（より確実）
+          console.log('🔄 sendメソッドでアプリ終了を要求します');
+          window.electron.ipcRenderer.send('quit-app');
+          
+          // 保険として少し待ってからinvokeも試す
+          setTimeout(() => {
+            try {
+              console.log('🔄 invokeメソッドでアプリ終了を要求します');
+              window.electron.ipcRenderer.invoke('quit-app')
+                .catch(err => {
+                  console.error('アプリ終了エラー:', err);
+                  // 最終手段
+                  console.log('🔄 window.closeでウィンドウを閉じます');
+                  window.close();
+                });
+            } catch (invokeErr) {
+              console.error('invoke呼び出しエラー:', invokeErr);
+              // 最終手段
+              window.close();
+            }
+          }, 300);
+        } catch (error) {
+          // エラー発生時はwindow.close()
+          console.error('IPC呼び出しエラー:', error);
+          window.close();
+        }
       } else {
-        console.error('Electron IPCが利用できません');
+        // electronが使用できない場合はwindow.close()
+        console.warn('electron IPCが利用できません。window.closeを使用します');
+        window.close();
       }
     });
   } else {
@@ -146,40 +159,8 @@ export function initUIElements() {
       if (event.button === 0) { // 左クリック
         console.log(`🖱️ ${element.id}で左ドラッグ開始`);
         
-        // マウスの移動距離を計測するための初期位置
-        const startX = event.clientX;
-        const startY = event.clientY;
-        
-        // マウスムーブイベント
-        const handleMouseMove = (moveEvent) => {
-          // 少し動いたらドラッグと判定
-          const deltaX = Math.abs(moveEvent.clientX - startX);
-          const deltaY = Math.abs(moveEvent.clientY - startY);
-          
-          if (deltaX > 5 || deltaY > 5) {
-            // ウィンドウドラッグ開始
-            if (window.electron && window.electron.ipcRenderer) {
-              window.electron.ipcRenderer.invoke('start-window-drag')
-                .catch(err => {
-                  console.error('ウィンドウドラッグエラー:', err);
-                });
-            }
-            
-            // イベントリスナーを削除
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-          }
-        };
-        
-        // マウスアップイベント
-        const handleMouseUp = () => {
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        };
-        
-        // イベントリスナーを追加
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        // ドラッグ処理
+        directWindowDragHandler(event);
       }
     });
   };
@@ -198,6 +179,97 @@ export function initUIElements() {
   }
   
   console.log('✨ uiHelper: UI要素の初期化が完了しました');
+}
+
+/**
+ * ウィンドウドラッグを直接処理するハンドラ
+ * @param {MouseEvent} initialEvent - マウスダウンイベント
+ */
+function directWindowDragHandler(initialEvent) {
+  // 初期位置を保存
+  const startX = initialEvent.clientX;
+  const startY = initialEvent.clientY;
+  
+  // マウスがどれだけ動いたかを追跡
+  let isDragging = false;
+  let moveCount = 0;
+  
+  // マウスムーブイベント
+  const handleMouseMove = (moveEvent) => {
+    // 少し動いたらドラッグと判定
+    const deltaX = Math.abs(moveEvent.clientX - startX);
+    const deltaY = Math.abs(moveEvent.clientY - startY);
+    
+    if (deltaX > 5 || deltaY > 5) {
+      // ドラッグと判定
+      isDragging = true;
+      window._wasDragging = true;
+      moveCount++;
+      
+      // 試行回数を制限（最大5回）
+      if (moveCount > 5) {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        return;
+      }
+      
+      // ドラッグ処理の多段フォールバック
+      // 1. ipcRenderer.sendを先に試す
+      if (window.electron && window.electron.ipcRenderer) {
+        try {
+          console.log('🔄 sendメソッドでウィンドウドラッグを開始します');
+          window.electron.ipcRenderer.send('start-window-drag');
+          
+          // 成功したと仮定してイベントリスナーを削除
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        } catch (error) {
+          console.error('IPC呼び出しエラー:', error);
+          
+          // 2. invoke方式を試す
+          try {
+            window.electron.ipcRenderer.invoke('start-window-drag')
+              .then(() => {
+                // 成功したらイベントリスナーを削除
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              })
+              .catch(err => {
+                console.error('ウィンドウドラッグエラー:', err);
+              });
+          } catch (invokeError) {
+            console.error('invoke呼び出しエラー:', invokeError);
+            
+            // 3. 最後の手段 - 直接メッセージを表示
+            console.log('⚠️ ドラッグ機能が利用できません');
+            showBubble('warning', 'ドラッグ機能が利用できません');
+          }
+        }
+      } else {
+        console.warn('electron IPCが利用できません');
+        showBubble('warning', 'ドラッグ機能が利用できません');
+        
+        // イベントリスナーを削除
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      }
+    }
+  };
+  
+  // マウスアップイベント
+  const handleMouseUp = () => {
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    
+    // クリックとして処理するなら
+    if (!isDragging && initialEvent.target && typeof initialEvent.target.click === 'function') {
+      // クリックイベントを発火させない
+    }
+  };
+  
+  // イベントリスナーを追加
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
 }
 
 /**

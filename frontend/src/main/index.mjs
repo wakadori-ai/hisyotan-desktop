@@ -2,6 +2,25 @@
  * ふにゃ秘書たんデスクトップアプリのメインプロセス
  * Electronの起動と統合UIの管理を行います
  */
+
+// 日本語コンソール出力のために文字コードを設定
+if (process.platform === 'win32') {
+  process.env.CHCP = '65001'; // UTF-8に設定
+  
+  // コマンドプロンプトのコードページをUTF-8に設定
+  try {
+    // child_processをESM形式でインポート
+    import('child_process').then(({ execSync }) => {
+      execSync('chcp 65001');
+      console.log('🌸 コンソール出力の文字コードをUTF-8に設定しました');
+    }).catch(e => {
+      console.error('❌ コードページの設定に失敗しました:', e);
+    });
+  } catch (e) {
+    console.error('❌ 文字コード設定エラー:', e);
+  }
+}
+
 import { app, BrowserWindow, ipcMain, shell, session } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -197,7 +216,191 @@ function setupIPC() {
       return { success: false, error: error.message };
     }
   });
-
+  
+  // ウィンドウドラッグ開始 - handle版
+  ipcMain.handle('start-window-drag', () => {
+    console.log('💫 ウィンドウドラッグ開始（handle）');
+    if (mainWindow) {
+      mainWindow.webContents.send('window-is-being-dragged');
+      mainWindow.startWindowDrag();
+      return true;
+    }
+    return false;
+  });
+  
+  // ウィンドウドラッグ開始 - on版
+  ipcMain.on('start-window-drag', () => {
+    console.log('💫 ウィンドウドラッグ開始（on）');
+    if (mainWindow) {
+      mainWindow.webContents.send('window-is-being-dragged');
+      mainWindow.startWindowDrag();
+    }
+  });
+  
+  // ランダムメッセージ表示 - handle版
+  ipcMain.handle('show-random-message', () => {
+    console.log('💬 ランダムメッセージ表示（handle）');
+    const messages = [
+      'こんにちは！何かお手伝いしましょうか？',
+      'お疲れ様です！休憩も大切ですよ✨',
+      '何か質問があればいつでも声をかけてくださいね',
+      'お仕事頑張ってますね！素敵です',
+      'リラックスタイムも必要ですよ〜',
+      'デスクの整理、手伝いましょうか？',
+      '今日も一日頑張りましょう！',
+      'ちょっと休憩しませんか？',
+      '何か飲み物でもいかがですか？',
+      'どんなことでもお手伝いしますよ'
+    ];
+    
+    const randomIndex = Math.floor(Math.random() * messages.length);
+    const message = messages[randomIndex];
+    
+    if (mainWindow) {
+      mainWindow.webContents.send('speech-manager-operation', {
+        method: 'speak',
+        args: [message, 'normal', 5000, false, 'default', null]
+      });
+      return message;
+    }
+    return null;
+  });
+  
+  // ランダムメッセージ表示 - on版
+  ipcMain.on('show-random-message', () => {
+    console.log('💬 ランダムメッセージ表示（on）');
+    const messages = [
+      'こんにちは！何かお手伝いしましょうか？',
+      'お疲れ様です！休憩も大切ですよ✨',
+      '何か質問があればいつでも声をかけてくださいね',
+      'お仕事頑張ってますね！素敵です',
+      'リラックスタイムも必要ですよ〜',
+      'デスクの整理、手伝いましょうか？',
+      '今日も一日頑張りましょう！',
+      'ちょっと休憩しませんか？',
+      '何か飲み物でもいかがですか？',
+      'どんなことでもお手伝いしますよ'
+    ];
+    
+    const randomIndex = Math.floor(Math.random() * messages.length);
+    const message = messages[randomIndex];
+    
+    if (mainWindow) {
+      mainWindow.webContents.send('speech-manager-operation', {
+        method: 'speak',
+        args: [message, 'normal', 5000, false, 'default', null]
+      });
+    }
+  });
+  
+  // アプリ終了 - handle版
+  ipcMain.handle('quit-app', () => {
+    console.log('🚪 アプリケーション終了を要求（handle）');
+    
+    try {
+      // バックエンドプロセスを確実に終了
+      if (backendProcess) {
+        try {
+          console.log('バックエンドプロセスを終了します...');
+          process.kill(backendProcess.pid);
+        } catch (error) {
+          console.error('バックエンドプロセス終了エラー:', error);
+        }
+      }
+      
+      // PowerShellスクリプトを実行して全プロセスを確実に終了
+      try {
+        const scriptPath = fileURLToPath(new URL('../../../tools/stop_hisyotan.ps1', import.meta.url));
+        console.log(`終了スクリプトを実行: ${scriptPath}`);
+        
+        // スクリプト実行を同期的に行う
+        exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+          if (error) {
+            console.error('終了スクリプトエラー:', error);
+          } else {
+            console.log('終了スクリプト出力:', stdout);
+          }
+          
+          // 関連プロセスを強制終了
+          try {
+            // VOICEVOXエンジンなど関連プロセスの終了を試みる
+            exec('taskkill /F /IM voicevox_engine.exe', () => {});
+            exec('taskkill /F /IM python.exe', () => {});
+            
+            // 少し待ってからアプリを終了
+            setTimeout(() => {
+              app.exit(0);
+            }, 500);
+          } catch (killError) {
+            console.error('プロセス強制終了エラー:', killError);
+            app.exit(0);
+          }
+        });
+      } catch (error) {
+        console.error('終了処理エラー:', error);
+        app.exit(0);
+      }
+    } catch (e) {
+      console.error('終了処理中の予期せぬエラー:', e);
+      app.exit(0);
+    }
+    
+    return true;
+  });
+  
+  // アプリ終了 - on版
+  ipcMain.on('quit-app', () => {
+    console.log('🚪 アプリケーション終了を要求（on）');
+    
+    try {
+      // バックエンドプロセスを確実に終了
+      if (backendProcess) {
+        try {
+          console.log('バックエンドプロセスを終了します...');
+          process.kill(backendProcess.pid);
+        } catch (error) {
+          console.error('バックエンドプロセス終了エラー:', error);
+        }
+      }
+      
+      // PowerShellスクリプトを実行して全プロセスを確実に終了
+      try {
+        const scriptPath = fileURLToPath(new URL('../../../tools/stop_hisyotan.ps1', import.meta.url));
+        console.log(`終了スクリプトを実行: ${scriptPath}`);
+        
+        // スクリプト実行を同期的に行う
+        exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
+          if (error) {
+            console.error('終了スクリプトエラー:', error);
+          } else {
+            console.log('終了スクリプト出力:', stdout);
+          }
+          
+          // 関連プロセスを強制終了
+          try {
+            // VOICEVOXエンジンなど関連プロセスの終了を試みる
+            exec('taskkill /F /IM voicevox_engine.exe', () => {});
+            exec('taskkill /F /IM python.exe', () => {});
+            
+            // 少し待ってからアプリを終了
+            setTimeout(() => {
+              app.exit(0);
+            }, 500);
+          } catch (killError) {
+            console.error('プロセス強制終了エラー:', killError);
+            app.exit(0);
+          }
+        });
+      } catch (error) {
+        console.error('終了処理エラー:', error);
+        app.exit(0);
+      }
+    } catch (e) {
+      console.error('終了処理中の予期せぬエラー:', e);
+      app.exit(0);
+    }
+  });
+  
   // ウィンドウ位置設定
   ipcMain.handle('set-window-position', (event, x, y) => {
     if (mainWindow) {
@@ -241,11 +444,6 @@ function setupIPC() {
       console.error('音声合成リクエストエラー:', error);
       return { success: false, error: error.message };
     }
-  });
-  
-  // アプリ終了
-  ipcMain.handle('quit-app', () => {
-    app.quit();
   });
   
   // 画像パス解決

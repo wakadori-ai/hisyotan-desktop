@@ -4,6 +4,9 @@
 // スタイルシートをインポート
 // import '@ui/styles.css';
 
+// 肉球UIをインポート（重要：これがないとpaw.jsが読み込まれない）
+import './paw.js';
+
 // コア機能のインポート
 import { logDebug, logError, saveErrorLog } from '@core/logger.js';
 import { loadConfig } from '@config/configLoader.js';
