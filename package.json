@@ -8,8 +8,8 @@
     "dev": "vite --port 5173",
     "dev:frontend": "vite --port 5173 --host",
     "dev:backend": "cross-env DEBUG_MODE=true python -m uvicorn backend.main:app --reload --port 8000 --reload-exclude node_modules",
-    "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173/ ELECTRON_CSP_DEV=true node copy-preload.mjs && electron .",
-    "dev:all": "concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\" \"wait-on http://localhost:8000 && wait-on http://localhost:5173 && pnpm run dev:electron\"",
+    "dev:electron": "node scripts/dev-electron.js",
+    "dev:all": "pnpm run dev:electron",
     "build": "vite build && node copy-preload.mjs",
     "build:electron": "vite build && node copy-preload.mjs && electron-builder",
     "pack": "vite build && node copy-preload.mjs && electron-builder --dir",
@@ -35,6 +35,7 @@
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
     "electron-builder": "^24.9.1",
+    "tree-kill": "^1.2.2",
     "vite": "^6.2.4",
     "wait-on": "^8.0.3"
   },
