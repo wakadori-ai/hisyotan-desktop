@@ -34,7 +34,7 @@ export default defineConfig({
     alias: {
       '@core': resolve(__dirname, 'frontend/src/core'),
       '@ui': resolve(__dirname, 'frontend/src/ui'),
-      '@emotion': resolve(__dirname, 'frontend/emotion'),
+      '@emotion': resolve(__dirname, 'frontend/src/emotion'),
       '@assets': resolve(__dirname, 'frontend/ui/public/assets'),
       '@config': resolve(__dirname, 'frontend/config'),
       '@voice': resolve(__dirname, 'frontend/voice')
