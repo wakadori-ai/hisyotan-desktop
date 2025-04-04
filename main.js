@@ -6,8 +6,9 @@
 
 const path = require('path');
 const { app } = require('electron');
-const { execSync } = require('child_process');
+const { execSync, exec } = require('child_process');
 const { ipcMain } = require('electron');
+const fs = require('fs');
 
 // Windows環境での日本語コンソール出力のために文字コードを設定
 if (process.platform === 'win32') {
@@ -27,6 +28,40 @@ console.log('🌸 main.js: CommonJSエントリーポイントが読み込まれ
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 console.log(`🔧 実行モード: ${isDev ? '開発' : '本番'}`);
 
+// 子プロセスのPIDを記録する変数
+let backendPID = null;
+
+// バックエンドプロセスのPIDを保存する関数
+function saveBackendPID(pid) {
+  // PIDファイルを作成・更新
+  const pidFilePath = path.join(__dirname, 'backend_pid.txt');
+  try {
+    fs.writeFileSync(pidFilePath, pid.toString(), 'utf8');
+    console.log(`✅ バックエンドプロセスのPID(${pid})を保存しました: ${pidFilePath}`);
+    backendPID = pid;
+    return true;
+  } catch (error) {
+    console.error('❌ バックエンドプロセスPIDの保存に失敗:', error);
+    return false;
+  }
+}
+
+// バックエンドプロセスのPIDを読み込む関数
+function loadBackendPID() {
+  const pidFilePath = path.join(__dirname, 'backend_pid.txt');
+  try {
+    if (fs.existsSync(pidFilePath)) {
+      const pid = parseInt(fs.readFileSync(pidFilePath, 'utf8').trim(), 10);
+      console.log(`📋 保存されたバックエンドプロセスPID: ${pid}`);
+      backendPID = pid;
+      return pid;
+    }
+  } catch (error) {
+    console.error('❌ バックエンドプロセスPIDの読み込みに失敗:', error);
+  }
+  return null;
+}
+
 // ESモジュールへのブリッジ
 try {
   // 実行環境のパスを解決
@@ -35,6 +70,9 @@ try {
   const moduleUrl = `file://${modulePath.replace(/\\/g, '/')}`;
   
   console.log(`🔄 ESモジュールをロードします: ${moduleUrl}`);
+  
+  // PIDファイルがあれば読み込む
+  loadBackendPID();
   
   // 動的importでESモジュールを読み込む
   import(moduleUrl).catch(err => {
@@ -76,9 +114,83 @@ async function shutdownBackend(force = false) {
   }
 }
 
+// バックエンドプロセスを強制終了する関数（PID指定）
+function forceKillBackendProcess() {
+  // 保存されたPIDを使用
+  const pid = backendPID || loadBackendPID();
+  
+  if (!pid) {
+    console.warn('⚠️ バックエンドプロセスのPIDが不明です。強制終了できません。');
+    return false;
+  }
+  
+  console.log(`🔥 バックエンドプロセス(PID: ${pid})を強制終了します...`);
+  
+  try {
+    if (process.platform === 'win32') {
+      // Windowsの場合はtaskkillコマンドを使用
+      execSync(`taskkill /F /PID ${pid}`);
+      console.log(`✅ バックエンドプロセス(PID: ${pid})の強制終了に成功しました`);
+      return true;
+    } else {
+      // Linux/Macの場合はkillコマンドを使用
+      execSync(`kill -9 ${pid}`);
+      console.log(`✅ バックエンドプロセス(PID: ${pid})の強制終了に成功しました`);
+      return true;
+    }
+  } catch (error) {
+    console.error(`❌ バックエンドプロセス(PID: ${pid})の強制終了に失敗:`, error);
+    return false;
+  }
+}
+
+// 複数の方法でPythonプロセスを終了させる関数
+async function killPythonProcesses() {
+  console.log('🔄 複数の方法でPythonプロセスの終了を試みます...');
+  
+  // 1. 保存されたPIDを使用した強制終了
+  forceKillBackendProcess();
+  
+  // 2. taskkillコマンドを使用してPythonプロセスを終了
+  try {
+    console.log('🔄 taskkillコマンドでPythonプロセスを終了します...');
+    execSync('taskkill /F /IM python.exe', { stdio: 'ignore' });
+    console.log('✅ taskkillコマンドでPythonプロセスを終了しました');
+  } catch (error) {
+    console.error('❌ taskkillコマンドでのPython終了に失敗:', error.message);
+  }
+  
+  // 3. WMICコマンドを使用してPythonプロセスを終了（代替方法）
+  try {
+    console.log('🔄 WMICコマンドでPythonプロセスを終了します...');
+    execSync('wmic process where name="python.exe" delete', { stdio: 'ignore' });
+    console.log('✅ WMICコマンドでPythonプロセスを終了しました');
+  } catch (error) {
+    console.error('❌ WMICコマンドでのPython終了に失敗:', error.message);
+  }
+  
+  // 4. PowerShellスクリプトで終了処理を実行
+  try {
+    const stopScriptPath = path.join(__dirname, 'tools', 'stop_hisyotan.ps1');
+    if (fs.existsSync(stopScriptPath)) {
+      console.log(`🔄 PowerShellスクリプトを実行: ${stopScriptPath}`);
+      execSync(`powershell.exe -ExecutionPolicy Bypass -File "${stopScriptPath}"`, { stdio: 'ignore' });
+      console.log('✅ PowerShellスクリプトでプロセス終了処理を実行しました');
+    }
+  } catch (error) {
+    console.error('❌ PowerShellスクリプト実行に失敗:', error.message);
+  }
+  
+  return true;
+}
+
 // IPCイベントハンドラを設定する関数
 function setupIPCHandlers() {
-  // 既存のハンドラ...
+  // バックエンドプロセスのPID登録用ハンドラ
+  ipcMain.handle('register-backend-pid', (event, pid) => {
+    console.log(`🔄 バックエンドプロセスPID登録リクエスト: ${pid}`);
+    return saveBackendPID(pid);
+  });
   
   // バックエンドを含めて完全に終了するハンドラ
   ipcMain.on('quit-app-with-backend', async (event) => {
@@ -88,56 +200,21 @@ function setupIPCHandlers() {
       // まずバックエンドのシャットダウンAPIを呼び出す
       await shutdownBackend(true);
       
-      // バックエンドプロセスを確実に終了
-      const { exec } = require('child_process');
-      
-      // タスクキル処理を非同期的に実行する関数
-      const killProcess = (processName, label, nextCallback) => {
-        console.log(`🔄 ${label}のプロセス終了を試みます...`);
-        exec(`taskkill /F /IM ${processName}`, (err) => {
-          if (err) {
-            console.error(`${label}プロセス終了エラー:`, err);
-          } else {
-            console.log(`✅ ${label}のプロセスを終了しました`);
-          }
-          if (nextCallback) nextCallback();
-        });
-      };
-      
-      // 優先度順に終了処理を実行
-      killProcess('python.exe /FI "WINDOWTITLE eq uvicorn*"', 'uvicorn', () => {
-        killProcess('python.exe', 'Python', () => {
-          killProcess('voicevox_engine.exe', 'VOICEVOX', () => {
-            console.log('🚪 すべてのプロセスを終了しました');
-            
-            // PowerShellスクリプトでさらに強制終了を試みる
-            try {
-              const path = require('path');
-              const stopScriptPath = path.join(__dirname, 'tools', 'stop_hisyotan.ps1');
-              console.log(`終了スクリプトを実行: ${stopScriptPath}`);
-              
-              exec(`powershell.exe -ExecutionPolicy Bypass -File "${stopScriptPath}"`, (error) => {
-                if (error) console.error('終了スクリプトエラー:', error);
-                
-                // 最後にアプリを終了
-                setTimeout(() => {
-                  app.exit(0);
-                }, 500);
-              });
-            } catch (error) {
-              console.error('終了スクリプト実行エラー:', error);
-              app.exit(0);
-            }
-          });
-        });
-      });
+      // 少し待機してからプロセス強制終了を試みる
+      setTimeout(async () => {
+        // バックエンドプロセスとその関連プロセスを確実に終了
+        await killPythonProcesses();
+        
+        // 少し待機してからアプリを終了
+        setTimeout(() => {
+          app.exit(0);
+        }, 1000);
+      }, 2000);
     } catch (error) {
       console.error('終了処理中にエラーが発生しました:', error);
       app.exit(0);
     }
   });
-  
-  // 他のハンドラ...
 }
 
 // アプリの初期化時にIPCハンドラを設定
@@ -158,31 +235,34 @@ app.on('before-quit', async (event) => {
   try {
     // バックエンドのシャットダウンAPIを呼び出す
     const apiSuccess = await shutdownBackend(false);
+    console.log(`🔌 シャットダウンAPI呼び出し結果: ${apiSuccess ? '成功' : '失敗'}`);
     
-    // APIの呼び出しが失敗した場合は強制終了を試みる
-    if (!apiSuccess) {
-      const { exec } = require('child_process');
-      
-      // Pythonプロセスを強制終了
-      exec('taskkill /F /IM python.exe', () => {
-        console.log('Pythonプロセスを終了しました');
-      });
-      
-      // VOICEVOXも終了
-      exec('taskkill /F /IM voicevox_engine.exe', () => {
-        console.log('VOICEVOXプロセスを終了しました');
-      });
+    // APIの呼び出しが成功しても失敗しても、完全にプロセスを終了させるための処理を実行
+    console.log('🔄 バックエンドプロセス終了処理を開始します...');
+    
+    // 複数の方法でプロセス終了を試みる
+    await killPythonProcesses();
+    
+    // VOICEVOXも終了
+    try {
+      console.log('🔄 VOICEVOXプロセスの終了を試みます...');
+      execSync('taskkill /F /IM voicevox_engine.exe', { stdio: 'ignore' });
+      console.log('✅ VOICEVOXプロセスを終了しました');
+    } catch (error) {
+      console.error('❌ VOICEVOXプロセス終了処理エラー:', error.message);
     }
     
     // 少し待ってからアプリを終了（バックエンドの終了処理が完了するのを待つ）
+    console.log('⏱️ 3秒間待機してからアプリを終了します...');
     setTimeout(() => {
+      console.log('👋 さようなら！アプリを終了します');
       app.exit(0);
-    }, 2000);
+    }, 3000);
   } catch (error) {
     console.error('終了処理中にエラーが発生しました:', error);
     // エラーが発生した場合も強制終了
     setTimeout(() => {
       app.exit(0);
-    }, 500);
+    }, 1000);
   }
 });

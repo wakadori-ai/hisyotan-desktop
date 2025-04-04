@@ -73,6 +73,7 @@ let currentEmotion = 0; // -100〜100の範囲で感情を管理
 // バックエンドサーバー起動管理
 let backendProcess = null;
 let isBackendInitialized = false;
+let backendPID = null;
 
 // CSP設定を開発モードで無効化する処理（開発時のみ）
 function setupDevCSP() {
@@ -120,6 +121,10 @@ async function startBackendServer() {
       detached: false // 親プロセスが終了した場合に子プロセスも終了させる
     });
     
+    // プロセスIDを記録
+    backendPID = backendProcess.pid;
+    console.log(`🆔 バックエンドプロセスID: ${backendPID}`);
+    
     // 標準出力のリスニング
     backendProcess.stdout.on('data', (data) => {
       // Python側がUTF-8で出力するようになったのでUTF-8でデコード
@@ -146,6 +151,9 @@ async function startBackendServer() {
     
     // バックエンドの接続確認
     await checkBackendConnection();
+    
+    // バックエンドプロセスの実際のPIDを取得（spawnで取得したPIDは親プロセスの場合がある）
+    await getBackendPID();
     
     return true;
   } catch (error) {
@@ -194,380 +202,95 @@ async function checkBackendConnection() {
   }
 }
 
+// バックエンドプロセスのPIDを取得する関数
+async function getBackendPID() {
+  try {
+    console.log('バックエンドプロセスのPIDを取得します...');
+    
+    // タイムアウト付きの接続確認
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/pid', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('バックエンドPID取得成功:', data);
+        
+        // PIDを保存
+        if (data.pid) {
+          backendPID = data.pid;
+          console.log(`🆔 バックエンド実際のプロセスID: ${backendPID}`);
+          
+          // メインプロセスにPIDを登録
+          try {
+            // ESM環境からElectronのIPC呼び出し
+            const { ipcRenderer } = await import('electron');
+            const registered = await ipcRenderer.invoke('register-backend-pid', backendPID);
+            console.log(`🔄 PID登録結果: ${registered ? '成功' : '失敗'}`);
+          } catch (ipcError) {
+            console.error('IPC呼び出しエラー:', ipcError);
+            
+            // 代替手段: fetchを使ってメインプロセスのAPIを呼び出す
+            try {
+              const port = process.env.ELECTRON_PORT || 3000;
+              await fetch(`http://localhost:${port}/register-backend-pid?pid=${backendPID}`);
+              console.log('代替手段でPID登録成功');
+            } catch (fetchError) {
+              console.error('代替手段でのPID登録失敗:', fetchError);
+            }
+          }
+          
+          return backendPID;
+        }
+        return null;
+      } else {
+        console.error('バックエンドPID取得エラー:', response.status);
+        return null;
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('バックエンドPID取得エラー:', fetchError);
+      return null;
+    }
+  } catch (error) {
+    console.error('バックエンドPID取得エラー (外部):', error);
+    return null;
+  }
+}
+
 /**
  * IPC通信の設定
  * レンダラープロセスとの通信を処理
  */
 function setupIPC() {
-  // 設定情報取得
-  ipcMain.handle('get-settings', async () => {
-    return config;
-  });
+  console.log('🔌 IPC通信の設定を開始します');
   
-  // 設定情報保存
-  ipcMain.handle('save-settings', async (event, newSettings) => {
+  // バックエンドPIDの登録
+  ipcMain.handle('register-backend-pid', async (event, pid) => {
+    console.log(`🔄 バックエンドPID登録要求: ${pid}`);
     try {
-      config = { ...config, ...newSettings };
-      const configPath = fileURLToPath(new URL('../../../config.json', import.meta.url));
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-      return { success: true };
-    } catch (error) {
-      console.error('設定保存エラー:', error);
-      return { success: false, error: error.message };
-    }
-  });
-  
-  // ウィンドウドラッグ開始 - handle版
-  ipcMain.handle('start-window-drag', () => {
-    console.log('💫 ウィンドウドラッグ開始（handle）');
-    if (mainWindow) {
-      // ドラッグイベントを通知
-      mainWindow.webContents.send('window-is-being-dragged');
+      backendPID = pid;
+      console.log(`✅ バックエンドPIDを登録しました: ${backendPID}`);
       return true;
-    }
-    return false;
-  });
-  
-  // ウィンドウドラッグ開始 - on版
-  ipcMain.on('start-window-drag', (event) => {
-    console.log('💫 ウィンドウドラッグ開始（on）');
-    if (mainWindow) {
-      mainWindow.webContents.send('window-is-being-dragged');
-      // Electronウィンドウの移動を許可
-      mainWindow.setMovable(true);
-    }
-  });
-  
-  // 追加: 明示的なウィンドウドラッグ処理
-  ipcMain.on('drag-start', () => {
-    console.log('💫 drag-startイベントを受信しました');
-    if (mainWindow) {
-      try {
-        console.log('🖱️ ウィンドウドラッグを開始します');
-        // Windows環境ではウィンドウの移動を許可
-        mainWindow.setMovable(true);
-      } catch (error) {
-        console.error('ウィンドウドラッグエラー:', error);
-      }
-    } else {
-      console.error('ウィンドウが存在しません');
-    }
-  });
-  
-  // ランダムメッセージ表示 - handle版
-  ipcMain.handle('show-random-message', () => {
-    console.log('💬 ランダムメッセージ表示（handle）');
-    const messages = [
-      'こんにちは！何かお手伝いしましょうか？',
-      'お疲れ様です！休憩も大切ですよ✨',
-      '何か質問があればいつでも声をかけてくださいね',
-      'お仕事頑張ってますね！素敵です',
-      'リラックスタイムも必要ですよ〜',
-      'デスクの整理、手伝いましょうか？',
-      '今日も一日頑張りましょう！',
-      'ちょっと休憩しませんか？',
-      '何か飲み物でもいかがですか？',
-      'どんなことでもお手伝いしますよ'
-    ];
-    
-    const randomIndex = Math.floor(Math.random() * messages.length);
-    const message = messages[randomIndex];
-    
-    if (mainWindow) {
-      mainWindow.webContents.send('speech-manager-operation', {
-        method: 'speak',
-        args: [message, 'normal', 5000, false, 'default', null]
-      });
-      return message;
-    }
-    return null;
-  });
-  
-  // ランダムメッセージ表示 - on版
-  ipcMain.on('show-random-message', () => {
-    console.log('💬 ランダムメッセージ表示（on）');
-    const messages = [
-      'こんにちは！何かお手伝いしましょうか？',
-      'お疲れ様です！休憩も大切ですよ✨',
-      '何か質問があればいつでも声をかけてくださいね',
-      'お仕事頑張ってますね！素敵です',
-      'リラックスタイムも必要ですよ〜',
-      'デスクの整理、手伝いましょうか？',
-      '今日も一日頑張りましょう！',
-      'ちょっと休憩しませんか？',
-      '何か飲み物でもいかがですか？',
-      'どんなことでもお手伝いしますよ'
-    ];
-    
-    const randomIndex = Math.floor(Math.random() * messages.length);
-    const message = messages[randomIndex];
-    
-    if (mainWindow) {
-      mainWindow.webContents.send('speech-manager-operation', {
-        method: 'speak',
-        args: [message, 'normal', 5000, false, 'default', null]
-      });
-    }
-  });
-  
-  // アプリ終了 - handle版
-  ipcMain.handle('quit-app', () => {
-    console.log('🚪 アプリケーション終了を要求（handle）');
-    
-    try {
-      // バックエンドプロセスを確実に終了
-      if (backendProcess) {
-        try {
-          console.log('バックエンドプロセスを終了します...');
-          process.kill(backendProcess.pid);
-        } catch (error) {
-          console.error('バックエンドプロセス終了エラー:', error);
-        }
-      }
-      
-      // PowerShellスクリプトを実行して全プロセスを確実に終了
-      try {
-        const scriptPath = fileURLToPath(new URL('../../../tools/stop_hisyotan.ps1', import.meta.url));
-        console.log(`終了スクリプトを実行: ${scriptPath}`);
-        
-        // スクリプト実行を同期的に行う
-        exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
-          if (error) {
-            console.error('終了スクリプトエラー:', error);
-          } else {
-            console.log('終了スクリプト出力:', stdout);
-          }
-          
-          // 関連プロセスを強制終了
-          try {
-            // VOICEVOXエンジンなど関連プロセスの終了を試みる
-            exec('taskkill /F /IM voicevox_engine.exe', () => {});
-            exec('taskkill /F /IM python.exe', () => {});
-            
-            // 少し待ってからアプリを終了
-            setTimeout(() => {
-              app.exit(0);
-            }, 500);
-          } catch (killError) {
-            console.error('プロセス強制終了エラー:', killError);
-            app.exit(0);
-          }
-        });
-      } catch (error) {
-        console.error('終了処理エラー:', error);
-        app.exit(0);
-      }
-    } catch (e) {
-      console.error('終了処理中の予期せぬエラー:', e);
-      app.exit(0);
-    }
-    
-    return true;
-  });
-  
-  // アプリ終了 - on版
-  ipcMain.on('quit-app', () => {
-    console.log('🚪 アプリケーション終了を要求（on）');
-    
-    try {
-      // バックエンドプロセスを確実に終了
-      if (backendProcess) {
-        try {
-          console.log('バックエンドプロセスを終了します...');
-          process.kill(backendProcess.pid);
-        } catch (error) {
-          console.error('バックエンドプロセス終了エラー:', error);
-        }
-      }
-      
-      // PowerShellスクリプトを実行して全プロセスを確実に終了
-      try {
-        const scriptPath = fileURLToPath(new URL('../../../tools/stop_hisyotan.ps1', import.meta.url));
-        console.log(`終了スクリプトを実行: ${scriptPath}`);
-        
-        // スクリプト実行を同期的に行う
-        exec(`powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout, stderr) => {
-          if (error) {
-            console.error('終了スクリプトエラー:', error);
-          } else {
-            console.log('終了スクリプト出力:', stdout);
-          }
-          
-          // 関連プロセスを強制終了
-          try {
-            // VOICEVOXエンジンなど関連プロセスの終了を試みる
-            exec('taskkill /F /IM voicevox_engine.exe', () => {});
-            exec('taskkill /F /IM python.exe', () => {});
-            
-            // 少し待ってからアプリを終了
-            setTimeout(() => {
-              app.exit(0);
-            }, 500);
-          } catch (killError) {
-            console.error('プロセス強制終了エラー:', killError);
-            app.exit(0);
-          }
-        });
-      } catch (error) {
-        console.error('終了処理エラー:', error);
-        app.exit(0);
-      }
-    } catch (e) {
-      console.error('終了処理中の予期せぬエラー:', e);
-      app.exit(0);
-    }
-  });
-  
-  // ウィンドウ位置設定
-  ipcMain.handle('set-window-position', (event, x, y) => {
-    if (mainWindow) {
-      mainWindow.setPosition(x, y);
-      return { success: true };
-    }
-    return { success: false, error: 'ウィンドウが存在しません' };
-  });
-
-  // ウィンドウ位置取得
-  ipcMain.handle('get-window-position', () => {
-    if (mainWindow) {
-      return { x: mainWindow.getPosition()[0], y: mainWindow.getPosition()[1] };
-    }
-    return { x: 0, y: 0 };
-  });
-
-  // 音声合成リクエスト
-  ipcMain.handle('speak-text', async (event, text, emotion) => {
-    try {
-      // バックエンドAPIを呼び出して音声合成を実行
-      const response = await fetch('http://127.0.0.1:8000/api/voice/speak', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          text: text,
-          emotion: emotion || 'normal',
-          speaker_id: config.voicevox?.speaker_id || 8
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`音声合成エラー: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      return result;
     } catch (error) {
-      console.error('音声合成リクエストエラー:', error);
-      return { success: false, error: error.message };
+      console.error('❌ バックエンドPID登録エラー:', error);
+      return false;
     }
   });
   
-  // 画像パス解決
-  ipcMain.handle('resolve-asset-path', (event, relativePath) => {
-    // 開発環境と本番環境でのパス解決 - ESMパス解決を使用
-    if (isDev) {
-      return fileURLToPath(new URL(`../../../${relativePath}`, import.meta.url));
-    } else {
-      return path.join(process.resourcesPath, 'app', relativePath);
-    }
+  // バックエンドPIDの取得
+  ipcMain.handle('get-backend-pid', () => {
+    console.log(`🔍 バックエンドPID取得要求: ${backendPID}`);
+    return backendPID;
   });
   
-  // 外部リンクを既定のブラウザで開く
-  ipcMain.handle('open-external-link', async (event, url) => {
-    try {
-      await shell.openExternal(url);
-      return { success: true };
-    } catch (error) {
-      console.error('外部リンクを開く際にエラーが発生しました:', error);
-      return { success: false, error: error.message };
-    }
-  });
-  
-  // バックエンド状態確認
-  ipcMain.handle('check-backend-status', async () => {
-    try {
-      const isConnected = await checkBackendConnection();
-      return { 
-        success: true, 
-        isRunning: backendProcess !== null,
-        isConnected: isConnected,
-        initialized: isBackendInitialized 
-      };
-    } catch (error) {
-      console.error('バックエンド状態確認エラー:', error);
-      return { 
-        success: false, 
-        isRunning: backendProcess !== null,
-        isConnected: false,
-        initialized: isBackendInitialized,
-        error: error.message 
-      };
-    }
-  });
-  
-  // バックエンドを再起動
-  ipcMain.handle('restart-backend', async () => {
-    try {
-      // 既存のバックエンドプロセスを終了
-      if (backendProcess !== null) {
-        console.log('既存のバックエンドサーバーを終了します...');
-        backendProcess.kill();
-        backendProcess = null;
-        
-        // プロセスが確実に終了するまで少し待機
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // バックエンドサーバーを再起動
-      console.log('バックエンドサーバーを再起動します...');
-      const result = await startBackendServer();
-      return { success: result };
-    } catch (error) {
-      console.error('バックエンド再起動エラー:', error);
-      return { success: false, error: error.message };
-    }
-  });
-  
-  // 感情値の取得
-  ipcMain.handle('get-emotion', () => {
-    return { 
-      value: currentEmotion,
-      label: getEmotionLabel(currentEmotion) 
-    };
-  });
-  
-  // 感情値の設定
-  ipcMain.handle('set-emotion', (event, value) => {
-    try {
-      // 値を-100〜100の範囲に制限
-      currentEmotion = Math.max(-100, Math.min(100, value));
-      return { 
-        success: true, 
-        value: currentEmotion,
-        label: getEmotionLabel(currentEmotion)
-      };
-    } catch (error) {
-      console.error('感情設定エラー:', error);
-      return { success: false, error: error.message };
-    }
-  });
-  
-  // 感情値の更新（増減）
-  ipcMain.handle('update-emotion', (event, delta) => {
-    try {
-      // 現在の値に増減を適用し、-100〜100の範囲に制限
-      currentEmotion = Math.max(-100, Math.min(100, currentEmotion + delta));
-      return { 
-        success: true, 
-        value: currentEmotion,
-        label: getEmotionLabel(currentEmotion)
-      };
-    } catch (error) {
-      console.error('感情更新エラー:', error);
-      return { success: false, error: error.message };
-    }
-  });
+  console.log('✨ IPC通信の設定が完了しました');
 }
 
 // 感情ラベルを取得
@@ -591,86 +314,53 @@ function registerGlobalShortcuts() {
  * メインウィンドウの作成
  */
 function createWindow() {
-  // 開発モードでのCSP制限の緩和
-  setupDevCSP();
+  console.log('🪟 メインウィンドウを作成します');
   
-  // アプリケーション名の設定
-  const appName = appNameFromEnv || config.app?.name || 'ふにゃ秘書たん';
-  app.setName(appName);
+  // CSP設定
+  const csp = `
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' file: data: blob:;
+    connect-src 'self' http://localhost:* ws://localhost:*;
+    media-src 'self' file: data: blob:;
+  `;
   
-  // ウィンドウ設定のデフォルト値
-  const defaultWidth = 400;
-  const defaultHeight = 600;
-  
-  // 設定から透明度と枠の有無を取得（デフォルトは透明・枠なし）
-  const isTransparent = config.window?.transparent !== false;
-  const hasFrame = config.window?.frame === true;
-  const isAlwaysOnTop = config.window?.alwaysOnTop !== false;
-  
-  // ウィンドウサイズを設定から取得、もしくはデフォルト値を使用
-  const windowWidth = config.window?.width || defaultWidth;
-  const windowHeight = config.window?.height || defaultHeight;
-  
-  // 開発モードでViteデベロップサーバーのURLを取得
-  const viteDevServerUrl = process.env.VITE_DEV_SERVER_URL;
-  
-  // preloadスクリプトのパスを解決
-  let preloadPath;
-  
-  if (isDev) {
-    // 開発モードの場合は現在のディレクトリからの相対パス
-    preloadPath = fileURLToPath(new URL('../preload/preload.js', import.meta.url));
-  } else {
-    // 本番モードの場合はdistフォルダ内のファイル
-    preloadPath = fileURLToPath(new URL('../../../dist/preload.js', import.meta.url));
-  }
-  
-  // パスの存在確認
-  if (!fs.existsSync(preloadPath)) {
-    console.error(`❌ preloadパスが見つかりません: ${preloadPath}`);
-    // フォールバック
-    const fallbackPath = fileURLToPath(new URL('../../../dist/preload.js', import.meta.url));
-    if (fs.existsSync(fallbackPath)) {
-      console.log(`✅ フォールバックpreloadパスを使用します: ${fallbackPath}`);
-      preloadPath = fallbackPath;
-    }
-  }
-  
-  console.log(`プリロードスクリプトパス: ${preloadPath}`);
-  console.log(`開発モード: ${isDev}, Vite URL: ${viteDevServerUrl || 'なし'}`);
-  
-  // メインウィンドウを作成
+  // メインウィンドウの設定
   mainWindow = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    transparent: isTransparent,
-    frame: hasFrame,
-    alwaysOnTop: isAlwaysOnTop,
+    width: 400,
+    height: 600,
     webPreferences: {
-      nodeIntegration: false, // 安全のためにノード統合を無効化
-      contextIsolation: true, // コンテキスト分離を有効化
-      preload: preloadPath // プリロードスクリプトを指定
-    }
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      preload: path.join(__dirname, 'preload.mjs'),
+      webSecurity: true
+    },
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    icon: path.join(__dirname, '../assets/icon.ico')
   });
   
-  // 開発モードの場合はViteデベロップサーバーを使用
-  if (viteDevServerUrl) {
-    console.log(`開発サーバーURL: ${viteDevServerUrl}`);
-    mainWindow.loadURL(viteDevServerUrl);
-    
-    // 開発ツールを自動的に開く
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  // CSPを設定
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp]
+      }
+    });
+  });
+  
+  // 開発モードでの設定
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
   } else {
-    // 本番環境の場合はビルドされたHTMLファイルを読み込む
-    const indexHtmlPath = fileURLToPath(new URL('../../../frontend/dist/index.html', import.meta.url));
-    console.log(`本番環境のHTML: ${indexHtmlPath}`);
-    mainWindow.loadFile(indexHtmlPath);
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
-  
-  // ウィンドウが閉じられたときにnullに設定
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
   
   return mainWindow;
 }
@@ -688,8 +378,41 @@ app.whenReady().then(async () => {
     // IPC通信を設定
     setupIPC();
     
-    // グローバルショートカットを登録
-    registerGlobalShortcuts();
+    // DOMContentLoadedイベントを待ってからUI初期化
+    mainWindow.webContents.on('dom-ready', () => {
+      console.log('🌸 DOMの読み込みが完了しました');
+      // UI初期化処理をここに移動
+      mainWindow.webContents.executeJavaScript(`
+        document.addEventListener('DOMContentLoaded', () => {
+          console.log('🎨 UI初期化を開始します');
+          // UI要素の初期化処理
+          const initUI = () => {
+            const speechBubble = document.getElementById('speechBubble');
+            const speechText = document.getElementById('speechText');
+            const errorBubble = document.getElementById('errorBubble');
+            const errorText = document.getElementById('errorText');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const speechSettingUI = document.getElementById('speechSettingUI');
+            
+            if (!speechBubble) console.warn('❌ speechBubble要素が見つかりません');
+            if (!speechText) console.warn('❌ speechText要素が見つかりません');
+            if (!errorBubble) console.warn('❌ errorBubble要素が見つかりません');
+            if (!errorText) console.warn('❌ errorText要素が見つかりません');
+            if (!statusIndicator) console.warn('❌ statusIndicator要素が見つかりません');
+            if (!speechSettingUI) console.warn('❌ speechSettingUI要素が作成できません');
+            
+            // 要素が存在する場合のみ初期化を続行
+            if (speechBubble && speechText && errorBubble && errorText && statusIndicator && speechSettingUI) {
+              console.log('✨ UI要素の初期化が完了しました');
+              // ここでUIの初期化処理を続行
+            }
+          };
+          
+          // 初期化を実行
+          initUI();
+        });
+      `);
+    });
     
     // バックエンドサーバーを起動
     await startBackendServer();

@@ -11,9 +11,12 @@ import uvicorn
 import threading
 import time
 import signal
+import psutil
 from pathlib import Path
-from fastapi import Body
+from fastapi import FastAPI, Body
 import argparse
+from typing import Optional
+import types
 
 # 標準出力・標準エラー出力のエンコーディングを明示的に設定
 import io
@@ -46,17 +49,61 @@ from app.events.startup_handler import start_zombie_monitoring
 should_exit = False
 exit_code = 0
 
+# すべての子プロセスを含めて終了する関数
+def terminate_process_tree():
+    """
+    現在のプロセスとすべての子プロセスを強制終了します
+    """
+    try:
+        # 自身のプロセスID
+        current_pid = os.getpid()
+        logger.info(f"🔄 プロセスツリーの終了を開始します (PID: {current_pid})")
+        
+        # psutilを使って自身のプロセスと子プロセスを取得
+        current_process = psutil.Process(current_pid)
+        
+        # 子プロセスを取得
+        children = current_process.children(recursive=True)
+        logger.info(f"🔍 子プロセス数: {len(children)}")
+        
+        # 子プロセスをまず終了
+        for child in children:
+            try:
+                logger.info(f"🛑 子プロセス終了: PID={child.pid}, 名前={child.name()}")
+                child.terminate()
+            except Exception as e:
+                logger.error(f"❌ 子プロセス終了エラー (PID={child.pid}): {e}")
+        
+        # すべての子プロセスが終了するのを待つ（最大3秒）
+        _, alive = psutil.wait_procs(children, timeout=3)
+        
+        # まだ生きているプロセスを強制終了
+        for child in alive:
+            try:
+                logger.info(f"💥 子プロセス強制終了: PID={child.pid}")
+                child.kill()
+            except Exception as e:
+                logger.error(f"❌ 子プロセス強制終了エラー (PID={child.pid}): {e}")
+        
+        logger.info("✅ プロセスツリーの終了処理が完了しました")
+    except Exception as e:
+        logger.error(f"❌ プロセスツリー終了処理エラー: {e}")
+
 # uvicornサーバーを制御するためのハンドラー
 class GracefulExitHandler:
-    def __init__(self, app):
+    def __init__(self, app: FastAPI) -> None:
         self.app = app
         self.should_exit = False
         self.exit_code = 0
         
-    def handle_exit(self, sig=None, frame=None, exit_code=0):
+    def handle_exit(self, sig: Optional[int] = None, frame: Optional[types.FrameType] = None, exit_code: int = 0) -> None:
         self.should_exit = True
         self.exit_code = exit_code
         logger.info(f"🔌 終了シグナルを受信しました。exit_code={exit_code}")
+        
+        # プロセスツリーを終了（子プロセスを含む）
+        terminate_process_tree()
+        
         # 自分自身のプロセスに終了シグナルを送信
         if os.name == 'nt':  # Windows
             pid = os.getpid()
@@ -64,7 +111,12 @@ class GracefulExitHandler:
             # 少し遅延させて応答が返せるようにする
             def delayed_exit():
                 time.sleep(2)
-                os.kill(pid, signal.CTRL_C_EVENT)
+                try:
+                    os.kill(pid, signal.CTRL_C_EVENT)
+                except Exception as e:
+                    logger.error(f"❌ プロセス終了シグナル送信エラー: {e}")
+                    # 最終手段としてexit関数を使用
+                    sys.exit(exit_code)
             threading.Thread(target=delayed_exit).start()
         else:  # Linux/Mac
             pid = os.getpid()
@@ -72,11 +124,34 @@ class GracefulExitHandler:
             # 少し遅延させて応答が返せるようにする
             def delayed_exit():
                 time.sleep(2)
-                os.kill(pid, signal.SIGTERM)
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except Exception as e:
+                    logger.error(f"❌ プロセス終了シグナル送信エラー: {e}")
+                    # 最終手段としてexit関数を使用
+                    sys.exit(exit_code)
             threading.Thread(target=delayed_exit).start()
 
 # グローバルのハンドラーインスタンス
 exit_handler = GracefulExitHandler(app)
+
+# プロセスID取得エンドポイント
+@app.get("/api/pid")
+def get_process_id():
+    """
+    現在のバックエンドプロセスのPIDを返す
+    
+    Returns:
+        dict: PID情報
+    """
+    pid = os.getpid()
+    logger.info(f"💡 PID照会: {pid}")
+    return {
+        "pid": pid,
+        "parent_pid": os.getppid() if hasattr(os, 'getppid') else None,
+        "process_name": "python",
+        "message": f"バックエンドプロセスID: {pid}"
+    }
 
 # シャットダウンエンドポイント
 @app.post("/api/shutdown")
@@ -91,22 +166,31 @@ async def shutdown(force: bool = Body(False)):
         dict: 結果メッセージ
     """
     logger.info(f"🔌 シャットダウンリクエストを受信しました。force={force}")
+    pid = os.getpid()
     
     # 非同期で終了処理を実行（レスポンスを返してから終了するため）
     def shutdown_app():
         # 少し遅延させてレスポンスが返せるようにする
-        logger.info("⏱️ 3秒後にアプリケーションを終了します...")
+        logger.info(f"⏱️ 3秒後にアプリケーションを終了します... (PID: {pid})")
         time.sleep(3)
         
         logger.info("🔄 アプリケーションを終了しています...")
         # 終了ハンドラーを呼び出し
         exit_code = 0 if not force else 1
         exit_handler.handle_exit(exit_code=exit_code)
+        
+        # さらに最終手段として、明示的にexitを呼び出す（少し遅延させる）
+        def final_exit():
+            time.sleep(2)
+            logger.info("💥 最終手段: sys.exit()を実行します")
+            sys.exit(exit_code)
+        
+        threading.Thread(target=final_exit).start()
     
     # 別スレッドで終了処理を実行
     threading.Thread(target=shutdown_app).start()
     
-    return {"message": "アプリケーションをシャットダウンしています"}
+    return {"message": f"アプリケーションをシャットダウンしています (PID: {pid})"}
 
 # ルートエンドポイント（ステータスチェック用）
 @app.head("/")
@@ -122,7 +206,8 @@ def read_root():
         "status": "ok",
         "service": "hisyotan-backend",
         "version": "1.0.0", 
-        "message": "秘書たんバックエンドサーバーが正常に動作しています"
+        "message": "秘書たんバックエンドサーバーが正常に動作しています",
+        "pid": os.getpid()
     }
 
 # メイン関数（初期化処理用）
@@ -168,6 +253,10 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, exit_handler.handle_exit)
     signal.signal(signal.SIGTERM, exit_handler.handle_exit)
     
+    # PID情報の表示
+    current_pid = os.getpid()
+    logger.info(f"🆔 バックエンドプロセスID: {current_pid}")
+    
     # FastAPIサーバーの起動
     logger.info(f"🌐 FastAPIサーバーを起動します (デバッグモード: {debug_mode})")
     # uvicornの型情報は重要ではないので無視
@@ -177,5 +266,5 @@ if __name__ == "__main__":
         port=8000, 
         reload=debug_mode,
         log_level="debug" if debug_mode else "info",
-        force_exit=True
+        lifespan="on"
     ) 
