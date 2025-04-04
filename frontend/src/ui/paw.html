@@ -28,8 +28,8 @@
     </style>
     <!-- speechManager.js をグローバルに利用できるようにするためのスクリプト -->
     <script type="module">
-        import * as SpeechManagerModule from '../emotion/speechManager.js';
-        import { hideBubble } from './paw-context-menu.js';
+        import * as SpeechManagerModule from '@emotion/speechManager.js';
+        import { hideBubble } from '@ui/handlers/bubbleManager.js';
         
         // グローバルに公開するためwindowオブジェクトに登録
         window.speechManager = SpeechManagerModule;

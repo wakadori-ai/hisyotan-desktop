@@ -4,8 +4,9 @@
  */
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
-import { showError } from '../../ui/uiHelper.js';
-import { showBubble, hideBubble } from '../../ui/uiHelper.js';
+import { showError } from '@ui/uiHelper.js';
+import { showBubble } from '@ui/uiHelper.js';
+import { hideBubble } from '@ui/handlers/bubbleManager.js';
 import { 
   setExpression, 
   startTalking, 
@@ -16,9 +17,9 @@ import {
   stopTrembling,
   startNervousShake,
   stopNervousShake
-} from '../expressionManager.js';
+} from '@emotion/expressionManager.js';
 import { playPresetSound } from '@emotion/audioReactor.js';
-import { formatMessage, forceShowBubble } from '../bubbleDisplay.js';
+import { formatMessage, forceShowBubble } from '@emotion/bubbleDisplay.js';
 import { requestVoiceSynthesis } from './voicevoxClient.js';
 
 // 多重実行防止用の変数

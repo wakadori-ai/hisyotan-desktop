@@ -7,9 +7,10 @@
 // import './styles.css'; // 相対パス
 // import '/src/ui/styles.css'; // 絶対パス
 
-import { createTestSettingsUI, hideBubble } from './paw-context-menu.js';
+import { createTestSettingsUI } from '@ui/paw-context-menu.js';
+import { hideBubble } from '@ui/handlers/bubbleManager.js';
 import apiClient from '@core/apiClient.js';
-import { setupMouseEventHandling } from './handlers/setupMouseEvents.js';
+import { setupMouseEventHandling } from '@ui/handlers/setupMouseEvents.js';
 
 // デバッグ情報
 console.log('🌸 paw.js が読み込まれました');

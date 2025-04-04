@@ -3,7 +3,8 @@
  * UI操作関連の機能を集約したヘルパーモジュール
  */
 
-import { createTestSettingsUI, hideBubble } from '../ui/paw-context-menu.js';
+import { createTestSettingsUI } from '@ui/paw-context-menu.js';
+import { hideBubble } from '@ui/handlers/bubbleManager.js';
 
 // グローバル要素の参照を保持
 let pawButton;

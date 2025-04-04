@@ -21,25 +21,8 @@ let apiClient = null;
   }
 })();
 
-/**
- * 秘書たんUIの吹き出しを非表示にする
- */
-function hideBubble() {
-  const speechBubble = document.getElementById('speechBubble');
-  const secretaryTan = document.getElementById('assistantImage');
-  
-  if (speechBubble) {
-    speechBubble.classList.remove('active');
-  }
-  
-  if (secretaryTan) {
-    secretaryTan.classList.remove('active');
-    // アニメーション終了後に非表示
-    setTimeout(() => {
-      secretaryTan.style.opacity = '0';
-    }, 300);
-  }
-}
+// bubbleManager.jsからhideBubbleをインポート
+import { hideBubble } from './handlers/bubbleManager.js';
 
 /**
  * 設定項目のデータを取得する
@@ -436,4 +419,4 @@ function showDebugInfo() {
 setupContextMenuEvents(); 
 
 // 必要な関数をエクスポート
-export { createTestSettingsUI, hideBubble, showSettings, showDebugInfo }; 
+export { createTestSettingsUI, showSettings, showDebugInfo }; 

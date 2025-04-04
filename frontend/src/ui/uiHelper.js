@@ -2,8 +2,9 @@
 // UI表示制御用のモジュール
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
-import { updateSetting } from './apiClient.js';
-import { createTestSettingsUI, hideBubble } from './paw-context-menu.js';
+import { updateSetting } from '@ui/apiClient.js';
+import { createTestSettingsUI } from '@ui/paw-context-menu.js';
+import { hideBubble } from '@ui/handlers/bubbleManager.js';
 
 // DOM要素
 let speechBubble;
@@ -188,67 +189,6 @@ export function showBubble(eventType = 'default') {
   }, 50);
   
   logDebug(`吹き出し表示設定完了: クラス=${speechBubble.className}`);
-}
-
-/**
- * 吹き出しを非表示にする
- */
-export function hideBubble() {
-  logDebug('吹き出しを非表示にします...');
-  
-  // DOM要素の取得確認
-  if (!speechBubble) {
-    speechBubble = document.getElementById('speechBubble');
-    if (!speechBubble) {
-      logDebug('speechBubble要素が見つかりません。何も実行しません。');
-      return;
-    }
-  }
-  
-  // スタイル設定前の状態をデバッグ出力
-  console.log('[hideBubble] 非表示前の吹き出し状態:');
-  debugBubbleStyles();
-  
-  // ❶ showクラスを削除して非表示用クラスを追加（CSSトランジション用）
-  speechBubble.classList.remove('show', 'zombie-warning', 'keep-visible');
-  speechBubble.classList.add('hide');
-  
-  // ❷ リフローの強制
-  void speechBubble.offsetWidth;
-  
-  // ❸ 直接スタイル設定で非表示を確実に
-  speechBubble.style.cssText = `
-    opacity: 0 !important;
-    visibility: hidden !important;
-    display: none !important;
-    pointer-events: none !important;
-  `;
-  
-  // ❹ 非表示化の確認と保険処理
-  setTimeout(() => {
-    // 再確認して強制非表示化
-    const computedStyle = window.getComputedStyle(speechBubble);
-    if (computedStyle.display !== 'none' || computedStyle.visibility !== 'hidden' || parseFloat(computedStyle.opacity) > 0.1) {
-      console.log('[hideBubble] 非表示化が不完全です。強制非表示を実行します');
-      
-      // 最も強力な方法で非表示化
-      speechBubble.className = 'speech-bubble hide';
-      speechBubble.style.cssText = `
-        opacity: 0 !important;
-        visibility: hidden !important;
-        display: none !important;
-        pointer-events: none !important;
-        position: absolute !important;
-        z-index: -1 !important;
-      `;
-    }
-    
-    // 非表示後の状態を確認
-    debugBubbleStyles();
-  }, 100);
-  
-  console.log('[hideBubble] 非表示処理後のクラス:', speechBubble.className);
-  logDebug('吹き出し非表示処理完了');
 }
 
 /**

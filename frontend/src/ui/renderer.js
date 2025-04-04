@@ -5,7 +5,7 @@
 // import '@ui/styles.css';
 
 // 肉球UIをインポート（重要：これがないとpaw.jsが読み込まれない）
-import './paw.js';
+import '@ui/paw.js';
 
 // コア機能のインポート
 import { logDebug, logError, saveErrorLog } from '@core/logger.js';
@@ -18,15 +18,15 @@ import { initRandomLines } from '@emotion/emotionHandler.js';
 import zombieOverlayManager from '@ui/overlayManager.js';
 
 // 分割したハンドラーのインポート
-import { setupMouseEventHandling } from './handlers/setupMouseEvents.js';
-import { setupContextMenuEvents } from './handlers/contextMenuHandler.js';
-import { setupWindowAnimations } from './handlers/animationHandler.js';
-import { setupDebugPanel } from './handlers/debugPanel.js';
-import { setupAssistantImage } from './handlers/assistantImage.js';
-import { loadAndApplySettings } from './handlers/settingsLoader.js';
-import { showBubble, hideBubble } from './handlers/bubbleManager.js';
+import { setupMouseEventHandling } from '@ui/handlers/setupMouseEvents.js';
+import { setupContextMenuEvents } from '@ui/handlers/contextMenuHandler.js';
+import { setupWindowAnimations } from '@ui/handlers/animationHandler.js';
+import { setupDebugPanel } from '@ui/handlers/debugPanel.js';
+import { setupAssistantImage } from '@ui/handlers/assistantImage.js';
+import { loadAndApplySettings } from '@ui/handlers/settingsLoader.js';
+import { showBubble, hideBubble } from '@ui/handlers/bubbleManager.js';
 // レイアウトマネージャーをインポート
-import { setupLayoutManager } from './handlers/layoutManager.js';
+import { setupLayoutManager } from '@ui/handlers/layoutManager.js';
 
 // 起動中フラグ
 let isStartupInProgress = true;

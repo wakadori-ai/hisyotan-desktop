@@ -4,7 +4,8 @@
  */
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
-import { showBubble, hideBubble, setText, initUIElements } from '../../ui/uiHelper.js';
+import { showBubble, setText, initUIElements } from '@ui/uiHelper.js';
+import { hideBubble } from '@ui/handlers/bubbleManager.js';
 
 /**
  * メッセージの整形（語尾を統一）
