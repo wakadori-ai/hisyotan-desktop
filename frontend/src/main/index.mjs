@@ -221,10 +221,8 @@ function setupIPC() {
   ipcMain.handle('start-window-drag', () => {
     console.log('💫 ウィンドウドラッグ開始（handle）');
     if (mainWindow) {
-      // ウィンドウドラッグのBrowserWindowのメソッドを呼び出す
+      // ドラッグイベントを通知
       mainWindow.webContents.send('window-is-being-dragged');
-      // 実際のドラッグ処理はこちらで処理
-      mainWindow.dragWindow();
       return true;
     }
     return false;
@@ -235,9 +233,8 @@ function setupIPC() {
     console.log('💫 ウィンドウドラッグ開始（on）');
     if (mainWindow) {
       mainWindow.webContents.send('window-is-being-dragged');
-      // 実際のドラッグ処理 - Win32 APIを使用
+      // Electronウィンドウの移動を許可
       mainWindow.setMovable(true);
-      mainWindow.startDrag();
     }
   });
   
@@ -247,15 +244,8 @@ function setupIPC() {
     if (mainWindow) {
       try {
         console.log('🖱️ ウィンドウドラッグを開始します');
-        // Windows環境ではsetMovableが必要
+        // Windows環境ではウィンドウの移動を許可
         mainWindow.setMovable(true);
-        // Electronの標準APIでウィンドウを移動モードに
-        if (typeof mainWindow.startDrag === 'function') {
-          mainWindow.startDrag();
-        } else if (process.platform === 'win32') {
-          // Windows専用のカスタムドラッグ処理
-          exec('powershell -Command "(Add-Type -PassThru -Name Win32 -MemberDefinition \'[DllImport(\\"user32.dll\\")] public static extern bool ReleaseCapture(); [DllImport(\\"user32.dll\\")] public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);\' -Namespace Win32Functions)::ReleaseCapture(); (Add-Type -PassThru -Name Win32 -MemberDefinition \'[DllImport(\\"user32.dll\\")] public static extern bool ReleaseCapture(); [DllImport(\\"user32.dll\\")] public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);\' -Namespace Win32Functions)::SendMessage((Get-Process -Id ' + mainWindow.webContents.getOSProcessId() + ').MainWindowHandle, 0xA1, 0x2, 0)"');
-        }
       } catch (error) {
         console.error('ウィンドウドラッグエラー:', error);
       }

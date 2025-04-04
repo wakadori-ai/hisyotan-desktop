@@ -106,13 +106,7 @@ export function initUIElements() {
       }
     });
     
-    // 左ドラッグ - ウィンドウ移動（シンプル版）
-    pawButton.addEventListener('mousedown', (event) => {
-      if (event.button === 0) { // 左クリック
-        // ドラッグ処理
-        directWindowDragHandler(event);
-      }
-    });
+    // JavaScriptでのドラッグ処理は削除（CSSの-webkit-app-region: dragを使用）
   } else {
     console.error('❌ pawButtonが見つかりません');
   }
@@ -179,23 +173,8 @@ export function initUIElements() {
     console.error('❌ quitButtonが見つかりません');
   }
   
-  // 立ち絵と吹き出しのイベント設定（ウィンドウドラッグ用）
-  const setupDraggable = (element) => {
-    if (!element) return;
-    
-    element.addEventListener('mousedown', (event) => {
-      if (event.button === 0) { // 左クリック
-        console.log(`🖱️ ${element.id}で左ドラッグ開始`);
-        
-        // ドラッグ処理
-        directWindowDragHandler(event);
-      }
-    });
-  };
-  
-  // 立ち絵と吹き出しにドラッグイベントを設定
-  setupDraggable(assistantImage);
-  setupDraggable(speechBubble);
+  // 立ち絵と吹き出しのイベント設定（JavaScriptでのドラッグ処理は不要）
+  // CSSの-webkit-app-region: dragを使用するため、イベントリスナーは削除
   
   // 立ち絵を表示
   if (assistantImage) {
@@ -211,99 +190,13 @@ export function initUIElements() {
 
 /**
  * ウィンドウドラッグを直接処理するハンドラ
- * @param {MouseEvent} initialEvent - マウスダウンイベント
+ * 注: CSSの-webkit-app-region: dragを使用するため、
+ * このハンドラは実際には使われません。
+ * 互換性のために残しています。
  */
 function directWindowDragHandler(initialEvent) {
-  // 初期位置を保存
-  const startX = initialEvent.clientX;
-  const startY = initialEvent.clientY;
-  
-  // マウスがどれだけ動いたかを追跡
-  let isDragging = false;
-  let moveCount = 0;
-  
-  // マウスムーブイベント
-  const handleMouseMove = (moveEvent) => {
-    // 少し動いたらドラッグと判定
-    const deltaX = Math.abs(moveEvent.clientX - startX);
-    const deltaY = Math.abs(moveEvent.clientY - startY);
-    
-    if (deltaX > 5 || deltaY > 5) {
-      // ドラッグと判定
-      isDragging = true;
-      window._wasDragging = true;
-      moveCount++;
-      
-      // 試行回数を制限（最大3回）
-      if (moveCount > 3) {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        return;
-      }
-      
-      // ドラッグ処理の多段フォールバック
-      if (window.electron && window.electron.ipcRenderer) {
-        try {
-          // IPCイベントの順番を修正 - まず直接的なdrag-startを試す
-          console.log('🔄 drag-startイベントを発行します');
-          window.electron.ipcRenderer.send('drag-start');
-          
-          // 少し待って別のイベントも試す
-          setTimeout(() => {
-            if (isDragging) {
-              console.log('🔄 start-window-dragイベントを発行します');
-              window.electron.ipcRenderer.send('start-window-drag');
-            }
-          }, 50);
-          
-          // ipcRendererのinvokeも試す
-          setTimeout(() => {
-            if (isDragging) {
-              console.log('🔄 invokeメソッドでウィンドウドラッグを開始します');
-              window.electron.ipcRenderer.invoke('start-window-drag')
-                .catch(err => {
-                  console.error('ウィンドウドラッグエラー:', err);
-                });
-            }
-          }, 100);
-          
-          // 成功したと仮定してイベントリスナーを削除
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        } catch (error) {
-          console.error('IPC呼び出しエラー:', error);
-          // エラー時のフォールバック表示
-          showBubble('warning', 'ドラッグ機能にエラーが発生しました');
-          
-          // イベントリスナーを削除
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        }
-      } else {
-        console.warn('electron IPCが利用できません');
-        showBubble('warning', 'ドラッグ機能が利用できません');
-        
-        // イベントリスナーを削除
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      }
-    }
-  };
-  
-  // マウスアップイベント
-  const handleMouseUp = () => {
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-    
-    // クリックとして処理するなら
-    if (!isDragging && initialEvent.target && typeof initialEvent.target.click === 'function') {
-      // クリックイベントを発火させない
-    }
-  };
-  
-  // イベントリスナーを追加
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
+  console.log('🖱️ CSSによるドラッグ機能が使用されます');
+  // CSSで-webkit-app-region: dragを使用するため実装は空
 }
 
 /**

@@ -29,26 +29,17 @@
   animation: pulseBg 4s ease-in-out infinite;
 }
 
-/* 肉球ボタン */
+/* 肉球ボタンコンテナ */
 #paw-button {
   position: relative;
+  margin-top: 10px;
+  cursor: pointer;
   width: 60px;
   height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #ffd1e0, #ffb6c9);
-  box-shadow: 0 4px 10px rgba(255, 150, 180, 0.4),
-              inset 0 -2px 5px rgba(255, 120, 160, 0.2),
-              inset 0 2px 5px rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 999;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  user-select: none;
-  -webkit-user-drag: none;
-  animation: floatPaw 4s ease-in-out infinite;
-  -webkit-app-region: no-drag; /* クリック可能領域 */
+  z-index: 1001;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: center;
+  -webkit-app-region: drag; /* ドラッグ可能にする */
 }
 
 /* ホバー時のスタイル */

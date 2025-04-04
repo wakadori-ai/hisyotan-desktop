@@ -18,6 +18,7 @@
   pointer-events: auto;
   display: none;
   align-self: flex-end;
+  -webkit-app-region: drag; /* ドラッグ可能にする */
 }
 
 /* 表示状態 */
