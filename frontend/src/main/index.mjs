@@ -316,6 +316,57 @@ function setupIPC() {
     return backendPID;
   });
   
+  // アセットのパスを解決するハンドラ
+  ipcMain.handle('resolve-asset-path', (event, relativePath) => {
+    console.log(`🔍 アセットパス解決要求: ${relativePath}`);
+    try {
+      // 開発モードと本番モードでのパス解決を分ける
+      let assetPath;
+      if (isDev) {
+        assetPath = path.join(process.cwd(), 'assets', relativePath);
+      } else {
+        assetPath = path.join(app.getAppPath(), 'assets', relativePath);
+      }
+      console.log(`✅ 解決されたパス: ${assetPath}`);
+      return assetPath;
+    } catch (error) {
+      console.error('❌ アセットパス解決エラー:', error);
+      return relativePath; // エラー時は元のパスをそのまま返す
+    }
+  });
+  
+  // アプリケーション終了ハンドラ
+  ipcMain.handle('quit-app', () => {
+    console.log('🚪 アプリケーション終了要求を受信しました');
+    try {
+      app.quit();
+      return true;
+    } catch (error) {
+      console.error('❌ アプリケーション終了エラー:', error);
+      return false;
+    }
+  });
+  
+  // app:quit イベントリスナー（既存の互換性のため）
+  ipcMain.on('app:quit', () => {
+    console.log('🚪 app:quit イベントを受信しました');
+    try {
+      app.quit();
+    } catch (error) {
+      console.error('❌ app:quit イベント処理エラー:', error);
+    }
+  });
+  
+  // quit-app イベントリスナー（invoke以外の方法でも受け付けるため）
+  ipcMain.on('quit-app', () => {
+    console.log('🚪 quit-app イベントを受信しました');
+    try {
+      app.quit();
+    } catch (error) {
+      console.error('❌ quit-app イベント処理エラー:', error);
+    }
+  });
+  
   console.log('✨ IPC通信の設定が完了しました');
 }
 

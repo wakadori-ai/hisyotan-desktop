@@ -80,13 +80,20 @@ export function initUIElements() {
 
 // イベントリスナーの設定を分離
 function setupEventListeners() {
+  // ガード処理 - すでにリスナーが設定されているかをチェック
+  if (window._eventListenersInitialized) {
+    console.log('🔄 イベントリスナーはすでに設定済みです');
+    return;
+  }
+
   // pawButton
   const pawBtn = document.getElementById('paw-button') || pawButton;
   if (pawBtn) {
     console.log('🐾 pawButtonにイベントリスナーを設定します');
     setupPawButtonEvents(pawBtn);
   } else {
-    console.warn('⚠️ pawButtonが見つかりません');
+    console.log('ℹ️ pawButtonが見つかりません。UI初期化後に再試行します');
+    // 後で再試行するための処理をここに追加できます
   }
   
   // quitButton
@@ -95,7 +102,7 @@ function setupEventListeners() {
     console.log('🚪 quitButtonにイベントリスナーを設定します');
     setupQuitButtonEvents(quitBtn);
   } else {
-    console.warn('⚠️ quitButtonが見つかりません');
+    console.log('ℹ️ quitButtonが見つかりません。UI初期化後に再試行します');
   }
   
   // 立ち絵と吹き出しのイベント設定
@@ -107,7 +114,7 @@ function setupEventListeners() {
       console.log('🖼️ 立ち絵が右クリックされました - 右クリックメニューを無効化');
     });
   } else {
-    console.warn('⚠️ assistantImage要素が見つからないか、HTML要素ではありません');
+    console.log('ℹ️ assistantImage要素が見つかりません。UI初期化後に再試行します');
   }
   
   // 吹き出し
@@ -119,8 +126,11 @@ function setupEventListeners() {
       console.log('💬 吹き出しが右クリックされました - 右クリックメニューを無効化');
     });
   } else {
-    console.warn('⚠️ speechBubble要素が見つからないか、HTML要素ではありません');
+    console.log('ℹ️ speechBubble要素が見つかりません。UI初期化後に再試行します');
   }
+
+  // 設定済みフラグを設定
+  window._eventListenersInitialized = true;
 }
 
 // 肉球ボタンのイベント設定を分離
@@ -498,11 +508,11 @@ export function createUI() {
 
   // モジュール内グローバル変数にも割り当て
   // thisではなくモジュールスコープの変数に直接割り当てる
-  pawButton = pawButton;
-  quitButton = quitButton;
-  speechBubble = speechBubble;
-  speechText = speechText;
-  assistantImage = assistantImage;
+  globalThis.pawButton = pawButton;
+  globalThis.quitButton = quitButton;
+  globalThis.speechBubble = speechBubble;
+  globalThis.speechText = speechText;
+  globalThis.assistantImage = assistantImage;
 
   // イベントリスナーの設定（DOM要素を直接渡す）
   setTimeout(() => {
@@ -524,6 +534,12 @@ export {
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🌟 DOMContentLoaded: assistantUI初期化を開始します');
   
+  // すでに初期化済みかどうかをフラグで確認
+  if (window._assistantUIInitialized) {
+    console.log('🔄 UI要素はすでに初期化済みです。再初期化をスキップします。');
+    return;
+  }
+  
   // 既存のUI要素の初期化
   initUIElements();
   
@@ -534,6 +550,9 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.log('♻️ 既存のUI要素を再利用します');
   }
+  
+  // 初期化済みフラグを設定
+  window._assistantUIInitialized = true;
   
   console.log('🌸 assistantUI初期化完了');
 }); 
