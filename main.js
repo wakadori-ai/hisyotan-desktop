@@ -58,23 +58,43 @@ function setupIPCHandlers() {
       // バックエンドプロセスを確実に終了
       const { exec } = require('child_process');
       
-      // Pythonプロセスを強制終了（uvicornに関連するものを優先）
-      exec('taskkill /F /IM python.exe /FI "WINDOWTITLE eq uvicorn*"', (err) => {
-        if (err) console.error('uvicornプロセス終了エラー:', err);
-        
-        // 一般的なPythonプロセスも終了
-        exec('taskkill /F /IM python.exe', (err) => {
-          if (err) console.error('Pythonプロセス終了エラー:', err);
-          
-          // 念のためVOICEVOXも終了
-          exec('taskkill /F /IM voicevox_engine.exe', (err) => {
-            if (err) console.error('VOICEVOXプロセス終了エラー:', err);
+      // タスクキル処理を非同期的に実行する関数
+      const killProcess = (processName, label, nextCallback) => {
+        console.log(`🔄 ${label}のプロセス終了を試みます...`);
+        exec(`taskkill /F /IM ${processName}`, (err) => {
+          if (err) {
+            console.error(`${label}プロセス終了エラー:`, err);
+          } else {
+            console.log(`✅ ${label}のプロセスを終了しました`);
+          }
+          if (nextCallback) nextCallback();
+        });
+      };
+      
+      // 優先度順に終了処理を実行
+      killProcess('python.exe /FI "WINDOWTITLE eq uvicorn*"', 'uvicorn', () => {
+        killProcess('python.exe', 'Python', () => {
+          killProcess('voicevox_engine.exe', 'VOICEVOX', () => {
+            console.log('🚪 すべてのプロセスを終了しました');
             
-            // 最後にアプリを終了
-            console.log('🚪 アプリを終了します');
-            setTimeout(() => {
+            // PowerShellスクリプトでさらに強制終了を試みる
+            try {
+              const path = require('path');
+              const stopScriptPath = path.join(__dirname, 'tools', 'stop_hisyotan.ps1');
+              console.log(`終了スクリプトを実行: ${stopScriptPath}`);
+              
+              exec(`powershell.exe -ExecutionPolicy Bypass -File "${stopScriptPath}"`, (error) => {
+                if (error) console.error('終了スクリプトエラー:', error);
+                
+                // 最後にアプリを終了
+                setTimeout(() => {
+                  app.exit(0);
+                }, 500);
+              });
+            } catch (error) {
+              console.error('終了スクリプト実行エラー:', error);
               app.exit(0);
-            }, 500);
+            }
           });
         });
       });
@@ -89,6 +109,29 @@ function setupIPCHandlers() {
 
 // アプリの初期化時にIPCハンドラを設定
 app.whenReady().then(() => {
+  console.log('🌸 Electronアプリの初期化完了');
   setupIPCHandlers();
   // 既存の初期化コード...
+});
+
+// アプリ終了時の処理
+app.on('before-quit', (event) => {
+  console.log('🚪 アプリの終了が要求されました');
+  
+  // バックエンドプロセスなどを確実に終了する処理を追加
+  try {
+    const { exec } = require('child_process');
+    
+    // Pythonプロセスを強制終了
+    exec('taskkill /F /IM python.exe', () => {
+      console.log('Pythonプロセスを終了しました');
+    });
+    
+    // VOICEVOXも終了
+    exec('taskkill /F /IM voicevox_engine.exe', () => {
+      console.log('VOICEVOXプロセスを終了しました');
+    });
+  } catch (error) {
+    console.error('終了処理中にエラーが発生しました:', error);
+  }
 });

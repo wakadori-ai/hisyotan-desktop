@@ -221,17 +221,46 @@ function setupIPC() {
   ipcMain.handle('start-window-drag', () => {
     console.log('💫 ウィンドウドラッグ開始（handle）');
     if (mainWindow) {
+      // ウィンドウドラッグのBrowserWindowのメソッドを呼び出す
       mainWindow.webContents.send('window-is-being-dragged');
+      // 実際のドラッグ処理はこちらで処理
+      mainWindow.dragWindow();
       return true;
     }
     return false;
   });
   
   // ウィンドウドラッグ開始 - on版
-  ipcMain.on('start-window-drag', () => {
+  ipcMain.on('start-window-drag', (event) => {
     console.log('💫 ウィンドウドラッグ開始（on）');
     if (mainWindow) {
       mainWindow.webContents.send('window-is-being-dragged');
+      // 実際のドラッグ処理 - Win32 APIを使用
+      mainWindow.setMovable(true);
+      mainWindow.startDrag();
+    }
+  });
+  
+  // 追加: 明示的なウィンドウドラッグ処理
+  ipcMain.on('drag-start', () => {
+    console.log('💫 drag-startイベントを受信しました');
+    if (mainWindow) {
+      try {
+        console.log('🖱️ ウィンドウドラッグを開始します');
+        // Windows環境ではsetMovableが必要
+        mainWindow.setMovable(true);
+        // Electronの標準APIでウィンドウを移動モードに
+        if (typeof mainWindow.startDrag === 'function') {
+          mainWindow.startDrag();
+        } else if (process.platform === 'win32') {
+          // Windows専用のカスタムドラッグ処理
+          exec('powershell -Command "(Add-Type -PassThru -Name Win32 -MemberDefinition \'[DllImport(\\"user32.dll\\")] public static extern bool ReleaseCapture(); [DllImport(\\"user32.dll\\")] public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);\' -Namespace Win32Functions)::ReleaseCapture(); (Add-Type -PassThru -Name Win32 -MemberDefinition \'[DllImport(\\"user32.dll\\")] public static extern bool ReleaseCapture(); [DllImport(\\"user32.dll\\")] public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);\' -Namespace Win32Functions)::SendMessage((Get-Process -Id ' + mainWindow.webContents.getOSProcessId() + ').MainWindowHandle, 0xA1, 0x2, 0)"');
+        }
+      } catch (error) {
+        console.error('ウィンドウドラッグエラー:', error);
+      }
+    } else {
+      console.error('ウィンドウが存在しません');
     }
   });
   

@@ -93,7 +93,17 @@ export function initUIElements() {
     pawButton.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       console.log('🔧 肉球ボタンが右クリックされました');
-      createTestSettingsUI();
+      
+      try {
+        // 設定UIを表示
+        createTestSettingsUI();
+        
+        // フォールバックとして直接メッセージも表示
+        showBubble('default', '設定メニューを開きますね');
+      } catch (error) {
+        console.error('設定UI表示エラー:', error);
+        showBubble('warning', '設定を開けませんでした');
+      }
     });
     
     // 左ドラッグ - ウィンドウ移動（シンプル版）
@@ -125,6 +135,12 @@ export function initUIElements() {
           if (window.electron.ipcRenderer.send) {
             console.log('🔄 sendメソッドでアプリとバックエンド終了を要求します');
             window.electron.ipcRenderer.send('quit-app-with-backend');
+            
+            // バックエンドのPythonプロセスを確実に終了するため少し待機
+            setTimeout(() => {
+              // 通常の方法でも終了を試みる
+              window.electron.ipcRenderer.send('quit-app');
+            }, 500);
           }
           
           // 第2手段: 通常のquit-app
@@ -218,44 +234,50 @@ function directWindowDragHandler(initialEvent) {
       window._wasDragging = true;
       moveCount++;
       
-      // 試行回数を制限（最大5回）
-      if (moveCount > 5) {
+      // 試行回数を制限（最大3回）
+      if (moveCount > 3) {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
         return;
       }
       
       // ドラッグ処理の多段フォールバック
-      // 1. ipcRenderer.sendを先に試す
       if (window.electron && window.electron.ipcRenderer) {
         try {
-          console.log('🔄 sendメソッドでウィンドウドラッグを開始します');
-          window.electron.ipcRenderer.send('start-window-drag');
+          // IPCイベントの順番を修正 - まず直接的なdrag-startを試す
+          console.log('🔄 drag-startイベントを発行します');
+          window.electron.ipcRenderer.send('drag-start');
+          
+          // 少し待って別のイベントも試す
+          setTimeout(() => {
+            if (isDragging) {
+              console.log('🔄 start-window-dragイベントを発行します');
+              window.electron.ipcRenderer.send('start-window-drag');
+            }
+          }, 50);
+          
+          // ipcRendererのinvokeも試す
+          setTimeout(() => {
+            if (isDragging) {
+              console.log('🔄 invokeメソッドでウィンドウドラッグを開始します');
+              window.electron.ipcRenderer.invoke('start-window-drag')
+                .catch(err => {
+                  console.error('ウィンドウドラッグエラー:', err);
+                });
+            }
+          }, 100);
           
           // 成功したと仮定してイベントリスナーを削除
           document.removeEventListener('mousemove', handleMouseMove);
           document.removeEventListener('mouseup', handleMouseUp);
         } catch (error) {
           console.error('IPC呼び出しエラー:', error);
+          // エラー時のフォールバック表示
+          showBubble('warning', 'ドラッグ機能にエラーが発生しました');
           
-          // 2. invoke方式を試す
-          try {
-            window.electron.ipcRenderer.invoke('start-window-drag')
-              .then(() => {
-                // 成功したらイベントリスナーを削除
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-              })
-              .catch(err => {
-                console.error('ウィンドウドラッグエラー:', err);
-              });
-          } catch (invokeError) {
-            console.error('invoke呼び出しエラー:', invokeError);
-            
-            // 3. 最後の手段 - 直接メッセージを表示
-            console.log('⚠️ ドラッグ機能が利用できません');
-            showBubble('warning', 'ドラッグ機能が利用できません');
-          }
+          // イベントリスナーを削除
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
         }
       } else {
         console.warn('electron IPCが利用できません');
