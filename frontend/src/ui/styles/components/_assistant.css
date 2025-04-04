@@ -5,14 +5,14 @@
   right: 0 !important;
   width: 250px !important;
   height: 420px !important;
-  z-index: 996 !important;
+  z-index: var(--z-index-base) !important;
   pointer-events: none !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: flex-end !important;
+  align-items: center !important;
   justify-content: flex-end !important;
   overflow: visible !important;
-  padding: 20px !important;
+  padding: var(--spacing-md) !important;
 }
 
 /* 立ち絵 */
@@ -20,22 +20,79 @@
   position: absolute;
   bottom: 0;
   right: 10px;
-  height: 80vh;
+  height: var(--assistant-image-height);
   max-height: 600px;
   width: auto; /* 幅を自動調整して縦横比を維持 */
   object-fit: contain; /* 縦横比を維持して表示 */
-  opacity: 1; /* opacityを0から1に変更 */
-  transition: opacity 0.5s ease-in-out;
+  opacity: 1;
+  transition: opacity var(--transition-duration) ease-in-out, 
+              transform var(--transition-duration) ease;
   user-select: none;
   pointer-events: auto;
   -webkit-app-region: drag; /* ドラッグ可能にする */
-  z-index: 10;
+  z-index: var(--z-index-base);
+  transform-origin: bottom center;
 }
 
 /* 立ち絵アクティブ状態 */
 .assistant-image.active {
   opacity: 1 !important;
   animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* 立ち絵の感情表現スタイル */
+.assistant-image.happy {
+  animation: bounce 2s infinite ease-in-out;
+}
+
+.assistant-image.sad {
+  filter: brightness(0.9);
+  transform: translateY(5px) scale(0.98);
+}
+
+.assistant-image.surprised {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+.assistant-image.angry {
+  filter: brightness(1.1) saturate(1.2);
+  animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* シェイクアニメーション（驚き、怒り用） */
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* 吹き出し */
+.speech-bubble {
+  position: absolute !important;
+  top: -120px !important;
+  left: 0 !important;
+  width: 250px !important;
+  max-width: 300px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 20px !important;
+  padding: 15px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+  z-index: 999 !important;
+  transition: opacity 0.3s ease, transform 0.3s ease !important;
+  pointer-events: auto !important;
+}
+
+.speech-bubble.show {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.speech-bubble.hide {
+  opacity: 0 !important;
+  transform: translateY(-10px) !important;
 }
 
 /* UI ボタンコンテナ */
@@ -72,10 +129,27 @@
 
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
+  .assistant-container {
+    width: 180px !important;
+    height: 300px !important;
+  }
+  
+  .assistant-image {
+    max-width: 160px;
+    max-height: 280px;
+  }
+}
+
+/* モバイル対応 */
+@media (max-width: 480px) {
+  .assistant-container {
+    width: 140px !important;
+    height: 240px !important;
+  }
+  
   .assistant-image {
     max-width: 120px;
-    max-height: 240px;
-    width: auto; /* 幅を自動調整して縦横比を維持 */
+    max-height: 200px;
   }
 }
 

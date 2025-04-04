@@ -35,9 +35,9 @@ export function initUIElements() {
     speechBubble: { id: 'speechBubble', type: 'div' },
     speechText: { id: 'speechText', type: 'div' },
     assistantImage: { id: 'assistantImage', type: 'img' },
-    // errorBubble と errorText は削除（不要なため生成しない）
-    statusIndicator: { id: 'statusIndicator', type: 'div' },
-    speechSettingUI: { id: 'speechSettingUI', type: 'div' }
+    // errorBubble関連の要素を完全に削除
+    statusIndicator: { id: 'statusIndicator', type: 'div' }
+    // speechSettingUI要素を削除（吹き出し内に表示するため）
   };
   
   // 各要素の初期化
@@ -59,9 +59,6 @@ export function initUIElements() {
           break;
         case 'statusIndicator':
           element.className = 'status-indicator';
-          break;
-        case 'speechSettingUI':
-          element.className = 'speech-setting-ui';
           break;
       }
       
@@ -523,18 +520,15 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
   setText(text);
   
   // 吹き出しのスタイルを設定
-  bubble.style.cssText = `
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 2147483647 !important;
-    pointer-events: auto !important;
-  `;
-  
-  // 必要に応じてクラスを設定
   bubble.className = 'speech-bubble';
   bubble.classList.add('show');
   
+  // 吹き出しを表示
+  bubble.style.display = 'flex';
+  bubble.style.visibility = 'visible';
+  bubble.style.opacity = '1';
+  
+  // タイプに応じたクラスを追加
   if (type === 'warning') {
     bubble.classList.add('warning');
   } else if (type === 'error') {
@@ -545,8 +539,41 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
     bubble.classList.add('zombie-warning');
   }
   
+  // 吹き出しが非表示にならないように監視
+  startBubbleObserver();
+  
   // 強制的に再描画を促す
   void bubble.offsetWidth;
+}
+
+// 吹き出しの表示状態を監視する関数
+let bubbleObserver = null;
+function startBubbleObserver() {
+  if (bubbleObserver) return; // 既に監視中なら何もしない
+  
+  const checkBubbleVisibility = () => {
+    const bubble = document.getElementById('speechBubble') || speechBubble;
+    if (!bubble) return;
+    
+    const computedStyle = window.getComputedStyle(bubble);
+    if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden' || parseFloat(computedStyle.opacity) < 0.1) {
+      console.log('💬 吹き出しが非表示になっていました。表示状態を復元します。');
+      bubble.style.display = 'flex';
+      bubble.style.visibility = 'visible';
+      bubble.style.opacity = '1';
+    }
+  };
+  
+  // 定期的に表示状態をチェック
+  bubbleObserver = setInterval(checkBubbleVisibility, 500);
+}
+
+// 監視を停止する関数
+function stopBubbleObserver() {
+  if (bubbleObserver) {
+    clearInterval(bubbleObserver);
+    bubbleObserver = null;
+  }
 }
 
 /**
@@ -577,14 +604,31 @@ function setText(text) {
 
 /**
  * 吹き出しを非表示にする
+ * 設定UIが表示されている場合は非表示にしない
  */
 export function hideSpeechBubble() {
   const bubble = document.getElementById('speechBubble') || speechBubble;
-  if (bubble) {
-    bubble.style.display = 'none';
-    bubble.classList.remove('show');
-    bubble.classList.add('hide');
+  if (!bubble) return;
+  
+  // 設定UIが表示されているかチェック
+  const textElement = document.getElementById('speechText') || speechText;
+  if (textElement && textElement.querySelector('.settings-container')) {
+    console.log('🔧 設定UIが表示中のため、吹き出しを非表示にしません');
+    return; // 設定UI表示中は非表示にしない
   }
+  
+  console.log('💬 吹き出しを非表示にします');
+  
+  // クラスの切り替え
+  bubble.classList.remove('show');
+  bubble.classList.add('hide');
+  
+  // 一定時間後に状態リセット
+  setTimeout(() => {
+    bubble.style.display = 'none';
+    // 次回表示時のためにクラスをリセット
+    bubble.classList.remove('hide', 'warning', 'error', 'success', 'zombie-warning');
+  }, 500);
 }
 
 /**
@@ -603,16 +647,6 @@ export function createUI() {
   const container = document.createElement('div');
   container.id = 'assistant-container';
   container.className = 'assistant-container';
-  container.style.position = 'fixed';
-  container.style.bottom = '0px';
-  container.style.right = '0px';
-  container.style.zIndex = '2147483647';
-  container.style.width = '250px';
-  container.style.height = '400px';
-  container.style.display = 'flex';
-  container.style.flexDirection = 'column';
-  container.style.alignItems = 'center';
-  container.style.justifyContent = 'flex-end';
   
   // 立ち絵の作成
   const assistantImage = document.createElement('img');
@@ -620,40 +654,19 @@ export function createUI() {
   assistantImage.className = 'assistant-image active';
   assistantImage.src = '/assets/images/secretary_normal.png';
   assistantImage.alt = '秘書たん';
-  assistantImage.style.width = 'auto';
-  assistantImage.style.height = '100%';
-  assistantImage.style.maxHeight = '400px';
-  assistantImage.style.display = 'block';
-  assistantImage.style.position = 'relative';
-  assistantImage.style.zIndex = '1';
-  assistantImage.style.objectFit = 'contain';
-  assistantImage.style.opacity = '1';
-  assistantImage.style.webkitAppRegion = 'drag';
+  assistantImage.style.webkitAppRegion = 'drag'; // ドラッグ可能に設定（これだけはインラインで）
   
   // 吹き出しの作成
   const speechBubble = document.createElement('div');
   speechBubble.id = 'speechBubble';
   speechBubble.className = 'speech-bubble';
-  speechBubble.style.position = 'absolute';
-  speechBubble.style.top = '-80px';
-  speechBubble.style.left = '0';
-  speechBubble.style.width = '200px';
-  speechBubble.style.maxWidth = '300px';
-  speechBubble.style.padding = '10px 15px';
-  speechBubble.style.background = 'rgba(255, 255, 255, 0.9)';
-  speechBubble.style.borderRadius = '20px';
-  speechBubble.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-  speechBubble.style.zIndex = '3';
-  speechBubble.style.display = 'none';
-  speechBubble.style.webkitAppRegion = 'drag';
+  speechBubble.style.display = 'none'; // 初期状態は非表示
+  speechBubble.style.webkitAppRegion = 'drag'; // ドラッグ可能に設定（これだけはインラインで）
   
   // 吹き出しテキストの作成
   const speechText = document.createElement('div');
   speechText.id = 'speechText';
   speechText.className = 'speech-text';
-  speechText.style.fontSize = '14px';
-  speechText.style.color = '#333';
-  speechText.style.lineHeight = '1.4';
   speechText.textContent = 'こんにちは！何かお手伝いしましょうか？';
   
   // 吹き出し要素を組み立て
@@ -663,28 +676,8 @@ export function createUI() {
   const pawButton = document.createElement('div');
   pawButton.id = 'paw-button';
   pawButton.className = 'paw-button';
-  pawButton.style.position = 'absolute';
-  pawButton.style.bottom = '10px';
-  pawButton.style.right = '10px';
-  pawButton.style.width = '40px';
-  pawButton.style.height = '40px';
-  pawButton.style.borderRadius = '50%';
-  pawButton.style.backgroundColor = 'rgba(255, 192, 203, 0.8)';
-  pawButton.style.cursor = 'pointer';
-  pawButton.style.zIndex = '2';
-  pawButton.style.display = 'flex';
-  pawButton.style.alignItems = 'center';
-  pawButton.style.justifyContent = 'center';
-  pawButton.style.fontSize = '24px';
-  pawButton.style.transition = 'transform 0.2s ease-in-out';
-  pawButton.style.transform = 'scale(1)';
   pawButton.textContent = '🐾';
-  pawButton.style.webkitAppRegion = 'no-drag';
-  
-  // 肉球ボタンのスタイル強化
-  pawButton.style.backgroundImage = 'radial-gradient(circle, #ffb6c1 0%, #ff69b4 100%)';
-  pawButton.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
-  pawButton.style.userSelect = 'none';
+  pawButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定（これだけはインラインで）
   
   // ホバーエフェクト
   pawButton.addEventListener('mouseover', () => {
@@ -699,24 +692,8 @@ export function createUI() {
   const quitButton = document.createElement('div');
   quitButton.id = 'quit-button';
   quitButton.className = 'quit-button';
-  quitButton.style.position = 'absolute';
-  quitButton.style.top = '5px';
-  quitButton.style.right = '5px';
-  quitButton.style.width = '30px';
-  quitButton.style.height = '30px';
-  quitButton.style.borderRadius = '50%';
-  quitButton.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
-  quitButton.style.cursor = 'pointer';
-  quitButton.style.zIndex = '10';
-  quitButton.style.display = 'flex';
-  quitButton.style.alignItems = 'center';
-  quitButton.style.justifyContent = 'center';
-  quitButton.style.color = 'white';
-  quitButton.style.fontSize = '20px';
-  quitButton.style.transition = 'opacity 0.2s ease-in-out';
-  quitButton.style.opacity = '0.8';
   quitButton.textContent = '×';
-  quitButton.style.webkitAppRegion = 'no-drag';
+  quitButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定（これだけはインラインで）
   
   // ホバーエフェクト
   quitButton.addEventListener('mouseover', () => {
