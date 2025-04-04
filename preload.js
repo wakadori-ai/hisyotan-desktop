@@ -18,14 +18,22 @@ console.log(`📂 __dirnameの値: ${__dirname}`);
 // Electronの機能をブラウザウィンドウで使えるようにする
 contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-    send: (channel, ...args) => ipcRenderer.send(channel, ...args),
+    invoke: (channel, ...args) => {
+      console.log(`🔄 IPC invoke: ${channel}`, args);
+      return ipcRenderer.invoke(channel, ...args);
+    },
+    send: (channel, ...args) => {
+      console.log(`🔄 IPC send: ${channel}`, args);
+      ipcRenderer.send(channel, ...args);
+    },
     on: (channel, func) => {
+      console.log(`🔄 IPC on: ${channel}`);
       const subscription = (event, ...args) => func(...args);
       ipcRenderer.on(channel, subscription);
       return () => ipcRenderer.removeListener(channel, subscription);
     },
     once: (channel, func) => {
+      console.log(`🔄 IPC once: ${channel}`);
       ipcRenderer.once(channel, (event, ...args) => func(...args));
     }
   },
@@ -51,16 +59,30 @@ contextBridge.exposeInMainWorld('electron', {
   // API接続先の設定（環境変数から取得、デフォルトは127.0.0.1）
   apiHost: process.env.API_HOST || '127.0.0.1',
   
-  // バックエンド接続確認
+  // バックエンドPIDの登録処理を追加
+  registerBackendPID: async (pid) => {
+    try {
+      console.log(`🔄 バックエンドPID登録を試みます: ${pid}`);
+      const result = await ipcRenderer.invoke('register-backend-pid', pid);
+      console.log('✅ バックエンドPID登録結果:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ バックエンドPID登録エラー:', error);
+      return false;
+    }
+  },
+  
+  // バックエンド接続確認の改善
   checkBackendConnection: async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/', {
+      const response = await fetch(`http://${process.env.API_HOST || '127.0.0.1'}:8000/`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
+        timeout: 3000 // タイムアウト設定を追加
       });
       return response.ok;
     } catch (err) {
-      console.error('バックエンド接続エラー:', err);
+      console.error('❌ バックエンド接続エラー:', err);
       return false;
     }
   },

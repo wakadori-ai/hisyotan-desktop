@@ -92,33 +92,37 @@ function setupDevCSP() {
 // バックエンドサーバーの起動
 async function startBackendServer() {
   try {
-    // すでにバックエンドが実行中の場合は何もしない
+    // 既存のバックエンドプロセスを確認
     if (backendProcess !== null) {
-      console.log('バックエンドサーバーはすでに起動しています');
-      return;
+      console.log('🔄 既存のバックエンドプロセスを終了します');
+      try {
+        backendProcess.kill('SIGTERM');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (backendProcess.exitCode === null) {
+          console.log('⚠️ プロセスが終了しないため、強制終了します');
+          backendProcess.kill('SIGKILL');
+        }
+      } catch (error) {
+        console.error('❌ プロセス終了エラー:', error);
+      }
+      backendProcess = null;
     }
+
+    console.log('🚀 バックエンドサーバーを起動します...');
     
-    console.log('バックエンドサーバーを起動します...');
+    // Pythonの実行パスを取得
+    const pythonPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'python', 'python.exe')
+      : 'python';
     
-    // Pythonの実行パスを取得（開発環境と本番環境で異なる可能性がある）
-    let pythonPath;
-    const isPackaged = app.isPackaged;
-    
-    if (isPackaged) {
-      // 本番環境（パッケージ化済み）の場合はリソースディレクトリ内のPythonを使用
-      pythonPath = path.join(process.resourcesPath, 'python', 'python.exe');
-    } else {
-      // 開発環境の場合はシステムPythonを使用
-      pythonPath = 'python';
-    }
-    
-    // バックエンドのスクリプトパス - ESMパス解決を使用
+    // バックエンドのスクリプトパス
     const backendScript = fileURLToPath(new URL('../../../backend/main.py', import.meta.url));
     
-    // バックエンドサーバーをサブプロセスとして起動
+    // バックエンドサーバーを起動
     backendProcess = spawn(pythonPath, [backendScript], {
-      stdio: 'pipe', // 標準出力とエラー出力を親プロセスにパイプ
-      detached: false // 親プロセスが終了した場合に子プロセスも終了させる
+      stdio: 'pipe',
+      detached: false,
+      windowsHide: true
     });
     
     // プロセスIDを記録
@@ -127,37 +131,40 @@ async function startBackendServer() {
     
     // 標準出力のリスニング
     backendProcess.stdout.on('data', (data) => {
-      // Python側がUTF-8で出力するようになったのでUTF-8でデコード
       const output = iconv.decode(data, 'utf-8').trim();
-      console.log(`バックエンド出力: ${output}`);
+      console.log(`📝 バックエンド出力: ${output}`);
     });
     
     // エラー出力のリスニング
     backendProcess.stderr.on('data', (data) => {
-      // Python側がUTF-8で出力するようになったのでUTF-8でデコード
       const output = iconv.decode(data, 'utf-8').trim();
-      console.error(`バックエンドエラー: ${output}`);
+      console.error(`❌ バックエンドエラー: ${output}`);
     });
     
     // プロセス終了時の処理
     backendProcess.on('close', (code) => {
-      console.log(`バックエンドサーバーが終了しました (コード: ${code})`);
+      console.log(`🛑 バックエンドサーバーが終了しました (コード: ${code})`);
       backendProcess = null;
+      backendPID = null;
     });
     
     // バックエンドサーバーの起動を待機
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log('バックエンドサーバー起動待機完了');
+    console.log('✅ バックエンドサーバー起動待機完了');
     
     // バックエンドの接続確認
-    await checkBackendConnection();
-    
-    // バックエンドプロセスの実際のPIDを取得（spawnで取得したPIDは親プロセスの場合がある）
-    await getBackendPID();
+    const isConnected = await checkBackendConnection();
+    if (!isConnected) {
+      throw new Error('バックエンドサーバーへの接続に失敗しました');
+    }
     
     return true;
   } catch (error) {
-    console.error('バックエンドサーバー起動エラー:', error);
+    console.error('❌ バックエンドサーバー起動エラー:', error);
+    if (backendProcess) {
+      backendProcess.kill('SIGKILL');
+      backendProcess = null;
+    }
     return false;
   }
 }
@@ -322,7 +329,7 @@ function createWindow() {
     script-src 'self' 'unsafe-inline' 'unsafe-eval';
     style-src 'self' 'unsafe-inline';
     img-src 'self' file: data: blob:;
-    connect-src 'self' http://localhost:* ws://localhost:*;
+    connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:*;
     media-src 'self' file: data: blob:;
   `;
   
@@ -334,7 +341,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload/preload.js'),
       webSecurity: true
     },
     frame: false,
@@ -448,12 +455,23 @@ app.on('window-all-closed', () => {
  * アプリケーション終了時の処理
  */
 app.on('before-quit', async () => {
-  console.log('アプリケーション終了処理を開始します...');
+  console.log('🛑 アプリケーション終了処理を開始します...');
   
-  // バックエンドサーバーを終了
-  if (backendProcess !== null) {
-    console.log('バックエンドサーバーを終了しています...');
-    backendProcess.kill();
+  if (backendProcess) {
+    console.log('🔄 バックエンドサーバーを終了しています...');
+    try {
+      // まずは正常終了を試みる
+      backendProcess.kill('SIGTERM');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // プロセスがまだ生きている場合は強制終了
+      if (backendProcess.exitCode === null) {
+        console.log('⚠️ プロセスが終了しないため、強制終了します');
+        backendProcess.kill('SIGKILL');
+      }
+    } catch (error) {
+      console.error('❌ バックエンド終了エラー:', error);
+    }
     backendProcess = null;
   }
 });
