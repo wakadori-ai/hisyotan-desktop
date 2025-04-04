@@ -25,12 +25,7 @@ import {
   resetObserver
 } from './helpers/speechObserver.js';
 
-import {
-  errorBubbleModule,
-  showError,
-  initErrorElements,
-  shouldShowError
-} from './helpers/errorBubble.js';
+// errorBubble関連のインポートを削除（不要なため）
 
 import {
   statusIndicatorModule,
@@ -62,7 +57,7 @@ export function initUIElements() {
   
   // 各モジュールの初期化関数を呼び出し
   initSpeechBubbleElements();
-  initErrorElements();
+  // initErrorElements の呼び出しを削除
   initStatusIndicator();
   initSettingUI();
   
@@ -87,9 +82,7 @@ export {
   observeSpeechTextAutoRecovery,
   resetObserver,
   
-  // errorBubble
-  showError,
-  shouldShowError,
+  // errorBubble関連のエクスポートを削除
   
   // statusIndicator
   updateConnectionStatus,
@@ -105,7 +98,7 @@ export {
 export const modules = {
   speechBubble: speechBubbleModule,
   speechObserver: speechObserverModule,
-  errorBubble: errorBubbleModule,
+  // errorBubble: errorBubbleModule, の行を削除
   statusIndicator: statusIndicatorModule,
   settingPanel: settingPanelModule
 };
@@ -118,8 +111,7 @@ if (typeof window !== 'undefined') {
       showBubble,
       hideBubble,
       setText,
-      showError,
-      shouldShowError,
+      // showError, shouldShowError, を削除
       updateConnectionStatus,
       renderSettingUI,
       initUIElements,
@@ -154,8 +146,7 @@ export default {
   showBubble,
   hideBubble,
   setText,
-  showError,
-  shouldShowError,
+  // showError, shouldShowError, を削除
   updateConnectionStatus,
   renderSettingUI,
   initUIElements,

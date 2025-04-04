@@ -2,8 +2,8 @@
 // WebSocket接続管理用のモジュール
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
-import { showError, shouldShowError } from '../ui/uiHelper.js';
 import { updateConnectionStatus } from '../ui/uiHelper.js';
+import { showBubble } from '../ui/uiHelper.js';
 import { speak, speakWithPreset } from '../emotion/speechManager.js';
 import { hideTimeoutMap } from '../emotion/speechManager.js';
 import { 
@@ -174,8 +174,8 @@ function connectWebSocket() {
         console.error('[WSパース失敗]', error);
         logError(`WebSocketメッセージのパース失敗: ${error.message}`, error);
         // エラー表示は起動猶予期間後のみ
-        if (shouldShowError()) {
-          showError('メッセージ処理中にエラーが発生しました');
+        if (shouldDisplayError()) {
+          displayError('メッセージ処理中にエラーが発生しました');
         }
       }
     };
@@ -210,8 +210,8 @@ function connectWebSocket() {
         logError('WebSocket再接続の最大試行回数に達しました', new Error('再接続失敗'));
         
         // 起動猶予期間後かつ未表示の場合のみエラー表示
-        if (shouldShowError() && !connectionErrorShown) {
-          showError('バックエンドサーバーに接続できません。サーバーが起動しているか確認してください。');
+        if (shouldDisplayError() && !connectionErrorShown) {
+          displayError('バックエンドサーバーに接続できません。サーバーが起動しているか確認してください。');
           connectionErrorShown = true;
         }
         
@@ -234,8 +234,8 @@ function connectWebSocket() {
       logDebug(`エラーが発生したため、次回は ${useAltUrl ? 'localhost' : '127.0.0.1'} URLを試します`);
       
       // 起動猶予期間後かつ未表示の場合のみエラー表示
-      if (shouldShowError() && !connectionErrorShown) {
-        showError('バックエンド接続中にエラーが発生しました');
+      if (shouldDisplayError() && !connectionErrorShown) {
+        displayError('バックエンド接続中にエラーが発生しました');
         connectionErrorShown = true;
       }
     };
@@ -254,8 +254,8 @@ function connectWebSocket() {
     logDebug(`エラーが発生したため、次回は ${useAltUrl ? 'localhost' : '127.0.0.1'} URLを試します`);
     
     // 起動猶予期間後かつ未表示の場合のみエラー表示
-    if (shouldShowError() && !connectionErrorShown) {
-      showError(`バックエンド接続エラー: ${error.message}`);
+    if (shouldDisplayError() && !connectionErrorShown) {
+      displayError(`バックエンド接続エラー: ${error.message}`);
       connectionErrorShown = true;
     }
     
@@ -367,7 +367,7 @@ function handleWebSocketMessage(message) {
       if (message.status === 'available') {
         logDebug('VOICEVOX利用可能');
       } else {
-        showError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
+        displayError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
       }
       break;
       
@@ -439,7 +439,7 @@ function handleWebSocketMessage(message) {
     case 'status_update':
       // ステータス更新の処理
       if (message.status === 'error') {
-        showError(message.message);
+        displayError(message.message);
       }
       break;
       
@@ -948,4 +948,22 @@ if (typeof window !== 'undefined') {
  */
 export function isWebSocketConnected() {
   return isConnected;
+}
+
+/**
+ * エラーメッセージを表示する (showErrorの代替関数)
+ * @param {string} message - エラーメッセージ
+ */
+function displayError(message) {
+  logError(`エラー: ${message}`);
+  showBubble('error', message);
+}
+
+/**
+ * エラーを表示すべきかどうかを判断する (shouldShowErrorの代替関数)
+ * @returns {boolean} エラーを表示すべきかどうか
+ */
+function shouldDisplayError() {
+  // 常にエラーを表示する
+  return true;
 } 

@@ -2,10 +2,7 @@
 // エラー表示機能を担当するモジュール
 
 import { logDebug, logError } from '@core/logger.js';
-
-// DOM要素
-let errorBubble;
-let errorText;
+import { showBubble } from '@ui/uiHelper.js';
 
 // 起動猶予期間の設定
 const INIT_GRACE_PERIOD_MS = 5000;
@@ -18,25 +15,7 @@ let lastErrorTime = 0;
  */
 export function initErrorElements() {
   logDebug('エラー表示要素初期化を開始');
-  
-  // 要素の取得
-  errorBubble = document.getElementById('errorBubble');
-  errorText = document.getElementById('errorText');
-  
-  // 各要素の存在確認とログ
-  if (errorBubble) {
-    logDebug('errorBubble要素を取得しました');
-  } else {
-    logError('errorBubble要素が見つかりません');
-  }
-  
-  if (errorText) {
-    logDebug('errorText要素を取得しました');
-  } else {
-    logError('errorText要素が見つかりません');
-  }
-  
-  logDebug('エラー表示要素初期化が完了しました');
+  logDebug('エラー表示は現在 showBubble に移行しました');
 }
 
 /**
@@ -72,44 +51,8 @@ export function showError(message, force = false) {
   
   logDebug(`エラー表示関数が呼び出されました: ${message}`);
   
-  // DOM要素が確実に取得できるか再チェック
-  if (!errorText || !errorBubble) {
-    logDebug('errorText/errorBubble要素が見つかりません。再取得を試みます');
-    errorText = document.getElementById('errorText');
-    errorBubble = document.getElementById('errorBubble');
-    
-    if (!errorText || !errorBubble) {
-      logError('エラー表示要素の取得に失敗しました', new Error('DOM要素が見つかりません'));
-      console.error('エラーメッセージを表示できません:', message);
-      return;
-    }
-  }
-  
-  // エラーメッセージをセット
-  errorText.textContent = `「${message}」`;
-  
-  // 確実に表示するため強制的なスタイル設定
-  errorBubble.style.cssText = `
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: absolute !important;
-    top: 20px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    z-index: 2147483647 !important;
-    pointer-events: auto !important;
-  `;
-  
-  // 8秒後に非表示
-  setTimeout(() => {
-    errorBubble.style.cssText = `
-      display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
-    `;
-    logDebug(`エラー表示を終了: ${message}`);
-  }, 8000);
+  // showBubbleを使用してエラーメッセージを表示
+  showBubble('error', message);
   
   logDebug(`エラー表示を開始: ${message}`);
 }

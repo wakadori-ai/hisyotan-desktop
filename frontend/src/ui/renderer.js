@@ -2,7 +2,7 @@
 // 秘書たんのUI制御用エントリポイント
 
 // スタイルシートをインポート
-// import '@ui/styles.css';
+import '@ui/styles/main.css';
 
 // 肉球UIをインポート（重要：これがないとpaw.jsが読み込まれない）
 import '@ui/paw.js';

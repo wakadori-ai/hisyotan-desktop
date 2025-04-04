@@ -4,7 +4,6 @@
  */
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
-import { showError } from '@ui/uiHelper.js';
 import { showBubble } from '@ui/uiHelper.js';
 import { hideBubble } from '@ui/handlers/bubbleManager.js';
 import { 
@@ -21,6 +20,15 @@ import {
 import { playPresetSound } from '@emotion/audioReactor.js';
 import { formatMessage, forceShowBubble } from '@emotion/bubbleDisplay.js';
 import { requestVoiceSynthesis } from './voicevoxClient.js';
+
+/**
+ * エラーメッセージを表示する (showErrorの代替関数)
+ * @param {string} message - エラーメッセージ
+ */
+function displayError(message) {
+  logError(`エラー: ${message}`);
+  showBubble('error', message);
+}
 
 // 多重実行防止用の変数
 let lastSpokenEvent = null;
@@ -274,7 +282,7 @@ export async function speak(
     return success;
   } catch (error) {
     logError(`発話エラー: ${error.message}`);
-    showError(`発話処理に失敗しました: ${error.message}`);
+    showBubble('error', `発話処理に失敗しました: ${error.message}`);
     return false;
   }
 }

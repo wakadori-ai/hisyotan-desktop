@@ -108,7 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function checkUIElements(includeStyles = false) {
   const elements = [
     'paw-button', 'quit-button', 'speechBubble', 
-    'speechText', 'assistantImage', 'errorBubble'
+    'speechText', 'assistantImage'
+    // 'errorBubble' を削除（不要なため）
   ];
   
   console.log('🔍 UI要素チェック結果:');
@@ -135,6 +136,22 @@ function checkUIElements(includeStyles = false) {
           el.style.display = 'block';
           el.style.opacity = '1';
           el.style.visibility = 'visible';
+        }
+      }
+      
+      // pawButtonの見た目を確認・修正
+      if (id === 'paw-button') {
+        console.log(`  - backgroundColor: ${computedStyle.backgroundColor}`);
+        console.log(`  - backgroundImage: ${computedStyle.backgroundImage}`);
+        
+        // 肉球ボタンの外観を強化（白い四角の問題を解決）
+        if (computedStyle.backgroundImage === 'none' || computedStyle.backgroundColor === 'rgba(0, 0, 0, 0)') {
+          console.log('肉球ボタンの見た目に問題があります。スタイルを強化します。');
+          el.style.backgroundImage = 'radial-gradient(circle, #ffb6c1 0%, #ff69b4 100%)';
+          el.style.backgroundColor = 'rgba(255, 192, 203, 0.8)';
+          el.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
+          el.style.fontSize = '24px';
+          el.textContent = '🐾';
         }
       }
     }

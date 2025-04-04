@@ -4,7 +4,6 @@
  */
 
 import { logDebug, logError } from '@core/logger.js';
-import { showError, shouldShowError } from '@ui/helpers/errorBubble.js';
 import { 
   showBubble, 
   hideBubble, 
@@ -32,6 +31,24 @@ import {
   getHordeModeState,
   setHordeModeState
 } from './hordeModeToggle.js';
+
+/**
+ * エラーメッセージを表示する (showErrorの代替関数)
+ * @param {string} message - エラーメッセージ
+ */
+function displayError(message) {
+  logError(`エラー: ${message}`);
+  showBubble('error', message);
+}
+
+/**
+ * エラーを表示すべきかどうかを判断する (shouldShowErrorの代替関数)
+ * @returns {boolean} エラーを表示すべきかどうか
+ */
+function shouldDisplayError() {
+  // 常にエラーを表示する
+  return true;
+}
 
 /**
  * 秘書たんの発話・音声合成を管理するクラス
@@ -213,7 +230,7 @@ export class SpeechManager {
       );
     } catch (error) {
       logError(`発話エラー: ${error.message}`);
-      showError(`発話処理に失敗しました: ${error.message}`);
+      showBubble('error', `発話処理に失敗しました: ${error.message}`);
       return false;
     }
   }
@@ -247,9 +264,9 @@ export class SpeechManager {
         setTimeout(() => {
           this.checkVoicevoxConnection().catch(err => logDebug(`再試行時のエラー: ${err.message}`));
         }, this.VOICEVOX_RETRY_INTERVAL);
-      } else if (shouldShowError() && !this.voicevoxConnectionErrorShown) {
+      } else if (shouldDisplayError() && !this.voicevoxConnectionErrorShown) {
         // 最大再試行回数を超えた場合のみエラー表示（猶予期間後）
-        showError('VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
+        showBubble('error', 'VOICEVOXに接続できません。VOICEVOXが起動しているか確認してください。');
         this.voicevoxConnectionErrorShown = true;
       }
       
