@@ -354,7 +354,7 @@ def speak(
         logger.debug(f"WAVファイルを保存: {wav_path}")
         
         # 音声再生
-        play_voice(wav_path)
+        # play_voice(wav_path)
         
         return wav_path
     except Exception as e:
@@ -365,33 +365,11 @@ def speak(
 # 音声ファイルを再生
 def play_voice(wav_path: str):
     """
-    WAVファイルを再生
-    
-    Args:
-        wav_path: 再生するWAVファイルのパス
+    WAVファイルを再生（今は何もしない！）
     """
-    try:
-        # Windows環境での再生
-        command = f'powershell -c "(New-Object Media.SoundPlayer \'{wav_path}\').PlaySync();"'
-        
-        # 別プロセスで非同期実行
-        def play_process():
-            try:
-                os.system(command)
-                # 音声再生が終了したらフラグをリセット
-                reset_audio_playback()
-            except Exception as e:
-                logger.error(f"音声再生エラー: {str(e)}")
-                reset_audio_playback()
-        
-        # 別スレッドで音声再生
-        play_thread = threading.Thread(target=play_process)
-        play_thread.daemon = True
-        play_thread.start()
-        
-    except Exception as e:
-        logger.error(f"音声再生エラー: {str(e)}")
-        reset_audio_playback()
+    logger.info(f"[再生スキップ] {wav_path}")
+    reset_audio_playback()
+
 
 def play_voice_async(wav_path: str) -> Optional[concurrent.futures.Future[int]]:
     """
@@ -441,23 +419,11 @@ def is_voice_cached(text: str, speaker_id: int = 0) -> bool:
     cache_path = get_voice_cache_path(text, speaker_id)
     return os.path.exists(cache_path)
 
-def play_preset_voice(preset_name: str) -> Optional[concurrent.futures.Future[int]]:
-    """
-    プリセット音声を即時に再生
-    
-    Args:
-        preset_name: プリセット名（ファイル名から.wavを除いたもの）
-        
-    Returns:
-        Future: 再生処理のFutureオブジェクト（失敗時はNone）
-    """
-    preset_path = os.path.join(PRESET_VOICE_DIR, f"{preset_name}.wav")
-    if not os.path.exists(preset_path):
-        logger.warning(f"プリセット音声が見つかりません: {preset_path}")
-        return None
-        
-    logger.debug(f"プリセット音声を再生: {preset_name}")
-    return play_voice_async(preset_path)
+
+def play_preset_voice(filename: str):
+    logger.info(f"[スキップ] プリセット音声の再生: {filename}")
+    reset_audio_playback()
+
 
 def speak_with_preset(
     text: str,
@@ -487,27 +453,27 @@ def speak_with_preset(
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     
     # プリセット音声を即時再生
-    preset_future = play_preset_voice(preset_name)
-    if preset_future is None:
-        # プリセット失敗時は通常の音声合成のみ実行
-        speak(text, speaker_id, speed, pitch, intonation, volume)
-        return
+    # preset_future = play_preset_voice(preset_name)
+    # if preset_future is None:
+    #     # プリセット失敗時は通常の音声合成のみ実行
+    #     speak(text, speaker_id, speed, pitch, intonation, volume)
+    #     return
     
     # キャッシュを確認
-    if is_voice_cached(text, speaker_id):
-        # キャッシュが存在する場合、遅延後に再生
-        def play_cached_after_delay():
-            try:
-                time.sleep(delay)  # 指定された遅延
-                play_voice(cache_path)
-            except Exception as e:
-                logger.error(f"キャッシュ音声再生エラー: {e}")
+    # if is_voice_cached(text, speaker_id):
+    #     # キャッシュが存在する場合、遅延後に再生
+    #     def play_cached_after_delay():
+    #         try:
+    #             time.sleep(delay)  # 指定された遅延
+    #             # play_voice(cache_path)
+    #         except Exception as e:
+    #             logger.error(f"キャッシュ音声再生エラー: {e}")
         
-        # 別スレッドでキャッシュ音声再生
-        cache_thread = threading.Thread(target=play_cached_after_delay)
-        cache_thread.daemon = True
-        cache_thread.start()
-        return
+    #     # 別スレッドでキャッシュ音声再生
+    #     cache_thread = threading.Thread(target=play_cached_after_delay)
+    #     cache_thread.daemon = True
+    #     cache_thread.start()
+    #     return
     
     # キャッシュがない場合は合成して保存
     def synthesize_and_play():
@@ -560,15 +526,15 @@ def speak_with_preset(
             
             # 遅延後に再生
             time.sleep(delay)
-            play_voice(cache_path)
+            # play_voice(cache_path)
             
         except Exception as e:
             logger.error(f"音声合成・再生エラー: {e}")
     
     # 別スレッドで音声合成と再生を実行
-    synth_thread = threading.Thread(target=synthesize_and_play)
-    synth_thread.daemon = True
-    synth_thread.start()
+    # synth_thread = threading.Thread(target=synthesize_and_play)
+    # synth_thread.daemon = True
+    # synth_thread.start()
 
 def safe_speak_with_preset(
     text: str,
@@ -617,7 +583,7 @@ def safe_speak_with_preset(
     
     # 重複の場合はプリセットのみ再生
     if duplicate:
-        play_preset_voice(preset_name)
+        # play_preset_voice(preset_name)
         return
     
     # プリセットと合成音声を再生
