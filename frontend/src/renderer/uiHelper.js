@@ -27,27 +27,37 @@ export function initUIElements() {
   
   // 肉球ボタンのイベント設定
   if (pawButton) {
+    console.log('🐾 pawButtonにイベントリスナーを設定します');
     pawButton.addEventListener('click', () => {
+      console.log('🐾 肉球ボタンがクリックされました');
       createTestSettingsUI();
     });
+  } else {
+    console.error('❌ pawButtonが見つかりません');
   }
   
   // 終了ボタンのイベント設定
   if (quitButton) {
+    console.log('🚪 quitButtonにイベントリスナーを設定します');
     quitButton.addEventListener('click', () => {
+      console.log('🚪 終了ボタンがクリックされました');
       if (window.electron && window.electron.ipcRenderer) {
         window.electron.ipcRenderer.send('quit-app');
       } else {
         console.error('Electron IPCが利用できません');
       }
     });
+  } else {
+    console.error('❌ quitButtonが見つかりません');
   }
   
   // 立ち絵を表示
   if (assistantImage) {
-    setTimeout(() => {
-      assistantImage.classList.add('active');
-    }, 500);
+    console.log('👩‍💼 assistantImageを表示します');
+    // 即時クラス追加に変更
+    assistantImage.classList.add('active');
+  } else {
+    console.error('❌ assistantImageが見つかりません');
   }
   
   console.log('✨ uiHelper: UI要素の初期化が完了しました');
@@ -113,7 +123,7 @@ export function createUI() {
         <div id="speechBubble" class="speech-bubble">
           <div id="speechText" class="speech-text">「こんにちは！何かお手伝いしましょうか？」</div>
         </div>
-        <img id="assistantImage" class="assistant-image" src="/assets/secretary.png" alt="秘書たん">
+        <img id="assistantImage" class="assistant-image" src="/src/ui/public/assets/images/secretary_normal.png" alt="秘書たん">
         <div class="ui-buttons">
           <div id="paw-button">
             <div class="paw-button-wrapper">
