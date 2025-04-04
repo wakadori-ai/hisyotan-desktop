@@ -18,7 +18,7 @@ import {
   stopNervousShake
 } from '../expressionManager.js';
 import { playPresetSound } from '@emotion/audioReactor.js';
-import { formatMessage, forceShowBubble } from './bubbleDisplay.js';
+import { formatMessage, forceShowBubble } from '../bubbleDisplay.js';
 import { requestVoiceSynthesis } from './voicevoxClient.js';
 
 // 多重実行防止用の変数
