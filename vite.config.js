@@ -16,10 +16,6 @@ export default defineConfig({
     }
   },
   
-  // 静的アセット用のパブリックディレクトリを設定
-  // frontend/ui/public が実際のパブリックフォルダになります
-  publicDir: 'src/ui/public',
-  
   // Electron統合のためのサーバー設定
   server: {
     port: 5173,

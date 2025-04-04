@@ -427,7 +427,7 @@ ipcMain.handle('check-image-exists', (event, imagePath) => {
 ipcMain.handle('resolve-asset-path', (event, relativePath) => {
   try {
     const fullPath = process.env.VITE_DEV_SERVER_URL 
-      ? path.join(process.cwd(), 'frontend', 'ui', 'public', relativePath)
+      ? path.join(process.cwd(), 'frontend', 'public', relativePath)
       : path.join(app.getAppPath(), 'dist', relativePath);
     
     console.log(`アセットパス解決: ${relativePath} => ${fullPath}`);

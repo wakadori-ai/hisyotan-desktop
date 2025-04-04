@@ -497,11 +497,12 @@ export function createUI() {
   window.assistantImage = assistantImage;
 
   // モジュール内グローバル変数にも割り当て
-  this.pawButton = pawButton;
-  this.quitButton = quitButton;
-  this.speechBubble = speechBubble;
-  this.speechText = speechText;
-  this.assistantImage = assistantImage;
+  // thisではなくモジュールスコープの変数に直接割り当てる
+  pawButton = pawButton;
+  quitButton = quitButton;
+  speechBubble = speechBubble;
+  speechText = speechText;
+  assistantImage = assistantImage;
 
   // イベントリスナーの設定（DOM要素を直接渡す）
   setTimeout(() => {

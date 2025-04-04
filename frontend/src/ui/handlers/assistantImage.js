@@ -39,13 +39,13 @@ export function setupAssistantImage() {
  * @returns {Promise<string>} 絶対パス
  */
 export async function resolveImagePath(relativePath) {
-  if (!window.electronAPI || !window.electronAPI.resolveImagePath) {
+  if (!window.electronAPI || !window.electronAPI.resolveAssetPath) {
     return relativePath; // ElectronAPIが使用できない場合はそのまま返す
   }
   
   try {
     // Electron側で画像パスを解決
-    const resolvedPath = await window.electronAPI.resolveImagePath(relativePath);
+    const resolvedPath = await window.electronAPI.resolveAssetPath(relativePath);
     return resolvedPath;
   } catch (error) {
     logError(`画像パス解決エラー: ${error.message}`);
