@@ -15,7 +15,7 @@ import {
   stopNervousShake,
   setExpression
 } from '../emotion/expressionManager.js';
-import { playPresetSound } from '../voice/audioReactor.js';
+import { playPresetSound } from '@emotion/audioReactor.js';
 import zombieOverlayManager from '../ui/overlayManager.js';
 
 let websocket = null; // WebSocketオブジェクト

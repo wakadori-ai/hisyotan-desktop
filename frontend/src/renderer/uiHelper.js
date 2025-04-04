@@ -112,10 +112,21 @@ export function initUIElements() {
     quitButton.addEventListener('click', () => {
       console.log('🚪 終了ボタンがクリックされました');
       
+      // 終了前の確認メッセージを表示（オプション）
+      if (window.speechManager) {
+        window.speechManager.speak('さようなら、またね！', 'normal', 2000, null, 'quit_app');
+      }
+      
       // マルチレベルフォールバック
       if (window.electron && window.electron.ipcRenderer) {
         try {
-          // 第1手段: send（より確実）
+          // 第1手段: 最も確実なquit-app-with-backend 使用
+          if (window.electron.ipcRenderer.send) {
+            console.log('🔄 sendメソッドでアプリとバックエンド終了を要求します');
+            window.electron.ipcRenderer.send('quit-app-with-backend');
+          }
+          
+          // 第2手段: 通常のquit-app
           console.log('🔄 sendメソッドでアプリ終了を要求します');
           window.electron.ipcRenderer.send('quit-app');
           

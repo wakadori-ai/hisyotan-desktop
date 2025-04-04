@@ -4,6 +4,7 @@
   width: 64px;
   height: 64px;
   margin-bottom: 15px;
+  -webkit-app-region: drag; /* ドラッグ可能領域 */
 }
 
 /* 肉球アイコン */
@@ -47,6 +48,7 @@
   user-select: none;
   -webkit-user-drag: none;
   animation: floatPaw 4s ease-in-out infinite;
+  -webkit-app-region: no-drag; /* クリック可能領域 */
 }
 
 /* ホバー時のスタイル */
@@ -84,6 +86,7 @@
   transition: all 0.3s ease;
   border: 2px solid rgba(255, 255, 255, 0.5);
   opacity: 0.7;
+  -webkit-app-region: no-drag; /* クリック可能領域 */
 }
 
 #quit-button:hover {

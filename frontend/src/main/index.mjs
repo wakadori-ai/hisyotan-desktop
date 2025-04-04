@@ -222,7 +222,6 @@ function setupIPC() {
     console.log('💫 ウィンドウドラッグ開始（handle）');
     if (mainWindow) {
       mainWindow.webContents.send('window-is-being-dragged');
-      mainWindow.startWindowDrag();
       return true;
     }
     return false;
@@ -233,7 +232,6 @@ function setupIPC() {
     console.log('💫 ウィンドウドラッグ開始（on）');
     if (mainWindow) {
       mainWindow.webContents.send('window-is-being-dragged');
-      mainWindow.startWindowDrag();
     }
   });
   

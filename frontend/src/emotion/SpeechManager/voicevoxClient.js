@@ -5,6 +5,12 @@
 
 import { logDebug, logError } from '@core/logger.js';
 
+// AudioContextのシングルトンインスタンス
+let audioContext = null;
+
+// 音声再生中フラグ
+let isPlaying = false;
+
 /**
  * 音声合成リクエストを送信する
  * @param {string} text - 合成するテキスト
@@ -57,8 +63,8 @@ export async function requestVoiceSynthesis(text, emotion = 'normal', speakerId 
     
     logDebug(`リクエスト内容: ${JSON.stringify(requestBody)}`);
     
-    // バックエンド側で音声合成＆再生するAPIを呼び出す
-    const response = await fetch(`${apiBaseUrl}/api/voice/speak`, {
+    // バックエンド側で音声合成＆WAVデータ取得するAPIを呼び出す
+    const response = await fetch(`${apiBaseUrl}/api/voice/synthesize`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -75,14 +81,12 @@ export async function requestVoiceSynthesis(text, emotion = 'normal', speakerId 
       throw new Error(`バックエンドAPI呼び出し失敗: ${response.status} ${response.statusText}`);
     }
     
-    // レスポンスからステータスを確認
-    const result = await response.json();
-    if (result.status !== 'success') {
-      logError(`音声再生リクエストエラー: ${result.message}`);
-      throw new Error(`音声再生リクエストエラー: ${result.message}`);
-    }
+    // WAVデータを取得（バイナリデータとして）
+    const audioData = await response.arrayBuffer();
     
-    logDebug(`音声再生リクエスト成功: ${result.message}`);
+    // フロントエンド側で音声再生
+    await playAudioData(audioData);
+    
     return true;
     
   } catch (error) {
@@ -108,6 +112,79 @@ export async function requestVoiceSynthesis(text, emotion = 'normal', speakerId 
 }
 
 /**
+ * 音声データを再生する関数
+ * @param {ArrayBuffer} audioData - 再生する音声データ（WAVフォーマット）
+ * @returns {Promise<boolean>} 再生が完了したらtrueを返す
+ */
+async function playAudioData(audioData) {
+  try {
+    // 再生中の場合は前の再生を停止
+    if (isPlaying) {
+      logDebug('前の音声再生を停止します');
+      if (audioContext) {
+        await audioContext.close();
+        audioContext = null;
+      }
+    }
+    
+    // AudioContextの初期化
+    if (!audioContext) {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        logDebug('AudioContextを初期化しました');
+      } catch (err) {
+        logError(`AudioContext初期化エラー: ${err.message}`);
+        return false;
+      }
+    }
+    
+    // 音声データをデコード
+    const audioBuffer = await audioContext.decodeAudioData(audioData);
+    
+    // 音源ノードを作成
+    const sourceNode = audioContext.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    
+    // 音量ノードを追加
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = 1.0; // 最大音量
+    
+    // ノードを接続
+    sourceNode.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // 再生中フラグをセット
+    isPlaying = true;
+    logDebug('音声再生を開始します');
+    
+    // 再生開始
+    sourceNode.start(0);
+    
+    // 再生終了時の処理
+    return new Promise((resolve) => {
+      sourceNode.onended = () => {
+        isPlaying = false;
+        logDebug('音声再生が完了しました');
+        resolve(true);
+      };
+      
+      // タイムアウト処理（万が一onendedが発火しない場合の保険）
+      setTimeout(() => {
+        if (isPlaying) {
+          isPlaying = false;
+          logDebug('音声再生タイムアウト処理を実行しました');
+          resolve(true);
+        }
+      }, audioBuffer.duration * 1000 + 500);
+    });
+  } catch (error) {
+    isPlaying = false;
+    logError(`音声再生エラー: ${error.message}`);
+    return false;
+  }
+}
+
+/**
  * VOICEVOX接続確認API呼び出し
  * @returns {Promise<boolean>} 接続成功したかどうか
  */
@@ -128,7 +205,16 @@ export async function checkVoicevoxConnection() {
   }
 }
 
+/**
+ * 現在音声が再生中かどうか
+ * @returns {boolean} 再生中ならtrue
+ */
+export function isAudioPlaying() {
+  return isPlaying;
+}
+
 export default {
   requestVoiceSynthesis,
-  checkVoicevoxConnection
+  checkVoicevoxConnection,
+  isAudioPlaying
 }; 

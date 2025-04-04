@@ -48,7 +48,46 @@ function setupPawEvents() {
     // ドラッグ操作ではない場合のみセリフ再生
     if (!isDragging) {
       logDebug('肉球がクリックされました - ランダムセリフを再生します');
-      showRandomLine();
+      
+      // クールタイムチェック（連打防止）
+      const now = Date.now();
+      const lastClick = pawButton._lastClickTime || 0;
+      const cooldown = 1000; // 1秒間のクールタイム
+      
+      if (now - lastClick < cooldown) {
+        logDebug('クールタイム中のためスキップします');
+        return;
+      }
+      
+      pawButton._lastClickTime = now;
+      
+      // speechManagerの存在確認
+      if (window.speechManager) {
+        // グローバルスコープから取得したSpeechManagerでランダムセリフを再生
+        try {
+          const phrases = [
+            { text: "おつかれさま〜…ぎゅってしてあげたい気分なの", emotion: "soft" },
+            { text: "すごいよ…ちゃんと頑張ってるの、見てるからね", emotion: "gentle" },
+            { text: "ふにゃ…今日はのんびりしよ？", emotion: "soft" },
+            { text: "ねぇ、ちょっとだけ甘えてもいい…？", emotion: "happy" },
+            { text: "ここにいるからね。ひとりじゃないよ", emotion: "normal" },
+            { text: "お水飲んだ？小休憩しよっか", emotion: "gentle" },
+            { text: "えらいえらい…よしよしっ", emotion: "happy" },
+            { text: "もし疲れたら、ぎゅってするからね🐾", emotion: "soft" }
+          ];
+          
+          const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+          window.speechManager.speak(phrase.text, phrase.emotion, 5000, null, 'random_speak');
+          logDebug(`セリフ再生: "${phrase.text}"`);
+        } catch (error) {
+          logDebug(`セリフ再生エラー: ${error.message}`);
+        }
+      } else if (window.showRandomLine) {
+        // バックアップ: 古い関数を使用
+        window.showRandomLine();
+      } else {
+        logDebug('セリフ再生機能が利用できません');
+      }
     }
     // バブリングを停止
     e.stopPropagation();
@@ -95,7 +134,68 @@ function setupPawEvents() {
   pawButton.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     logDebug('肉球が右クリックされました - 設定吹き出しを表示します');
-    createTestSettingsUI();
+    
+    // SpeechManagerの設定UIを表示
+    if (window.speechManager && window.speechManager.speakWithObject) {
+      try {
+        // 設定UIを含むセリフオブジェクトを作成
+        const settingSpeech = {
+          id: 'setting_ui',
+          type: 'setting',
+          text: '設定を変更しますか？',
+          emotion: 'normal',
+          uiPayload: {
+            type: 'setting',
+            title: '秘書たん設定',
+            options: [
+              {
+                type: 'toggle',
+                id: 'enableVoice',
+                label: '音声を有効にする',
+                value: true,
+                onChange: (newValue) => {
+                  logDebug(`音声設定が変更されました: ${newValue}`);
+                  // 設定変更後のフィードバック
+                  setTimeout(() => {
+                    if (window.speechManager) {
+                      window.speechManager.speak(
+                        newValue ? '音声をオンにしました！' : '音声をオフにしました',
+                        newValue ? 'happy' : 'normal'
+                      );
+                    }
+                  }, 300);
+                }
+              },
+              {
+                type: 'slider',
+                id: 'volume',
+                label: '音量',
+                min: 0,
+                max: 100,
+                value: 70,
+                onChange: (newValue) => {
+                  logDebug(`音量が変更されました: ${newValue}`);
+                }
+              }
+            ]
+          }
+        };
+        
+        // 設定UIを表示
+        window.speechManager.speakWithObject(settingSpeech);
+      } catch (error) {
+        logDebug(`設定UI表示エラー: ${error.message}`);
+        // フォールバック: 古い関数を使用
+        if (typeof createTestSettingsUI === 'function') {
+          createTestSettingsUI();
+        }
+      }
+    } else if (typeof createTestSettingsUI === 'function') {
+      // バックアップ: 古い関数を使用
+      createTestSettingsUI();
+    } else {
+      logDebug('設定UI機能が利用できません');
+    }
   });
 }
 

@@ -3,7 +3,7 @@
 
 import { logDebug } from '@core/logger.js';
 import { speak } from '../emotion/speechManager.js';
-import { reactWithVoice } from '../voice/audioReactor.js';
+import { reactWithVoice } from '@emotion/audioReactor.js';
 
 let randomLinesController = null; // ランダムセリフ表示の制御オブジェクト
 
