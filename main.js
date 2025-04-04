@@ -46,15 +46,48 @@ try {
   process.exit(1);
 }
 
+// バックエンドのシャットダウンAPIを呼び出す関数
+async function shutdownBackend(force = false) {
+  try {
+    console.log(`🔌 バックエンドのシャットダウンAPIを呼び出します (force=${force})`);
+    
+    // fetch APIを使って、バックエンドのシャットダウンエンドポイントを呼び出す
+    const { default: fetch } = await import('node-fetch');
+    const response = await fetch('http://127.0.0.1:8000/api/shutdown', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force }),
+      timeout: 3000 // 3秒でタイムアウト
+    }).catch(err => {
+      console.error('❌ バックエンドシャットダウンAPI呼び出しエラー:', err);
+      return null;
+    });
+    
+    if (response && response.ok) {
+      console.log('✅ バックエンドのシャットダウンAPIが正常に応答しました');
+      return true;
+    } else {
+      console.warn('⚠️ バックエンドのシャットダウンAPIが正常に応答しませんでした');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ バックエンドシャットダウン処理エラー:', error);
+    return false;
+  }
+}
+
 // IPCイベントハンドラを設定する関数
 function setupIPCHandlers() {
   // 既存のハンドラ...
   
   // バックエンドを含めて完全に終了するハンドラ
-  ipcMain.on('quit-app-with-backend', (event) => {
+  ipcMain.on('quit-app-with-backend', async (event) => {
     console.log('⚠️ バックエンドを含む完全終了を要求されました');
     
     try {
+      // まずバックエンドのシャットダウンAPIを呼び出す
+      await shutdownBackend(true);
+      
       // バックエンドプロセスを確実に終了
       const { exec } = require('child_process');
       
@@ -115,23 +148,41 @@ app.whenReady().then(() => {
 });
 
 // アプリ終了時の処理
-app.on('before-quit', (event) => {
+app.on('before-quit', async (event) => {
   console.log('🚪 アプリの終了が要求されました');
+  
+  // イベントをキャンセルして、バックエンドの終了処理を実行
+  event.preventDefault();
   
   // バックエンドプロセスなどを確実に終了する処理を追加
   try {
-    const { exec } = require('child_process');
+    // バックエンドのシャットダウンAPIを呼び出す
+    const apiSuccess = await shutdownBackend(false);
     
-    // Pythonプロセスを強制終了
-    exec('taskkill /F /IM python.exe', () => {
-      console.log('Pythonプロセスを終了しました');
-    });
+    // APIの呼び出しが失敗した場合は強制終了を試みる
+    if (!apiSuccess) {
+      const { exec } = require('child_process');
+      
+      // Pythonプロセスを強制終了
+      exec('taskkill /F /IM python.exe', () => {
+        console.log('Pythonプロセスを終了しました');
+      });
+      
+      // VOICEVOXも終了
+      exec('taskkill /F /IM voicevox_engine.exe', () => {
+        console.log('VOICEVOXプロセスを終了しました');
+      });
+    }
     
-    // VOICEVOXも終了
-    exec('taskkill /F /IM voicevox_engine.exe', () => {
-      console.log('VOICEVOXプロセスを終了しました');
-    });
+    // 少し待ってからアプリを終了（バックエンドの終了処理が完了するのを待つ）
+    setTimeout(() => {
+      app.exit(0);
+    }, 2000);
   } catch (error) {
     console.error('終了処理中にエラーが発生しました:', error);
+    // エラーが発生した場合も強制終了
+    setTimeout(() => {
+      app.exit(0);
+    }, 500);
   }
 });

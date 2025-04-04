@@ -55,7 +55,6 @@ hisyotan-desktop/
 │   ├── start.ps1             # 全体起動をまとめた便利スクリプト
 │   └── diagnose.ps1          # 環境診断用
 ├── tools/                     # 機能テスト・メンテナンス用
-│   └── test_zombie_voice.ps1 # ゾンビ検出ボイスのテスト
 ├── main.js                    # Electronエントリーポイント (移動検討中)
 ├── package.json               # 依存関係・スクリプト定義
 ├── vite.config.js             # Viteの設定
