@@ -291,6 +291,44 @@ function setupIPC() {
     app.quit();
   });
   
+  // ウィンドウドラッグ開始
+  ipcMain.handle('start-window-drag', () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('window-is-being-dragged');
+      mainWindow.startWindowDrag();
+      return true;
+    }
+    return false;
+  });
+  
+  // ランダムメッセージ表示
+  ipcMain.handle('show-random-message', () => {
+    const messages = [
+      'こんにちは！何かお手伝いしましょうか？',
+      'お疲れ様です！休憩も大切ですよ✨',
+      '何か質問があればいつでも声をかけてくださいね',
+      'お仕事頑張ってますね！素敵です',
+      'リラックスタイムも必要ですよ〜',
+      'デスクの整理、手伝いましょうか？',
+      '今日も一日頑張りましょう！',
+      'ちょっと休憩しませんか？',
+      '何か飲み物でもいかがですか？',
+      'どんなことでもお手伝いしますよ'
+    ];
+    
+    const randomIndex = Math.floor(Math.random() * messages.length);
+    const message = messages[randomIndex];
+    
+    if (mainWindow) {
+      mainWindow.webContents.send('speech-manager-operation', {
+        method: 'speak',
+        args: [message, 'normal', 5000, false, 'default', null]
+      });
+      return message;
+    }
+    return null;
+  });
+  
   // 画像パス解決
   ipcMain.handle('resolve-asset-path', (event, relativePath) => {
     try {

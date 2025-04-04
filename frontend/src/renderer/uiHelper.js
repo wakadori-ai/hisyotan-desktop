@@ -25,12 +25,96 @@ export function initUIElements() {
   speechText = document.getElementById('speechText');
   assistantImage = document.getElementById('assistantImage');
   
+  // クールタイム管理用の変数
+  let lastClickTime = 0;
+  const COOLDOWN_TIME = 3000; // クールタイム3秒
+  
   // 肉球ボタンのイベント設定
   if (pawButton) {
     console.log('🐾 pawButtonにイベントリスナーを設定します');
-    pawButton.addEventListener('click', () => {
+    
+    // 左クリック - ランダムセリフ表示（クールタイム付き）
+    pawButton.addEventListener('click', (event) => {
       console.log('🐾 肉球ボタンがクリックされました');
+      
+      // ドラッグ操作の場合はクリックイベントをスキップ
+      if (window._wasDragging) {
+        window._wasDragging = false;
+        return;
+      }
+      
+      // クールタイムチェック
+      const currentTime = Date.now();
+      if (currentTime - lastClickTime < COOLDOWN_TIME) {
+        console.log('🕒 クールタイム中です');
+        return;
+      }
+      
+      // クールタイム更新
+      lastClickTime = currentTime;
+      
+      // ランダムセリフ表示
+      if (window.electron && window.electron.ipcRenderer) {
+        window.electron.ipcRenderer.invoke('show-random-message')
+          .then(message => {
+            if (message) {
+              console.log(`🗨️ ランダムメッセージ: ${message}`);
+            }
+          })
+          .catch(err => {
+            console.error('ランダムメッセージ表示エラー:', err);
+          });
+      }
+    });
+    
+    // 右クリック - 設定表示
+    pawButton.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      console.log('🔧 肉球ボタンが右クリックされました');
       createTestSettingsUI();
+    });
+    
+    // 左ドラッグ - ウィンドウ移動
+    pawButton.addEventListener('mousedown', (event) => {
+      if (event.button === 0) { // 左クリック
+        // マウスの移動距離を計測するための初期位置
+        const startX = event.clientX;
+        const startY = event.clientY;
+        
+        // マウスムーブイベント
+        const handleMouseMove = (moveEvent) => {
+          // 少し動いたらドラッグと判定
+          const deltaX = Math.abs(moveEvent.clientX - startX);
+          const deltaY = Math.abs(moveEvent.clientY - startY);
+          
+          if (deltaX > 5 || deltaY > 5) {
+            // ドラッグと判定
+            window._wasDragging = true;
+            
+            // ウィンドウドラッグ開始
+            if (window.electron && window.electron.ipcRenderer) {
+              window.electron.ipcRenderer.invoke('start-window-drag')
+                .catch(err => {
+                  console.error('ウィンドウドラッグエラー:', err);
+                });
+            }
+            
+            // イベントリスナーを削除
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+          }
+        };
+        
+        // マウスアップイベント
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        };
+        
+        // イベントリスナーを追加
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      }
     });
   } else {
     console.error('❌ pawButtonが見つかりません');
@@ -42,7 +126,10 @@ export function initUIElements() {
     quitButton.addEventListener('click', () => {
       console.log('🚪 終了ボタンがクリックされました');
       if (window.electron && window.electron.ipcRenderer) {
-        window.electron.ipcRenderer.send('quit-app');
+        window.electron.ipcRenderer.invoke('quit-app')
+          .catch(err => {
+            console.error('アプリ終了エラー:', err);
+          });
       } else {
         console.error('Electron IPCが利用できません');
       }
@@ -50,6 +137,56 @@ export function initUIElements() {
   } else {
     console.error('❌ quitButtonが見つかりません');
   }
+  
+  // 立ち絵と吹き出しのイベント設定（ウィンドウドラッグ用）
+  const setupDraggable = (element) => {
+    if (!element) return;
+    
+    element.addEventListener('mousedown', (event) => {
+      if (event.button === 0) { // 左クリック
+        console.log(`🖱️ ${element.id}で左ドラッグ開始`);
+        
+        // マウスの移動距離を計測するための初期位置
+        const startX = event.clientX;
+        const startY = event.clientY;
+        
+        // マウスムーブイベント
+        const handleMouseMove = (moveEvent) => {
+          // 少し動いたらドラッグと判定
+          const deltaX = Math.abs(moveEvent.clientX - startX);
+          const deltaY = Math.abs(moveEvent.clientY - startY);
+          
+          if (deltaX > 5 || deltaY > 5) {
+            // ウィンドウドラッグ開始
+            if (window.electron && window.electron.ipcRenderer) {
+              window.electron.ipcRenderer.invoke('start-window-drag')
+                .catch(err => {
+                  console.error('ウィンドウドラッグエラー:', err);
+                });
+            }
+            
+            // イベントリスナーを削除
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+          }
+        };
+        
+        // マウスアップイベント
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        };
+        
+        // イベントリスナーを追加
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      }
+    });
+  };
+  
+  // 立ち絵と吹き出しにドラッグイベントを設定
+  setupDraggable(assistantImage);
+  setupDraggable(speechBubble);
   
   // 立ち絵を表示
   if (assistantImage) {
