@@ -48,6 +48,20 @@ async function initializeApp() {
     // UI要素の初期化
     assistantUI.initUIElements();
     
+    // 立ち絵を表示
+    if (typeof assistantUI.showAssistantImage === 'function') {
+      assistantUI.showAssistantImage();
+    } else {
+      console.warn('🔍 showAssistantImage関数が見つかりません');
+      // 代替手段で立ち絵を表示
+      const imgElement = document.getElementById('assistantImage');
+      if (imgElement) {
+        imgElement.style.display = 'block';
+        imgElement.style.opacity = '1';
+        imgElement.classList.add('active');
+      }
+    }
+    
     // 設定の読み込み
     try {
       const config = await apiClient.getSettings();

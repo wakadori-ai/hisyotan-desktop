@@ -604,11 +604,11 @@ export function createUI() {
   container.id = 'assistant-container';
   container.className = 'assistant-container';
   container.style.position = 'fixed';
-  container.style.bottom = '20px';
-  container.style.right = '20px';
+  container.style.bottom = '0px';
+  container.style.right = '0px';
   container.style.zIndex = '2147483647';
-  container.style.width = '200px';
-  container.style.height = '300px';
+  container.style.width = '250px';
+  container.style.height = '400px';
   container.style.display = 'flex';
   container.style.flexDirection = 'column';
   container.style.alignItems = 'center';
@@ -617,16 +617,18 @@ export function createUI() {
   // 立ち絵の作成
   const assistantImage = document.createElement('img');
   assistantImage.id = 'assistantImage';
-  assistantImage.className = 'assistant-image';
+  assistantImage.className = 'assistant-image active';
   assistantImage.src = '/assets/images/secretary_normal.png';
   assistantImage.alt = '秘書たん';
-  assistantImage.style.width = '100%';
-  assistantImage.style.height = 'auto';
+  assistantImage.style.width = 'auto';
+  assistantImage.style.height = '100%';
+  assistantImage.style.maxHeight = '400px';
   assistantImage.style.display = 'block';
   assistantImage.style.position = 'relative';
   assistantImage.style.zIndex = '1';
   assistantImage.style.objectFit = 'contain';
-  assistantImage.style.webkitAppRegion = 'drag'; // ドラッグ可能に設定
+  assistantImage.style.opacity = '1';
+  assistantImage.style.webkitAppRegion = 'drag';
   
   // 吹き出しの作成
   const speechBubble = document.createElement('div');
@@ -643,7 +645,7 @@ export function createUI() {
   speechBubble.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
   speechBubble.style.zIndex = '3';
   speechBubble.style.display = 'none';
-  speechBubble.style.webkitAppRegion = 'drag'; // ドラッグ可能に設定
+  speechBubble.style.webkitAppRegion = 'drag';
   
   // 吹き出しテキストの作成
   const speechText = document.createElement('div');
@@ -677,7 +679,7 @@ export function createUI() {
   pawButton.style.transition = 'transform 0.2s ease-in-out';
   pawButton.style.transform = 'scale(1)';
   pawButton.textContent = '🐾';
-  pawButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定
+  pawButton.style.webkitAppRegion = 'no-drag';
   
   // 肉球ボタンのスタイル強化
   pawButton.style.backgroundImage = 'radial-gradient(circle, #ffb6c1 0%, #ff69b4 100%)';
@@ -714,7 +716,7 @@ export function createUI() {
   quitButton.style.transition = 'opacity 0.2s ease-in-out';
   quitButton.style.opacity = '0.8';
   quitButton.textContent = '×';
-  quitButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定
+  quitButton.style.webkitAppRegion = 'no-drag';
   
   // ホバーエフェクト
   quitButton.addEventListener('mouseover', () => {
@@ -758,6 +760,29 @@ export function createUI() {
   console.log('✨ UI要素の作成が完了しました');
 }
 
+// 立ち絵を表示する関数
+export function showAssistantImage() {
+  console.log('🖼️ 立ち絵を表示します');
+  const imgElement = document.getElementById('assistantImage') || assistantImage;
+  
+  if (imgElement) {
+    imgElement.style.display = 'block';
+    imgElement.style.opacity = '1';
+    imgElement.classList.add('active');
+    
+    // 表示位置の確認と調整
+    const container = document.getElementById('assistant-container');
+    if (container) {
+      container.style.bottom = '0px';
+      container.style.right = '0px';
+    }
+    
+    console.log('✅ 立ち絵を表示しました');
+  } else {
+    console.error('❌ 立ち絵要素が見つかりません');
+  }
+}
+
 // エクスポート
 export {
   createTestSettingsUI,
@@ -784,6 +809,11 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.log('♻️ 既存のUI要素を再利用します');
   }
+  
+  // 立ち絵を表示
+  setTimeout(() => {
+    showAssistantImage();
+  }, 100);
   
   // 初期化済みフラグを設定
   window._assistantUIInitialized = true;
