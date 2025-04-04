@@ -8,7 +8,6 @@ import os
 import sys
 import asyncio
 import uvicorn
-import logging
 import threading
 import time
 from pathlib import Path
@@ -146,5 +145,6 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         port=8000, 
         reload=debug_mode,
-        log_level="debug" if debug_mode else "info"
+        log_level="debug" if debug_mode else "info",
+        force_exit=True
     ) 

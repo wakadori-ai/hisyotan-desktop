@@ -25,7 +25,8 @@ import {
 import {
   errorBubbleModule,
   showError,
-  initErrorElements
+  initErrorElements,
+  shouldShowError
 } from './helpers/errorBubble.js';
 
 import {
@@ -76,6 +77,7 @@ export {
   
   // errorBubble
   showError,
+  shouldShowError,
   
   // statusIndicator
   updateConnectionStatus,
@@ -103,6 +105,7 @@ if (typeof window !== 'undefined') {
     hideBubble,
     setText,
     showError,
+    shouldShowError,
     updateConnectionStatus,
     renderSettingUI,
     initUIElements,
@@ -128,6 +131,7 @@ export default {
   hideBubble,
   setText,
   showError,
+  shouldShowError,
   updateConnectionStatus,
   renderSettingUI,
   initUIElements,

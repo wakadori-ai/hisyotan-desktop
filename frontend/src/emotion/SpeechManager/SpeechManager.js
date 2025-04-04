@@ -4,14 +4,14 @@
  */
 
 import { logDebug, logError } from '@core/logger.js';
-import { showError, shouldShowError } from '../../ui/uiHelper.js';
+import { showError, shouldShowError } from '@ui/helpers/errorBubble.js';
 import { 
   showBubble, 
   hideBubble, 
   setText, 
   initUIElements, 
   renderSettingUI 
-} from '../../ui/uiHelper.js';
+} from '@ui/uiHelper.js';
 import { setExpression, stopTalking } from '../expressionManager.js';
 import { 
   formatMessage, 

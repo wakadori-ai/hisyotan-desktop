@@ -10,7 +10,7 @@ import '../ui/styles/main.css';
 console.log('✅ styles.cssの読み込み完了');
 
 // ヘルパーモジュールをインポート
-import * as uiHelper from './uiHelper.js';
+import * as assistantUI from './assistantUI.js';
 import apiClient from '../core/apiClient.js';
 import speechManager from '../emotion/speechManager.js';
 
@@ -20,7 +20,7 @@ console.log('🔍 ビルドモード:', import.meta.env.MODE);
 console.log('📁 現在の実行パス:', import.meta.env.BASE_URL);
 
 // グローバルアクセス用に設定
-window.uiHelper = uiHelper;
+window.assistantUI = assistantUI;
 window.settingsApi = apiClient;
 window.speechManager = speechManager;
 console.log('🎤 SpeechManager をグローバルに登録しました');
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('🌟 UIの初期化を開始します');
   
   // UIを生成
-  uiHelper.createUI();
+  assistantUI.createUI();
   
   // 設定読み込み
   try {
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   // 歓迎メッセージを表示
-  uiHelper.showBubble('default');
+  assistantUI.showBubble('default');
   
   // スタイル適用確認
   setTimeout(() => {
@@ -105,7 +105,7 @@ console.log(`🔧 現在の実行環境: ${import.meta.env.MODE}`);
 
 // エクスポート
 export default {
-  uiHelper,
+  assistantUI,
   apiClient,
   speechManager
 }; 
