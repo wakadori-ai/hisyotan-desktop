@@ -67,7 +67,11 @@ export function initUIElements() {
     }
     
     // グローバル変数に要素を保存
-    window[key] = element;
+    if (key === 'pawButton') pawButton = element;
+    if (key === 'quitButton') quitButton = element;
+    if (key === 'speechBubble') speechBubble = element;
+    if (key === 'speechText') speechText = element;
+    if (key === 'assistantImage') assistantImage = element;
   }
   
   // イベントリスナーの設定
@@ -250,18 +254,23 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
     computedStyle: window.getComputedStyle(speechBubble)
   });
   
-  // 吹き出し表示
+  // テキスト設定
+  if (type === 'default') {
+    if (!text || text === 'default') {
+      text = 'こんにちは！何かお手伝いしましょうか？';
+    }
+  }
+  
+  // テキストを設定
+  speechText.textContent = text;
+  
+  // 吹き出しを表示
   speechBubble.style.display = 'block';
-  speechText.textContent = `「${text}」`;
   
-  // タイプによって吹き出しのスタイルを変更
-  speechBubble.className = `speech-bubble speech-bubble-${type} show`;
-  
-  // スタイル適用後の状態をログ出力
-  console.log('✅ スタイル適用後のspeechBubble:', {
-    display: speechBubble.style.display,
-    className: speechBubble.className,
-    computedStyle: window.getComputedStyle(speechBubble)
+  // 表示状態をログ出力
+  console.log('✅ 吹き出しを表示しました', { 
+    text: speechText.textContent,
+    display: speechBubble.style.display 
   });
 }
 
@@ -306,6 +315,34 @@ export function createUI() {
   assistantImage.style.position = 'relative';
   assistantImage.style.zIndex = '1';
   assistantImage.style.objectFit = 'contain';
+  
+  // 吹き出しの作成
+  const speechBubble = document.createElement('div');
+  speechBubble.id = 'speechBubble';
+  speechBubble.className = 'speech-bubble';
+  speechBubble.style.position = 'absolute';
+  speechBubble.style.top = '-80px';
+  speechBubble.style.left = '0';
+  speechBubble.style.width = '200px';
+  speechBubble.style.maxWidth = '300px';
+  speechBubble.style.padding = '10px 15px';
+  speechBubble.style.background = 'rgba(255, 255, 255, 0.9)';
+  speechBubble.style.borderRadius = '20px';
+  speechBubble.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+  speechBubble.style.zIndex = '3';
+  speechBubble.style.display = 'none';
+  
+  // 吹き出しテキストの作成
+  const speechText = document.createElement('div');
+  speechText.id = 'speechText';
+  speechText.className = 'speech-text';
+  speechText.style.fontSize = '14px';
+  speechText.style.color = '#333';
+  speechText.style.lineHeight = '1.4';
+  speechText.textContent = 'こんにちは！何かお手伝いしましょうか？';
+  
+  // 吹き出し要素を組み立て
+  speechBubble.appendChild(speechText);
   
   // 肉球ボタンの作成
   const pawButton = document.createElement('div');
@@ -370,6 +407,7 @@ export function createUI() {
   
   // 要素をコンテナに追加
   container.appendChild(assistantImage);
+  container.appendChild(speechBubble);
   container.appendChild(pawButton);
   container.appendChild(quitButton);
   
@@ -387,3 +425,21 @@ export {
   createTestSettingsUI,
   hideBubble
 }; 
+
+// DOMの読み込み完了後にUIを初期化
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('🌟 DOMContentLoaded: assistantUI初期化を開始します');
+  
+  // 既存のUI要素の初期化
+  initUIElements();
+  
+  // すでにDOMに存在する要素を確認
+  if (!document.getElementById('assistantImage')) {
+    console.log('🎨 UIを新規作成します');
+    createUI();
+  } else {
+    console.log('♻️ 既存のUI要素を再利用します');
+  }
+  
+  console.log('🌸 assistantUI初期化完了');
+}); 

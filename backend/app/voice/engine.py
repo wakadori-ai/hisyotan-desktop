@@ -250,119 +250,6 @@ async def synthesize_direct(
         logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
         return None
 
-# テキストを音声に変換して再生
-def speak(
-    text: str, 
-    speaker_id: int = 0, 
-    speed: float = 1.0, 
-    pitch: float = 0.0, 
-    intonation: float = 1.0, 
-    volume: float = 1.0, 
-    force: bool = False
-) -> Optional[str]:
-    """
-    VOICEVOXを使用してテキストを音声に変換し再生
-    
-    Args:
-        text: 発話するテキスト
-        speaker_id: 話者ID
-        speed: 話速（1.0が標準）
-        pitch: ピッチ（0.0が標準）
-        intonation: イントネーション（1.0が標準）
-        volume: 音量（1.0が標準）
-        force: クールダウンを無視して強制的に再生
-    
-    Returns:
-        str: WAVファイルのパス（成功時）
-    """
-    from ..config import get_settings
-    
-    # 設定の取得
-    settings = get_settings()
-    
-    # クールダウンチェック
-    current_time = time.time()
-    with voice_lock:
-        global last_voice_time, audio_playing
-        
-        # 強制フラグがなく、クールダウン中なら何もしない
-        if not force and current_time - last_voice_time < settings.VOICE_COOLDOWN:
-            logger.debug("音声再生クールダウン中")
-            return None
-            
-        # 音声再生中なら何もしない
-        if audio_playing:
-            logger.debug("前の音声再生中のため、新しい音声をスキップ")
-            return None
-        
-        last_voice_time = current_time
-        audio_playing = True
-        
-    try:
-        # 音声合成リクエストを2段階で行う
-        # 1. 音声合成用のクエリを作成
-        params = {
-            "text": text,
-            "speaker": speaker_id
-        }
-        
-        # 音声パラメータを追加
-        if speed != 1.0 or pitch != 0.0 or intonation != 1.0:
-            params["speedScale"] = speed
-            params["pitchScale"] = pitch
-            params["intonationScale"] = intonation
-            params["volumeScale"] = volume
-            
-        # 音声合成クエリの作成リクエスト
-        query_response = requests.post(
-            f"{settings.VOICEVOX_HOST}/audio_query",
-            params=params
-        )
-        
-        if query_response.status_code != 200:
-            logger.error(f"音声合成クエリの作成に失敗: {query_response.text}")
-            reset_audio_playback()
-            return None
-            
-        voice_params = query_response.json()
-        
-        # 2. 音声合成の実行
-        synthesis_response = requests.post(
-            f"{settings.VOICEVOX_HOST}/synthesis",
-            headers={"Content-Type": "application/json"},
-            params={"speaker": speaker_id},
-            data=json.dumps(voice_params)
-        )
-        
-        if synthesis_response.status_code != 200:
-            logger.error(f"音声合成に失敗: {synthesis_response.text}")
-            reset_audio_playback()
-            return None
-            
-        # 一時的なWAVファイルに保存
-        temp_dir = settings.TEMP_DIR
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # タイムスタンプを含むファイル名を生成
-        timestamp = int(time.time())
-        wav_filename = f"voice_{timestamp}.wav"
-        wav_path = os.path.join(temp_dir, wav_filename)
-        
-        with open(wav_path, "wb") as f:
-            f.write(synthesis_response.content)
-            
-        logger.debug(f"WAVファイルを保存: {wav_path}")
-        
-        # 音声再生
-        # play_voice(wav_path)
-        
-        return wav_path
-    except Exception as e:
-        reset_audio_playback()
-        logger.error(f"VOICEVOXエンジンエラー: {str(e)}")
-        return None
-        
-# 音声ファイルを再生
 def play_voice(wav_path: str):
     """
     WAVファイルを再生（今は何もしない！）
@@ -425,6 +312,107 @@ def play_preset_voice(filename: str):
     reset_audio_playback()
 
 
+def speak(
+    text: str, 
+    speaker_id: int = 0, 
+    speed: float = 1.0, 
+    pitch: float = 0.0, 
+    intonation: float = 1.0, 
+    volume: float = 1.0, 
+    force: bool = False
+) -> Optional[str]:
+    """
+    テキストを音声に変換して再生する
+    
+    Args:
+        text: 発話するテキスト
+        speaker_id: 話者ID
+        speed: 話速（1.0が標準）
+        pitch: ピッチ（0.0が標準）
+        intonation: イントネーション（1.0が標準）
+        volume: 音量（1.0が標準）
+        force: キャッシュをスキップして強制的に生成
+        
+    Returns:
+        str: 生成されたWAVファイルのパス、エラー時はNone
+    """
+    # テキストが空の場合は何もしない
+    if not text or len(text.strip()) == 0:
+        logger.warning("空のテキストが渡されました")
+        return None
+        
+    try:
+        from ..config import get_settings
+        
+        # 設定を取得
+        settings = get_settings()
+        
+        logger.info(f"音声合成: text={text[:30]}..., speaker={speaker_id}")
+        logger.debug(f"音声パラメータ: speed={speed}, pitch={pitch}, intonation={intonation}")
+        
+        # キャッシュパスをチェック
+        cache_path = get_voice_cache_path(text, speaker_id)
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        
+        # キャッシュが存在し、強制フラグがない場合はキャッシュを使用
+        if is_voice_cached(text, speaker_id) and not force:
+            logger.info(f"キャッシュされた音声ファイルを使用: {cache_path}")
+            # play_voice(cache_path)
+            return cache_path
+            
+        # 音声合成リクエストを2段階で行う
+        # 1. 音声合成用のクエリを作成
+        params = {
+            "text": text,
+            "speaker": speaker_id
+        }
+        
+        logger.debug(f"音声合成クエリを作成: {settings.VOICEVOX_HOST}/audio_query")
+        
+        # クエリ作成
+        query_response = requests.post(
+            f"{settings.VOICEVOX_HOST}/audio_query",
+            params=params
+        )
+        
+        if query_response.status_code != 200:
+            logger.error(f"音声合成クエリの作成に失敗: {query_response.text}")
+            return None
+            
+        voice_params = query_response.json()
+        
+        # パラメータ調整
+        voice_params["speedScale"] = speed
+        voice_params["pitchScale"] = pitch
+        voice_params["intonationScale"] = intonation
+        voice_params["volumeScale"] = volume
+        
+        # 2. 音声合成の実行
+        logger.debug(f"音声合成を実行: {settings.VOICEVOX_HOST}/synthesis")
+        
+        synthesis_response = requests.post(
+            f"{settings.VOICEVOX_HOST}/synthesis",
+            headers={"Content-Type": "application/json"},
+            params={"speaker": speaker_id},
+            data=json.dumps(voice_params)
+        )
+        
+        if synthesis_response.status_code != 200:
+            logger.error(f"音声合成に失敗: {synthesis_response.text}")
+            return None
+        
+        # キャッシュに保存
+        with open(cache_path, "wb") as f:
+            f.write(synthesis_response.content)
+            
+        logger.debug(f"WAVファイルを保存: {cache_path}")
+        
+        return cache_path
+    except Exception as e:
+        reset_audio_playback()
+        logger.error(f"VOICEVOXエンジンエラー: {str(e)}")
+        return None
+
 def speak_with_preset(
     text: str,
     preset_name: str,
@@ -452,89 +440,60 @@ def speak_with_preset(
     cache_path = get_voice_cache_path(text, speaker_id)
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     
-    # プリセット音声を即時再生
-    # preset_future = play_preset_voice(preset_name)
-    # if preset_future is None:
-    #     # プリセット失敗時は通常の音声合成のみ実行
-    #     speak(text, speaker_id, speed, pitch, intonation, volume)
-    #     return
-    
     # キャッシュを確認
-    # if is_voice_cached(text, speaker_id):
-    #     # キャッシュが存在する場合、遅延後に再生
-    #     def play_cached_after_delay():
-    #         try:
-    #             time.sleep(delay)  # 指定された遅延
-    #             # play_voice(cache_path)
-    #         except Exception as e:
-    #             logger.error(f"キャッシュ音声再生エラー: {e}")
-        
-    #     # 別スレッドでキャッシュ音声再生
-    #     cache_thread = threading.Thread(target=play_cached_after_delay)
-    #     cache_thread.daemon = True
-    #     cache_thread.start()
-    #     return
+    if is_voice_cached(text, speaker_id):
+        logger.debug(f"キャッシュされた音声を使用します: {cache_path}")
+        return
     
     # キャッシュがない場合は合成して保存
-    def synthesize_and_play():
-        try:
-            from ..config import get_settings
-            settings = get_settings()
+    try:
+        from ..config import get_settings
+        settings = get_settings()
+        
+        # 音声合成リクエストを2段階で行う
+        # 1. 音声合成用のクエリを作成
+        params = {
+            "text": text,
+            "speaker": speaker_id
+        }
+        
+        # クエリ作成
+        query_response = requests.post(
+            f"{settings.VOICEVOX_HOST}/audio_query",
+            params=params
+        )
+        
+        if query_response.status_code != 200:
+            logger.error(f"音声合成クエリの作成に失敗: {query_response.text}")
+            return
             
-            # 音声合成リクエストを2段階で行う
-            # 1. 音声合成用のクエリを作成
-            params = {
-                "text": text,
-                "speaker": speaker_id
-            }
+        voice_params = query_response.json()
+        
+        # パラメータ調整
+        voice_params["speedScale"] = speed
+        voice_params["pitchScale"] = pitch
+        voice_params["intonationScale"] = intonation
+        voice_params["volumeScale"] = volume
+        
+        # 2. 音声合成の実行
+        synthesis_response = requests.post(
+            f"{settings.VOICEVOX_HOST}/synthesis",
+            headers={"Content-Type": "application/json"},
+            params={"speaker": speaker_id},
+            data=json.dumps(voice_params)
+        )
+        
+        if synthesis_response.status_code != 200:
+            logger.error(f"音声合成に失敗: {synthesis_response.text}")
+            return
+        
+        # キャッシュに保存
+        with open(cache_path, "wb") as f:
+            f.write(synthesis_response.content)
             
-            # クエリ作成
-            query_response = requests.post(
-                f"{settings.VOICEVOX_HOST}/audio_query",
-                params=params
-            )
-            
-            if query_response.status_code != 200:
-                logger.error(f"音声合成クエリの作成に失敗: {query_response.text}")
-                return
-                
-            voice_params = query_response.json()
-            
-            # パラメータ調整
-            voice_params["speedScale"] = speed
-            voice_params["pitchScale"] = pitch
-            voice_params["intonationScale"] = intonation
-            voice_params["volumeScale"] = volume
-            
-            # 2. 音声合成の実行
-            synthesis_response = requests.post(
-                f"{settings.VOICEVOX_HOST}/synthesis",
-                headers={"Content-Type": "application/json"},
-                params={"speaker": speaker_id},
-                data=json.dumps(voice_params)
-            )
-            
-            if synthesis_response.status_code != 200:
-                logger.error(f"音声合成に失敗: {synthesis_response.text}")
-                return
-            
-            # キャッシュに保存
-            with open(cache_path, "wb") as f:
-                f.write(synthesis_response.content)
-                
-            logger.debug(f"合成音声をキャッシュに保存: {cache_path}")
-            
-            # 遅延後に再生
-            time.sleep(delay)
-            # play_voice(cache_path)
-            
-        except Exception as e:
-            logger.error(f"音声合成・再生エラー: {e}")
-    
-    # 別スレッドで音声合成と再生を実行
-    # synth_thread = threading.Thread(target=synthesize_and_play)
-    # synth_thread.daemon = True
-    # synth_thread.start()
+        logger.debug(f"合成音声をキャッシュに保存: {cache_path}")
+    except Exception as e:
+        logger.error(f"音声合成・再生エラー: {e}")
 
 def safe_speak_with_preset(
     text: str,
