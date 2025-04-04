@@ -182,8 +182,23 @@ export function initUIElements() {
     console.error('❌ quitButtonが見つかりません');
   }
   
-  // 立ち絵と吹き出しのイベント設定（JavaScriptでのドラッグ処理は不要）
-  // CSSの-webkit-app-region: dragを使用するため、イベントリスナーは削除
+  // 立ち絵と吹き出しのイベント設定
+  // CSSの-webkit-app-region: dragを使用するため、ドラッグ用のイベントリスナーは不要
+  if (assistantImage) {
+    // 立ち絵の右クリックを無効化（右クリック設定メニューを防止）
+    assistantImage.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      console.log('🖼️ 立ち絵が右クリックされました - 右クリックメニューを無効化');
+    });
+  }
+  
+  // 吹き出しの右クリックを無効化
+  if (speechBubble) {
+    speechBubble.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      console.log('💬 吹き出しが右クリックされました - 右クリックメニューを無効化');
+    });
+  }
   
   // 立ち絵を表示
   if (assistantImage) {

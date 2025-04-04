@@ -10,6 +10,7 @@ import asyncio
 import uvicorn
 import threading
 import time
+import signal
 from pathlib import Path
 from fastapi import Body
 import argparse
@@ -41,8 +42,44 @@ app = create_application()
 # ゾンビ監視の開始
 from app.events.startup_handler import start_zombie_monitoring
 
+# シャットダウン用のグローバル変数
+should_exit = False
+exit_code = 0
+
+# uvicornサーバーを制御するためのハンドラー
+class GracefulExitHandler:
+    def __init__(self, app):
+        self.app = app
+        self.should_exit = False
+        self.exit_code = 0
+        
+    def handle_exit(self, sig=None, frame=None, exit_code=0):
+        self.should_exit = True
+        self.exit_code = exit_code
+        logger.info(f"🔌 終了シグナルを受信しました。exit_code={exit_code}")
+        # 自分自身のプロセスに終了シグナルを送信
+        if os.name == 'nt':  # Windows
+            pid = os.getpid()
+            logger.info(f"🛑 Windows環境でプロセス {pid} を終了します")
+            # 少し遅延させて応答が返せるようにする
+            def delayed_exit():
+                time.sleep(2)
+                os.kill(pid, signal.CTRL_C_EVENT)
+            threading.Thread(target=delayed_exit).start()
+        else:  # Linux/Mac
+            pid = os.getpid()
+            logger.info(f"🛑 Unix環境でプロセス {pid} を終了します")
+            # 少し遅延させて応答が返せるようにする
+            def delayed_exit():
+                time.sleep(2)
+                os.kill(pid, signal.SIGTERM)
+            threading.Thread(target=delayed_exit).start()
+
+# グローバルのハンドラーインスタンス
+exit_handler = GracefulExitHandler(app)
+
 # シャットダウンエンドポイント
-@app.post("/shutdown")
+@app.post("/api/shutdown")
 async def shutdown(force: bool = Body(False)):
     """
     アプリケーションを安全に終了するエンドポイント
@@ -62,19 +99,9 @@ async def shutdown(force: bool = Body(False)):
         time.sleep(3)
         
         logger.info("🔄 アプリケーションを終了しています...")
-        if force:
-            # 自分自身のプロセスを終了
-            pid = os.getpid()
-            logger.info(f"🛑 プロセス {pid} を終了します")
-            # Windowsの場合はtaskkillを使用
-            if os.name == 'nt':
-                os.system(f"taskkill /F /PID {pid}")
-            else:
-                # LinuxやMacの場合
-                import signal
-                os.kill(pid, signal.SIGTERM)
-        else:
-            sys.exit(0)  # 通常終了
+        # 終了ハンドラーを呼び出し
+        exit_code = 0 if not force else 1
+        exit_handler.handle_exit(exit_code=exit_code)
     
     # 別スレッドで終了処理を実行
     threading.Thread(target=shutdown_app).start()
@@ -136,6 +163,10 @@ if __name__ == "__main__":
             logger.warning("⚠️ ゾンビ監視の自動開始が有効ですが、監視タスクを開始できませんでした")
     except Exception as e:
         logger.error(f"❌ ゾンビ監視の開始に失敗しました: {e}")
+    
+    # 終了シグナルハンドラの設定
+    signal.signal(signal.SIGINT, exit_handler.handle_exit)
+    signal.signal(signal.SIGTERM, exit_handler.handle_exit)
     
     # FastAPIサーバーの起動
     logger.info(f"🌐 FastAPIサーバーを起動します (デバッグモード: {debug_mode})")

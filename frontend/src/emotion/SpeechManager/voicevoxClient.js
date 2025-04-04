@@ -11,16 +11,61 @@ let audioContext = null;
 // 音声再生中フラグ
 let isPlaying = false;
 
+// 音声キャッシュ
+const audioCache = new Map();
+const CACHE_MAX_SIZE = 20; // キャッシュの最大エントリ数
+
+/**
+ * キャッシュにエントリを追加する
+ * @param {string} cacheKey - キャッシュキー
+ * @param {ArrayBuffer} audioData - 音声データ
+ */
+function addToCache(cacheKey, audioData) {
+  // キャッシュが最大サイズに達している場合、最も古いエントリを削除
+  if (audioCache.size >= CACHE_MAX_SIZE) {
+    const oldestKey = audioCache.keys().next().value;
+    audioCache.delete(oldestKey);
+    logDebug(`キャッシュから古いエントリを削除: ${oldestKey}`);
+  }
+  
+  // キャッシュに追加
+  audioCache.set(cacheKey, audioData);
+  logDebug(`音声データをキャッシュに追加: ${cacheKey}`);
+}
+
+/**
+ * キャッシュキーを生成する
+ * @param {string} text - 合成するテキスト
+ * @param {string} emotion - 感情
+ * @param {number} speakerId - 話者ID
+ * @returns {string} キャッシュキー
+ */
+function generateCacheKey(text, emotion, speakerId) {
+  return `${speakerId}_${emotion}_${text}`;
+}
+
 /**
  * 音声合成リクエストを送信する
  * @param {string} text - 合成するテキスト
  * @param {string} emotion - 感情
  * @param {number} speakerId - 話者ID
  * @param {AbortSignal} signal - リクエストキャンセル用のシグナル
+ * @param {boolean} useCache - キャッシュを使用するかどうか
  * @returns {Promise<boolean>} 成功したかどうか
  */
-export async function requestVoiceSynthesis(text, emotion = 'normal', speakerId = 8, signal = null) {
+export async function requestVoiceSynthesis(text, emotion = 'normal', speakerId = 8, signal = null, useCache = true) {
   try {
+    // キャッシュキーを生成
+    const cacheKey = generateCacheKey(text, emotion, speakerId);
+    
+    // キャッシュをチェック
+    if (useCache && audioCache.has(cacheKey)) {
+      logDebug(`キャッシュから音声データを使用: ${cacheKey}`);
+      // キャッシュから音声データを取得して再生
+      await playAudioData(audioCache.get(cacheKey));
+      return true;
+    }
+    
     // バックエンドAPIのベースURLを設定
     const apiBaseUrl = 'http://127.0.0.1:8000';
     
@@ -84,6 +129,11 @@ export async function requestVoiceSynthesis(text, emotion = 'normal', speakerId 
     // WAVデータを取得（バイナリデータとして）
     const audioData = await response.arrayBuffer();
     
+    // キャッシュに追加
+    if (useCache) {
+      addToCache(cacheKey, audioData);
+    }
+    
     // フロントエンド側で音声再生
     await playAudioData(audioData);
     
@@ -121,10 +171,7 @@ async function playAudioData(audioData) {
     // 再生中の場合は前の再生を停止
     if (isPlaying) {
       logDebug('前の音声再生を停止します');
-      if (audioContext) {
-        await audioContext.close();
-        audioContext = null;
-      }
+      stopCurrentPlayback();
     }
     
     // AudioContextの初期化
@@ -185,6 +232,26 @@ async function playAudioData(audioData) {
 }
 
 /**
+ * 現在再生中の音声を停止する
+ */
+function stopCurrentPlayback() {
+  try {
+    if (audioContext && isPlaying) {
+      // すべてのノードを切断
+      audioContext.suspend();
+      setTimeout(() => {
+        audioContext.resume();
+      }, 100);
+      
+      isPlaying = false;
+      logDebug('音声再生を停止しました');
+    }
+  } catch (err) {
+    logError(`音声停止エラー: ${err.message}`);
+  }
+}
+
+/**
  * VOICEVOX接続確認API呼び出し
  * @returns {Promise<boolean>} 接続成功したかどうか
  */
@@ -213,8 +280,76 @@ export function isAudioPlaying() {
   return isPlaying;
 }
 
+/**
+ * キャッシュをクリアする
+ */
+export function clearAudioCache() {
+  audioCache.clear();
+  logDebug('音声キャッシュをクリアしました');
+}
+
+/**
+ * ゾンビ検出に対するリアクションを実行する
+ * @param {number} count - 検出されたゾンビの数
+ * @param {number} distance - 最も近いゾンビとの距離
+ * @param {boolean} force - クールダウンを無視して強制的に再生するか
+ * @returns {Promise<boolean>} 成功したかどうか
+ */
+export async function reactToZombie(count, distance = 0, force = false) {
+  try {
+    // バックエンドAPIのベースURLを設定
+    const apiBaseUrl = 'http://127.0.0.1:8000';
+    
+    logDebug(`ゾンビ検出リアクション: count=${count}, distance=${distance}`);
+    
+    // リクエストパラメータを準備
+    const params = new URLSearchParams({
+      count,
+      distance,
+      force
+    });
+    
+    // バックエンド側でゾンビ検出リアクションAPIを呼び出す
+    const response = await fetch(`${apiBaseUrl}/api/voice/react_to_zombie?${params}`, {
+      method: 'POST'
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      logError(`ゾンビ検出リアクションAPI呼び出し失敗: ${response.status}`);
+      logError(`エラー詳細: ${errorText}`);
+      return false;
+    }
+    
+    // レスポンスのJSON解析
+    const result = await response.json();
+    
+    // レスポンスから音声合成のために必要な情報を取得
+    if (result.status === 'success' && result.reaction) {
+      const { text, emotion, speaker_id } = result.reaction;
+      
+      // テキストがある場合は音声合成して再生
+      if (text) {
+        // プリセット音声を再生（予定通りに実装されている場合）
+        // 音声合成を実行（キャッシュは使わない - 緊急性を優先）
+        await requestVoiceSynthesis(text, emotion, speaker_id, null, false);
+      }
+      
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    logError(`ゾンビ検出リアクションエラー: ${error.message}`);
+    return false;
+  }
+}
+
 export default {
   requestVoiceSynthesis,
   checkVoicevoxConnection,
-  isAudioPlaying
+  isAudioPlaying,
+  clearAudioCache,
+  reactToZombie,
+  stopCurrentPlayback
 }; 

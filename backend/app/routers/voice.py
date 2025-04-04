@@ -12,7 +12,7 @@ from fastapi import APIRouter, Query, Request, HTTPException, Response
 from starlette.responses import JSONResponse
 from pydantic import BaseModel
 from ..config import Settings, get_settings
-from ..voice.engine import safe_play_voice, speak_with_emotion, synthesize_direct, react_to_zombie, safe_speak_with_preset
+from ..voice.engine import synthesize_direct, react_to_zombie, speak_with_emotion
 from ..models import VoiceSynthesisRequest
 
 # ロガー設定
@@ -126,12 +126,12 @@ async def check_voicevox_connection():
         logger.error(f"VOICEVOX接続確認エラー: {str(e)}")
         return {"connected": False, "error": str(e)}
 
-# 既存の再生込みのエンドポイント（互換性のために残す）
+# 既存の再生込みのエンドポイント（互換性のために残すが、新しいsynthesizeエンドポイントにリダイレクト）
 @router.post("/api/voice/synthesize-play")
 async def synthesize_and_play_voice(request: Request):
     """
-    テキストを音声に変換して再生するエンドポイント
-    VOICEVOXを使用して音声合成を行う
+    テキストを音声に変換して返すエンドポイント（互換性のために残す）
+    実際の処理は /api/voice/synthesize にリダイレクト
     
     Request Body:
         text: 音声に変換するテキスト
@@ -147,10 +147,6 @@ async def synthesize_and_play_voice(request: Request):
         text = data.get('text', '')
         speaker = data.get('speaker', settings.VOICEVOX_SPEAKER)
         emotion = data.get('emotion', 'normal')
-        speed_scale = data.get('speedScale', 1.0)
-        pitch_scale = data.get('pitchScale', 0.0)
-        intonation_scale = data.get('intonationScale', 1.0)
-        volume_scale = data.get('volumeScale', 1.0)
         
         if not text:
             return JSONResponse(
@@ -158,77 +154,20 @@ async def synthesize_and_play_voice(request: Request):
                 content={"status": "error", "message": "テキストが空です"}
             )
         
-        logger.info(f"音声合成＆再生リクエスト: text={text[:20]}..., speaker={speaker}, emotion={emotion}")
+        logger.info(f"synthesize-playエンドポイントからsynthesizeにリダイレクト: {text[:20]}...")
         
-        # 感情に応じた音声プリセットを適用
-        voice_preset = None
-        if emotion in settings.VOICE_PRESETS:
-            voice_preset = settings.VOICE_PRESETS[emotion]
-            if voice_preset:
-                speed_scale = voice_preset.get("speed", speed_scale)
-                pitch_scale = voice_preset.get("pitch", pitch_scale)
-                intonation_scale = voice_preset.get("intonation", intonation_scale)
-        
-        # 音声合成クエリの作成リクエスト
-        query_response = requests.post(
-            f"{settings.VOICEVOX_HOST}/audio_query",
-            params={"text": text, "speaker": speaker}
+        # 新しいリクエストオブジェクトを作成
+        synthesis_request = VoiceSynthesisRequest(
+            text=text,
+            speaker_id=speaker,
+            emotion=emotion
         )
         
-        if query_response.status_code != 200:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error", 
-                    "message": f"音声クエリ生成エラー: {query_response.status_code}"
-                }
-            )
+        # 新しいエンドポイントを呼び出す
+        return await synthesize_voice(synthesis_request)
         
-        query_data = query_response.json()
-        
-        # 音声パラメータを設定
-        query_data["speedScale"] = speed_scale
-        query_data["pitchScale"] = pitch_scale
-        query_data["intonationScale"] = intonation_scale
-        query_data["volumeScale"] = volume_scale
-        
-        # 音声合成の実行
-        synthesis_response = requests.post(
-            f"{settings.VOICEVOX_HOST}/synthesis",
-            headers={"Content-Type": "application/json"},
-            params={"speaker": speaker},
-            data=json.dumps(query_data)
-        )
-        
-        if synthesis_response.status_code != 200:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error", 
-                    "message": f"音声合成エラー: {synthesis_response.status_code}"
-                }
-            )
-        
-        # 一時ファイルに保存
-        audio_data = synthesis_response.content
-        timestamp = int(os.path.getmtime(__file__))
-        temp_file = os.path.join(settings.TEMP_DIR, f"voice_{timestamp}.wav")
-        
-        os.makedirs(settings.TEMP_DIR, exist_ok=True)
-        with open(temp_file, "wb") as f:
-            f.write(audio_data)
-        
-        # Windows環境での再生コマンド
-        play_command = f'powershell -c "(New-Object Media.SoundPlayer \'{temp_file}\').PlaySync();"'
-        os.system(play_command)
-        
-        return {
-            "status": "success",
-            "message": "音声合成が完了しました",
-            "file": temp_file
-        }
     except Exception as e:
-        logger.error(f"音声合成エラー: {str(e)}")
+        logger.error(f"音声合成リダイレクトエラー: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={
@@ -240,18 +179,14 @@ async def synthesize_and_play_voice(request: Request):
 @router.post("/api/voice/analyze")
 async def analyze_voice(request: Request):
     """
-    テキストの感情を分析して最適なパラメータで音声合成するエンドポイント
+    テキストの感情を分析し、適切な音声パラメータを返すエンドポイント
     
     Request Body:
-        text: 音声に変換するテキスト
-        speaker: 話者ID (オプション)
-        force: 強制再生フラグ (オプション)
+        text: 分析するテキスト
     """
     try:
         data = await request.json()
         text = data.get('text', '')
-        speaker = data.get('speaker', settings.VOICEVOX_SPEAKER)
-        force = data.get('force', False)
         
         if not text:
             return JSONResponse(
@@ -259,128 +194,41 @@ async def analyze_voice(request: Request):
                 content={"status": "error", "message": "テキストが空です"}
             )
         
-        logger.info(f"感情分析＆音声合成リクエスト: text={text[:20]}..., speaker={speaker}")
+        logger.info(f"テキスト感情分析リクエスト: {text[:20]}...")
         
-        # テキストを分析して最適な音声パラメータで合成
-        wav_path, analysis_result = speak_with_emotion(
-            text,
-            speaker_id=speaker,
-            force=force,
-            message_type="analyzed_voice"
-        )
-        
-        if not wav_path:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error", 
-                    "message": "音声合成に失敗しました"
-                }
-            )
+        # 感情分析のみ実行
+        _, analysis_result = speak_with_emotion(text, force=True)
         
         return {
             "status": "success",
-            "message": "感情分析による音声合成が完了しました",
-            "file": wav_path,
-            "analysis": {
-                "emotion": analysis_result["emotion"],
-                "parameters": analysis_result["parameters"],
-                "explanation": analysis_result["explanation"]
-            }
+            "text": text,
+            "analysis": analysis_result
         }
+        
     except Exception as e:
-        logger.error(f"感情分析・音声合成エラー: {str(e)}")
+        logger.error(f"テキスト感情分析エラー: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error", 
-                "message": f"感情分析・音声合成に失敗しました: {str(e)}"
+                "message": f"テキスト感情分析に失敗しました: {str(e)}"
             }
         )
 
-# 新しいエンドポイント: フロントエンドから音声合成と再生をリクエスト
 @router.post("/api/voice/speak")
 async def speak_text(request: VoiceSynthesisRequest):
     """
-    テキストを音声に変換し、バックエンド側で直接再生するエンドポイント
-    VOICEVOXを使用して音声合成を行い、バックエンドで音声を再生する
+    テキストを音声合成して返すエンドポイント（/api/voice/synthesize と同じ動作）
+    古い実装との互換性のために残す
     
     Request Body:
-        text: 音声に変換するテキスト
+        text: 発話するテキスト
         emotion: 感情 (オプション)
         speaker_id: 話者ID (オプション)
-    
-    Returns:
-        JSONResponse: 処理結果
     """
-    try:
-        text = request.text
-        speaker_id = request.speaker_id
-        emotion = request.emotion
-        
-        if not text:
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "message": "テキストが空です"}
-            )
-        
-        logger.info(f"音声合成＆再生リクエスト: text={text[:20]}..., speaker={speaker_id}, emotion={emotion}")
-        
-        # 感情と話者IDを基に音声合成＆再生
-        from ..voice.engine import safe_play_voice
-        
-        # 感情に応じた音声パラメータを設定
-        voice_preset = settings.VOICE_PRESETS.get(emotion, {})
-        speed_scale = voice_preset.get("speed", 1.0)
-        pitch_scale = voice_preset.get("pitch", 0.0)
-        intonation_scale = voice_preset.get("intonation", 1.0)
-        volume_scale = voice_preset.get("volume", 1.0)
-        
-        # 非同期で音声合成＆再生（別スレッドで実行して即座に応答）
-        def play_in_thread():
-            try:
-                wav_path = safe_play_voice(
-                    text, 
-                    speaker_id,
-                    speed=speed_scale,
-                    pitch=pitch_scale,
-                    intonation=intonation_scale,
-                    volume=volume_scale,
-                    message_type=f"speak_{emotion}"
-                )
-                logger.info(f"音声再生完了: {wav_path if wav_path else 'なし'}")
-            except Exception as e:
-                logger.error(f"音声再生スレッドエラー: {str(e)}")
-                
-        # 別スレッドで実行して即座に応答
-        import threading
-        thread = threading.Thread(target=play_in_thread)
-        thread.daemon = True
-        thread.start()
-        
-        return {
-            "status": "success",
-            "message": "音声再生リクエストを受け付けました",
-            "details": {
-                "text": text[:30] + "..." if len(text) > 30 else text,
-                "emotion": emotion,
-                "speaker_id": speaker_id
-            }
-        }
-        
-    except Exception as e:
-        import traceback
-        logger.error(f"音声再生リクエストエラー: {str(e)}")
-        logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error", 
-                "message": f"音声再生リクエストに失敗しました: {str(e)}"
-            }
-        )
+    logger.info(f"speak エンドポイントが呼び出されました（synthesize に転送）: {request.text[:20] if request.text else ''}...")
+    return await synthesize_voice(request)
 
-# 新しいエンドポイント: プリセット音声とVOICEVOX合成音声を組み合わせて再生
 @router.post("/api/voice/react_to_zombie")
 async def react_to_zombie_endpoint(
     count: int = Query(..., description="検出されたゾンビの数"),
@@ -388,93 +236,76 @@ async def react_to_zombie_endpoint(
     force: bool = Query(False, description="クールダウンを無視して強制的に再生するか")
 ):
     """
-    ゾンビ検出に対して即時反応するエンドポイント
-    まずプリセット音声を再生し、その後VOICEVOXで合成した音声を再生
+    ゾンビ検出に対する反応を返すエンドポイント
     
     Args:
         count: 検出されたゾンビの数
-        distance: 最も近いゾンビとの距離（m）
+        distance: 最も近いゾンビとの距離（メートル）
         force: クールダウンを無視して強制的に再生するか
-    
-    Returns:
-        JSONResponse: 処理結果
     """
     try:
-        from ..voice.engine import react_to_zombie
+        logger.info(f"ゾンビ検出リクエスト: count={count}, distance={distance:.1f}, force={force}")
         
-        # ゾンビ検出に対する反応処理
-        react_to_zombie(count, distance)
+        # ゾンビ検出時の音声と表情変化を生成
+        # 注: 実際の音声再生はフロントエンド側で行われる
+        reaction_data = react_to_zombie(count, distance, force=force)
         
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success", 
-                "message": f"ゾンビ検出に対する音声反応を開始しました（{count}体）"
-            }
-        )
+        # 成功レスポンス
+        return {
+            "status": "success",
+            "message": "ゾンビ検出反応を生成しました",
+            "reaction": reaction_data
+        }
     except Exception as e:
-        logger.error(f"ゾンビ音声反応処理エラー: {str(e)}")
+        logger.error(f"ゾンビ検出反応エラー: {str(e)}")
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": f"ゾンビ音声反応処理エラー: {str(e)}"}
+            content={
+                "status": "error", 
+                "message": f"ゾンビ検出反応の生成に失敗しました: {str(e)}"
+            }
         )
 
-# 新しいエンドポイント: プリセット音声とVOICEVOX合成音声を組み合わせて再生
 @router.post("/api/voice/speak_with_preset")
 async def speak_with_preset_endpoint(request: Request):
     """
-    プリセット音声と合成音声を組み合わせて再生するエンドポイント
-    プリセットを即時再生し、その後にVOICEVOXで合成した音声を再生
+    プリセット感情を使用してテキストを音声合成するエンドポイント
     
     Request Body:
         text: 発話するテキスト
-        preset_name: 使用するプリセット音声名
+        preset_name: プリセット名
         speaker_id: 話者ID (オプション)
-        emotion: 感情 (オプション)
-        force: 強制実行フラグ (オプション)
-    
-    Returns:
-        JSONResponse: 処理結果
     """
     try:
-        request_data = await request.json()
+        data = await request.json()
+        text = data.get('text', '')
+        preset_name = data.get('preset_name', 'normal')
+        speaker_id = data.get('speaker_id', settings.VOICEVOX_SPEAKER)
         
-        # リクエストからパラメータを取得
-        text = request_data.get("text", "")
-        preset_name = request_data.get("preset_name", "")
-        speaker_id = request_data.get("speaker_id", None)
-        emotion = request_data.get("emotion", "normal")
-        force = request_data.get("force", False)
-        
-        if not text or not preset_name:
+        if not text:
             return JSONResponse(
                 status_code=400,
-                content={"status": "error", "message": "テキストとプリセット名は必須です"}
+                content={"status": "error", "message": "テキストが空です"}
             )
         
-        logger.info(f"プリセット音声＆合成音声リクエスト: text={text[:20]}..., preset={preset_name}, emotion={emotion}")
+        logger.info(f"プリセット音声合成リクエスト: text={text[:20]}..., preset={preset_name}, speaker={speaker_id}")
         
-        # プリセットと合成音声を再生
-        from ..voice.engine import safe_speak_with_preset
-        
-        safe_speak_with_preset(
+        # リクエストオブジェクトを作成して合成エンドポイントにリダイレクト
+        synthesis_request = VoiceSynthesisRequest(
             text=text,
-            preset_name=preset_name,
             speaker_id=speaker_id,
-            emotion=emotion,
-            force=force
+            emotion=preset_name
         )
         
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success", 
-                "message": f"プリセット'{preset_name}'と合成音声の再生を開始しました"
-            }
-        )
+        # 合成エンドポイントを呼び出す
+        return await synthesize_voice(synthesis_request)
+        
     except Exception as e:
-        logger.error(f"プリセット＆合成音声処理エラー: {str(e)}")
+        logger.error(f"プリセット音声合成エラー: {str(e)}")
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": f"音声処理エラー: {str(e)}"}
+            content={
+                "status": "error", 
+                "message": f"プリセット音声合成に失敗しました: {str(e)}"
+            }
         ) 
