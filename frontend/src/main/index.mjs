@@ -320,13 +320,17 @@ function setupIPC() {
   ipcMain.handle('resolve-asset-path', (event, relativePath) => {
     console.log(`🔍 アセットパス解決要求: ${relativePath}`);
     try {
+      // パスの正規化: 先頭の'assets/'または'/assets/'を削除
+      const normalizedPath = relativePath.replace(/^\/?(assets\/)/i, '');
+      
       // 開発モードと本番モードでのパス解決を分ける
       let assetPath;
       if (isDev) {
-        assetPath = path.join(process.cwd(), 'assets', relativePath);
+        assetPath = path.join(process.cwd(), 'frontend/public/assets', normalizedPath);
       } else {
-        assetPath = path.join(app.getAppPath(), 'assets', relativePath);
+        assetPath = path.join(app.getAppPath(), 'frontend/public/assets', normalizedPath);
       }
+      
       console.log(`✅ 解決されたパス: ${assetPath}`);
       return assetPath;
     } catch (error) {
@@ -411,7 +415,7 @@ function createWindow() {
     transparent: true,
     resizable: false,
     alwaysOnTop: true,
-    icon: path.join(__dirname, '../assets/icon.ico')
+    icon: path.join(__dirname, '../frontend/public/assets/icon.ico')
   });
   
   // 開発モードでの設定

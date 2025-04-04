@@ -3,8 +3,18 @@ const { contextBridge, ipcRenderer } = require('electron');
 // アセットのパスを解決する関数
 async function resolveAssetPath(relativePath) {
   try {
-    // メインプロセス経由でパスを解決する（安全な方法）
-    return await ipcRenderer.invoke('resolve-asset-path', relativePath);
+    // HTTP経由でアクセスするパスを生成
+    // パスが/から始まっていない場合は追加
+    const normalizedPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+    
+    // window.locationが利用できないため、ベースURLを定数として定義
+    const baseUrl = 'http://localhost:5173'; // 開発モード
+    // 本番モードでは相対パスとしてそのまま返す
+    
+    // 相対パスをHTTP URLに変換
+    const assetUrl = new URL(normalizedPath, baseUrl).toString();
+    console.log(`アセット解決: ${relativePath} → ${assetUrl}`);
+    return assetUrl;
   } catch (error) {
     console.error('アセットパス解決エラー:', error);
     // エラーが発生した場合は相対パスをそのまま返す
@@ -51,7 +61,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   changeSecretaryExpression: (expression) => ipcRenderer.send('change-secretary-expression', expression),
   
   // アセットのパスを解決する - 非同期関数に変更
-  resolveAssetPath: (relativePath) => ipcRenderer.invoke('resolve-asset-path', relativePath),
+  resolveAssetPath: (relativePath) => {
+    // HTTP経由でアクセスするパスを生成
+    try {
+      // パスが/から始まっていない場合は追加
+      const normalizedPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+      
+      // 相対パスをHTTP URLに変換（preload.jsのコンテキストではwindow.locationは使えない）
+      // 開発モードのベースURL
+      const baseUrl = 'http://localhost:5173';
+      const assetUrl = new URL(normalizedPath, baseUrl).toString();
+      return Promise.resolve(assetUrl);
+    } catch (error) {
+      console.error('アセットパス解決エラー:', error);
+      // エラー時はそのまま返す
+      return Promise.resolve(relativePath);
+    }
+  },
   
   // 画像ファイルの存在確認
   checkImageExists: (imagePath) => ipcRenderer.invoke('check-image-exists', imagePath),

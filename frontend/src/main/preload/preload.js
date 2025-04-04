@@ -87,12 +87,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resolveAssetPath: async (relativePath) => {
     console.log(`📂 アセットパス解決: ${relativePath}`);
     try {
-      const result = await ipcRenderer.invoke('resolve-asset-path', relativePath);
-      console.log('✅ パス解決成功:', result);
-      return result;
+      // HTTP経由でアクセスするパスを生成
+      // パスが/から始まっていない場合は追加
+      const normalizedPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+      
+      // 相対パスをHTTP URLに変換
+      const baseUrl = window.location.origin;
+      const assetUrl = new URL(normalizedPath, baseUrl).href;
+      
+      console.log('✅ HTTP URL生成成功:', assetUrl);
+      return assetUrl;
     } catch (error) {
-      console.error('❌ パス解決エラー:', error);
-      throw error;
+      console.error('❌ HTTP URL生成エラー:', error);
+      // エラー時はそのまま返す
+      return relativePath;
     }
   },
   

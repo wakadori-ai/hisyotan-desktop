@@ -13,11 +13,20 @@ let speechBubble;
 let speechText;
 let assistantImage;
 
+// 初期化済みフラグ
+let isUIInitialized = false;
+
 /**
  * UI要素の初期化
  */
 export function initUIElements() {
   console.log('🌸 assistantUI: UI要素を初期化します');
+  
+  // 既に初期化済みの場合は早期リターン
+  if (isUIInitialized && document.getElementById('paw-button')) {
+    console.log('🔄 UI要素はすでに初期化済みです');
+    return;
+  }
   
   // 必要なUI要素の定義
   const requiredElements = {
@@ -76,6 +85,9 @@ export function initUIElements() {
   
   // イベントリスナーの設定
   setupEventListeners();
+  
+  // 初期化済みフラグをセット
+  isUIInitialized = true;
 }
 
 // イベントリスナーの設定を分離
@@ -93,7 +105,6 @@ function setupEventListeners() {
     setupPawButtonEvents(pawBtn);
   } else {
     console.log('ℹ️ pawButtonが見つかりません。UI初期化後に再試行します');
-    // 後で再試行するための処理をここに追加できます
   }
   
   // quitButton
@@ -109,6 +120,9 @@ function setupEventListeners() {
   const imgElement = document.getElementById('assistantImage') || assistantImage;
   if (imgElement instanceof HTMLElement) {
     console.log('🖼️ assistantImageにイベントリスナーを設定します');
+    // CSS -webkit-app-regionを使用してドラッグ可能にする
+    imgElement.style.webkitAppRegion = 'drag';
+    
     imgElement.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       console.log('🖼️ 立ち絵が右クリックされました - 右クリックメニューを無効化');
@@ -121,6 +135,9 @@ function setupEventListeners() {
   const bubble = document.getElementById('speechBubble') || speechBubble;
   if (bubble instanceof HTMLElement) {
     console.log('💬 speechBubbleにイベントリスナーを設定します');
+    // CSS -webkit-app-regionを使用してドラッグ可能にする
+    bubble.style.webkitAppRegion = 'drag';
+    
     bubble.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       console.log('💬 吹き出しが右クリックされました - 右クリックメニューを無効化');
@@ -138,8 +155,10 @@ function setupPawButtonEvents(pawButton) {
   let lastClickTime = 0;
   const COOLDOWN_TIME = 3000;
   
+  // ボタンは -webkit-app-region: no-drag に設定してクリック可能に
   pawButton.style.webkitAppRegion = 'no-drag';
   
+  // 左クリックイベント
   pawButton.addEventListener('click', (event) => {
     console.log('🐾 肉球ボタンがクリックされました');
     
@@ -158,6 +177,7 @@ function setupPawButtonEvents(pawButton) {
     handlePawButtonClick();
   });
   
+  // 右クリックイベント（設定表示）
   pawButton.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     console.log('🔧 肉球ボタンが右クリックされました');
@@ -228,8 +248,15 @@ function handleQuitButtonClick() {
   
   if (window.electron && window.electron.ipcRenderer) {
     try {
+      // バックエンドも含めて完全終了
       window.electron.ipcRenderer.send('quit-app-with-backend');
       
+      // Windows環境ではPythonプロセスも明示的に終了
+      if (navigator.platform.includes('Win')) {
+        window.electron.ipcRenderer.send('kill-python-process');
+      }
+      
+      // 遅延を入れて確実に終了するようにする
       setTimeout(() => {
         window.electron.ipcRenderer.send('quit-app');
       }, 500);
@@ -251,131 +278,126 @@ function handleQuitButtonClick() {
 }
 
 /**
- * ウィンドウドラッグを直接処理するハンドラ
+ * ウィンドウのドラッグハンドラ
  * 注: CSSの-webkit-app-region: dragを使用するため、
- * このハンドラは実際には使われません。
- * 互換性のために残しています。
+ * 実際にはElectron側で自動的に処理されます。
+ * この関数は空の実装です。
  */
 function directWindowDragHandler(initialEvent) {
-  console.log('🖱️ CSSによるドラッグ機能が使用されます');
   // CSSで-webkit-app-region: dragを使用するため実装は空
+  console.log('ウィンドウドラッグ: CSS -webkit-app-region: drag を使用');
 }
 
 /**
- * 吹き出しにテキストを表示
- * @param {string} text - 表示するテキスト
- * @param {string} type - 吹き出しのタイプ（default, warning, error など）
+ * 吹き出しを表示する
+ * @param {string} type - 吹き出しタイプ
+ * @param {string} text - 表示テキスト
  */
 export function showBubble(type = 'default', text = 'こんにちは！何かお手伝いしましょうか？') {
-  console.log('🔍 showBubble関数が呼び出されました', { type, text });
+  console.log(`🗨️ 吹き出しを表示: ${type} - "${text.substring(0, 15)}..."`);
   
-  // 吹き出し要素を取得（グローバル変数かDOM直接取得）
-  const bubble = speechBubble || document.getElementById('speechBubble');
-  const textElem = speechText || document.getElementById('speechText');
-  
-  if (!bubble || !textElem) {
-    console.error('💔 speechBubbleまたはspeechTextが見つかりません。要素作成を試みます...');
-    
-    // 要素が存在しない場合は動的に作成
-    try {
-      // 既存のコンテナを探す
-      let container = document.querySelector('.assistant-container');
-      
-      // コンテナがなければ作成
-      if (!container) {
-        container = document.createElement('div');
-        container.className = 'assistant-container';
-        container.style.position = 'fixed';
-        container.style.bottom = '20px';
-        container.style.right = '20px';
-        container.style.zIndex = '1000';
-        document.body.appendChild(container);
-      }
-      
-      // 吹き出しが見つからなければ作成
-      if (!bubble) {
-        const newBubble = document.createElement('div');
-        newBubble.id = 'speechBubble';
-        newBubble.className = 'speech-bubble';
-        newBubble.style.display = 'block';
-        newBubble.style.position = 'absolute';
-        newBubble.style.top = '-80px';
-        newBubble.style.background = 'rgba(255, 255, 255, 0.9)';
-        newBubble.style.padding = '10px';
-        newBubble.style.borderRadius = '15px';
-        newBubble.style.zIndex = '3';
-        container.appendChild(newBubble);
-        
-        // グローバル変数を更新
-        speechBubble = newBubble;
-      }
-      
-      // テキスト要素が見つからなければ作成
-      if (!textElem) {
-        const newTextElem = document.createElement('div');
-        newTextElem.id = 'speechText';
-        newTextElem.className = 'speech-text';
-        newTextElem.style.fontSize = '14px';
-        newTextElem.style.color = '#333';
-        
-        // 吹き出しに追加
-        (speechBubble || document.getElementById('speechBubble')).appendChild(newTextElem);
-        
-        // グローバル変数を更新
-        speechText = newTextElem;
-      }
-      
-      console.log('✅ 不足していた吹き出し要素の作成が完了しました');
-      
-      // 再帰的に呼び出し（ただ一度だけ）
-      return showBubble(type, text);
-    } catch (error) {
-      console.error('💔 吹き出し要素の動的作成に失敗しました:', error);
-      return;
-    }
+  // 吹き出し要素の取得
+  const bubble = document.getElementById('speechBubble') || speechBubble;
+  if (!bubble) {
+    console.log('💬 speechBubble要素が見つかりません。作成します。');
+    createUI();
+    return setTimeout(() => showBubble(type, text), 10);
   }
   
-  // 要素のスタイル情報をログ出力
-  console.log('🎨 speechBubbleの現在のスタイル:', {
-    display: bubble.style.display,
-    className: bubble.className
-  });
-  
-  // テキスト設定
-  if (type === 'default' && (!text || text === 'default')) {
-    text = 'こんにちは！何かお手伝いしましょうか？';
+  // テキスト要素の取得
+  const textElement = document.getElementById('speechText') || speechText;
+  if (!textElement) {
+    console.log('💬 speechText要素が見つかりません。作成します。');
+    const newText = document.createElement('div');
+    newText.id = 'speechText';
+    newText.className = 'speech-text';
+    bubble.appendChild(newText);
+    speechText = newText;
   }
   
   // テキストを設定
-  textElem.textContent = text;
+  setText(text);
   
-  // 吹き出しを表示
-  bubble.style.display = 'block';
+  // 吹き出しのスタイルを設定
+  bubble.style.cssText = `
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 2147483647 !important;
+    pointer-events: auto !important;
+  `;
   
-  // 表示状態をログ出力
-  console.log('✅ 吹き出しを表示しました', { 
-    text: textElem.textContent,
-    display: bubble.style.display 
-  });
+  // 必要に応じてクラスを設定
+  bubble.className = 'speech-bubble';
+  bubble.classList.add('show');
+  
+  if (type === 'warning') {
+    bubble.classList.add('warning');
+  } else if (type === 'error') {
+    bubble.classList.add('error');
+  } else if (type === 'success') {
+    bubble.classList.add('success');
+  } else if (type === 'zombie_warning') {
+    bubble.classList.add('zombie-warning');
+  }
+  
+  // 強制的に再描画を促す
+  void bubble.offsetWidth;
+}
+
+/**
+ * 吹き出しにテキストを設定
+ * @param {string} text - 表示テキスト
+ */
+function setText(text) {
+  if (!text) {
+    console.error('setText: テキストが空です');
+    return;
+  }
+  
+  // テキスト要素の取得
+  const textElement = document.getElementById('speechText') || speechText;
+  if (!textElement) {
+    console.error('speechText要素が見つかりません');
+    return;
+  }
+  
+  // テキストを設定（安全のために複数の方法で設定）
+  textElement.textContent = text;
+  textElement.innerText = text;
+  textElement.dataset.originalText = text;
+  
+  // 強制的に再描画を促す
+  void textElement.offsetHeight;
 }
 
 /**
  * 吹き出しを非表示にする
  */
 export function hideSpeechBubble() {
-  if (speechBubble) {
-    speechBubble.style.display = 'none';
+  const bubble = document.getElementById('speechBubble') || speechBubble;
+  if (bubble) {
+    bubble.style.display = 'none';
+    bubble.classList.remove('show');
+    bubble.classList.add('hide');
   }
 }
 
 /**
- * UIを生成する
+ * UI要素を作成
  */
 export function createUI() {
   console.log('🎨 UI要素を作成します');
   
+  // 既に要素が存在する場合は作成しない
+  if (document.getElementById('assistant-container')) {
+    console.log('既にUIコンテナが存在します。スキップします。');
+    return;
+  }
+  
   // メインコンテナの作成
   const container = document.createElement('div');
+  container.id = 'assistant-container';
   container.className = 'assistant-container';
   container.style.position = 'fixed';
   container.style.bottom = '20px';
@@ -400,6 +422,7 @@ export function createUI() {
   assistantImage.style.position = 'relative';
   assistantImage.style.zIndex = '1';
   assistantImage.style.objectFit = 'contain';
+  assistantImage.style.webkitAppRegion = 'drag'; // ドラッグ可能に設定
   
   // 吹き出しの作成
   const speechBubble = document.createElement('div');
@@ -416,6 +439,7 @@ export function createUI() {
   speechBubble.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
   speechBubble.style.zIndex = '3';
   speechBubble.style.display = 'none';
+  speechBubble.style.webkitAppRegion = 'drag'; // ドラッグ可能に設定
   
   // 吹き出しテキストの作成
   const speechText = document.createElement('div');
@@ -449,6 +473,7 @@ export function createUI() {
   pawButton.style.transition = 'transform 0.2s ease-in-out';
   pawButton.style.transform = 'scale(1)';
   pawButton.textContent = '🐾';
+  pawButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定
   
   // ホバーエフェクト
   pawButton.addEventListener('mouseover', () => {
@@ -464,14 +489,14 @@ export function createUI() {
   quitButton.id = 'quit-button';
   quitButton.className = 'quit-button';
   quitButton.style.position = 'absolute';
-  quitButton.style.bottom = '-20px';
-  quitButton.style.right = '-20px';
+  quitButton.style.top = '5px';
+  quitButton.style.right = '5px';
   quitButton.style.width = '30px';
   quitButton.style.height = '30px';
   quitButton.style.borderRadius = '50%';
   quitButton.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
   quitButton.style.cursor = 'pointer';
-  quitButton.style.zIndex = '3';
+  quitButton.style.zIndex = '10';
   quitButton.style.display = 'flex';
   quitButton.style.alignItems = 'center';
   quitButton.style.justifyContent = 'center';
@@ -480,6 +505,7 @@ export function createUI() {
   quitButton.style.transition = 'opacity 0.2s ease-in-out';
   quitButton.style.opacity = '0.8';
   quitButton.textContent = '×';
+  quitButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定
   
   // ホバーエフェクト
   quitButton.addEventListener('mouseover', () => {
@@ -507,7 +533,6 @@ export function createUI() {
   window.assistantImage = assistantImage;
 
   // モジュール内グローバル変数にも割り当て
-  // thisではなくモジュールスコープの変数に直接割り当てる
   globalThis.pawButton = pawButton;
   globalThis.quitButton = quitButton;
   globalThis.speechBubble = speechBubble;

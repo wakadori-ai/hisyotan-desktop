@@ -36,35 +36,36 @@ export function setupAssistantImage() {
 /**
  * 画像パスを解決
  * @param {string} relativePath - 相対パス
- * @returns {Promise<string>} 絶対パス
+ * @returns {Promise<string>} HTTP URL
  */
 export async function resolveImagePath(relativePath) {
-  if (!window.electronAPI || !window.electronAPI.resolveAssetPath) {
-    return relativePath; // ElectronAPIが使用できない場合はそのまま返す
-  }
-  
   try {
-    // Electron側で画像パスを解決
-    const resolvedPath = await window.electronAPI.resolveAssetPath(relativePath);
-    return resolvedPath;
+    // パスの正規化: 先頭の'/'を追加（なければ）
+    const normalizedPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+    
+    // HTTP経由でアクセスするためのURLを生成
+    const imageUrl = new URL(normalizedPath, window.location.origin).href;
+    logDebug(`画像URLを生成しました: ${imageUrl}`);
+    
+    return imageUrl;
   } catch (error) {
     logError(`画像パス解決エラー: ${error.message}`);
-    throw error;
+    // エラー時でもURLオブジェクトを使用して適切なパスを返す
+    return new URL(relativePath, window.location.origin).href;
   }
 }
 
 /**
  * 秘書画像を読み込む
  * @param {string} emotion - 感情名（normal, happy, sad等）
- * @returns {Promise<string>} 画像パス
+ * @returns {Promise<string>} 画像URL
  */
 export async function loadSecretaryImage(emotion = 'normal') {
-  const imageBasePath = 'assets/secretary';
-  let imagePath = '';
+  // 画像のベースパス（Viteの公開フォルダを基準）
+  const imageBasePath = '/assets/images/secretary';
   
   try {
     // 設定に基づいて画像名を決定
-    // (デフォルトでこのパスを使用、設定で上書き可能)
     const settings = window.currentSettings || {};
     const characterName = settings.character || 'maki';
     
@@ -72,11 +73,10 @@ export async function loadSecretaryImage(emotion = 'normal') {
     const supportsAnimation = settings.animation !== false;
     
     // 感情名からファイル名を生成
-    // 例: normal → maki_normal.webp
     const fileExtension = supportsAnimation ? 'webp' : 'png';
-    imagePath = `${imageBasePath}/${characterName}_${emotion}.${fileExtension}`;
+    const imagePath = `${imageBasePath}/${characterName}_${emotion}.${fileExtension}`;
     
-    // パスを解決
+    // HTTPパスに解決
     const resolvedPath = await resolveImagePath(imagePath);
     logDebug(`画像パスを解決しました: ${emotion} → ${resolvedPath}`);
     
@@ -86,7 +86,7 @@ export async function loadSecretaryImage(emotion = 'normal') {
     return resolvedPath;
   } catch (error) {
     // エラー時はデフォルト画像にフォールバック
-    logError(`画像読み込みエラー（${imagePath}）: ${error.message}`);
+    logError(`画像読み込みエラー: ${error.message}`);
     
     try {
       // フォールバック画像パスを解決
@@ -100,7 +100,8 @@ export async function loadSecretaryImage(emotion = 'normal') {
       return resolvedFallbackPath;
     } catch (fallbackError) {
       logError(`フォールバック画像も読み込めませんでした: ${fallbackError.message}`);
-      throw fallbackError;
+      // 最終手段として絶対パスのURLを返す
+      return new URL('/assets/images/secretary/maki_normal.png', window.location.origin).href;
     }
   }
 }

@@ -6,35 +6,35 @@ import { logDebug } from '@core/logger.js';
 
 // 効果音（SE）と音声ファイルのマッピング定義
 const presetMap = {
-  surprised: "assets/sounds/presets/kya.wav",      // 驚き
-  worried: "assets/sounds/presets/sigh.wav",       // 心配
-  fearful: "assets/sounds/presets/gasp.wav",       // 恐怖
-  funya: "assets/sounds/presets/funya.wav",        // ふにゃっとした感じ
-  happy: "assets/sounds/presets/nya.wav",          // 嬉しい
-  sad: "assets/sounds/presets/sigh_sad.wav"        // 悲しい
+  surprised: "/assets/sounds/presets/kya.wav",      // 驚き
+  worried: "/assets/sounds/presets/sigh.wav",       // 心配
+  fearful: "/assets/sounds/presets/gasp.wav",       // 恐怖
+  funya: "/assets/sounds/presets/funya.wav",        // ふにゃっとした感じ
+  happy: "/assets/sounds/presets/nya.wav",          // 嬉しい
+  sad: "/assets/sounds/presets/sigh_sad.wav"        // 悲しい
 };
 
 // プリセット音声ファイルの名前から実際のパスへのマッピング
 const presetNameMap = {
-  "altu": "assets/sounds/presets/altu.wav",       // 小さく驚く
-  "funya": "assets/sounds/presets/funya.wav",     // ふにゃっと反応
-  "gasp": "assets/sounds/presets/gasp.wav",       // 息を飲む（緊張）
-  "kya": "assets/sounds/presets/kya.wav",         // 軽く叫ぶ（驚き）
-  "scream": "assets/sounds/presets/scream.wav",   // 大声（襲撃時）
-  "sigh": "assets/sounds/presets/sigh.wav",       // 安堵、落ち着いたとき
-  "hmm": "assets/sounds/presets/sigh.wav",        // うーん（考え中）- hmm.wavがないのでsigh.wavを代用
-  "appear": "assets/sounds/presets/appear.wav",   // 出現
-  "disappear": "assets/sounds/presets/disapper.wav" // 消失
+  "altu": "/assets/sounds/presets/altu.wav",       // 小さく驚く
+  "funya": "/assets/sounds/presets/funya.wav",     // ふにゃっと反応
+  "gasp": "/assets/sounds/presets/gasp.wav",       // 息を飲む（緊張）
+  "kya": "/assets/sounds/presets/kya.wav",         // 軽く叫ぶ（驚き）
+  "scream": "/assets/sounds/presets/scream.wav",   // 大声（襲撃時）
+  "sigh": "/assets/sounds/presets/sigh.wav",       // 安堵、落ち着いたとき
+  "hmm": "/assets/sounds/presets/sigh.wav",        // うーん（考え中）- hmm.wavがないのでsigh.wavを代用
+  "appear": "/assets/sounds/presets/appear.wav",   // 出現
+  "disappear": "/assets/sounds/presets/disapper.wav" // 消失
 };
 
 // VOICEVOX生成音声ファイルのマッピング定義
 const voiceMap = {
-  surprised: "assets/sounds/generated/surprised_01.wav",   // 驚き
-  worried: "assets/sounds/generated/worried_01.wav",       // 心配
-  fearful: "assets/sounds/generated/fearful_01.wav",       // 恐怖
-  funya: "assets/sounds/generated/funya_01.wav",           // ふにゃっとした感じ
-  happy: "assets/sounds/generated/happy_01.wav",           // 嬉しい
-  sad: "assets/sounds/generated/sad_01.wav"                // 悲しい
+  surprised: "/assets/sounds/generated/surprised_01.wav",   // 驚き
+  worried: "/assets/sounds/generated/worried_01.wav",       // 心配
+  fearful: "/assets/sounds/generated/fearful_01.wav",       // 恐怖
+  funya: "/assets/sounds/generated/funya_01.wav",           // ふにゃっとした感じ
+  happy: "/assets/sounds/generated/happy_01.wav",           // 嬉しい
+  sad: "/assets/sounds/generated/sad_01.wav"                // 悲しい
 };
 
 // 現在再生中のAudioオブジェクト

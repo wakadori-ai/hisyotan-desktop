@@ -34,57 +34,19 @@ export function setExpression(expression) {
     currentExpression = expression;
     
     try {
-      // 画像パスを設定（デバッグ向けに複数のパスを用意）
+      // assistantImageが見つかるか確認
+      if (!assistantImage) {
+        assistantImage = document.getElementById('assistantImage');
+        logDebug('assistantImageを再取得しました');
+      }
+      
+      // キャッシュ防止用タイムスタンプ
       const timestamp = new Date().getTime();
       
-      // Electronの場合は安全なアセットパス解決を使う
-      if (window.electronAPI) {
-        logDebug('Electron APIを使用して画像を読み込みます');
-        
-        // assistantImageが見つかるか確認
-        if (!assistantImage) {
-          assistantImage = document.getElementById('assistantImage');
-          logDebug('assistantImageを再取得しました');
-        }
-        
-        // Electronの場合はIPC経由で安全なパスを取得
-        if (window.electronAPI.resolveAssetPath) {
-          try {
-            const assetPath = `assets/images/secretary_${expression}.png`;
-            window.electronAPI.resolveAssetPath(assetPath)
-              .then(path => {
-                logDebug(`画像の絶対パスを取得: ${path}`);
-                assistantImage.src = path;
-              })
-              .catch(err => {
-                // 絶対パスが取得できない場合はエラーハンドリング
-                logDebug(`絶対パス取得エラー: ${err.message}`);
-                
-                // フォールバックとして相対パスを指定
-                const relativePath = `/assets/images/secretary_${expression}.png?t=${timestamp}`;
-                logDebug(`相対パスを使用: ${relativePath}`);
-                assistantImage.src = relativePath;
-              });
-          } catch (err) {
-            logDebug(`resolveAssetPath実行エラー: ${err.message}`);
-            
-            // エラー時は相対パスを設定
-            const relativePath = `/assets/images/secretary_${expression}.png?t=${timestamp}`;
-            logDebug(`相対パスを使用: ${relativePath}`);
-            assistantImage.src = relativePath;
-          }
-        } else {
-          // resolveAssetPathがない場合は相対パスを設定
-          const relativePath = `/assets/images/secretary_${expression}.png?t=${timestamp}`;
-          logDebug(`相対パスを使用: ${relativePath}`);
-          assistantImage.src = relativePath;
-        }
-      } else {
-        // 非Electron環境（ブラウザなど）
-        const imagePath = `/assets/images/secretary_${expression}.png?t=${timestamp}`;
-        logDebug(`非Electron環境用画像パス: ${imagePath}`);
-        assistantImage.src = imagePath;
-      }
+      // HTTP経由で画像を読み込む（常に相対パスを使用）
+      const imagePath = `/assets/images/secretary_${expression}.png?t=${timestamp}`;
+      logDebug(`画像パス設定: ${imagePath}`);
+      assistantImage.src = imagePath;
       
       // 代替テキストを設定
       assistantImage.alt = `秘書たん（${expression}）`;

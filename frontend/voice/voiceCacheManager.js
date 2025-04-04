@@ -5,7 +5,7 @@
 
 // 設定の読み込み（将来的にはconfigLoaderから取得するようにも可能）
 const VOICEVOX_HOST = 'http://127.0.0.1:50021';
-const CACHE_DIR = 'assets/sounds/generated';
+const CACHE_DIR = 'frontend/public/assets/sounds/generated';
 const INDEX_FILE = `${CACHE_DIR}/index.json`;
 
 // 音声インデックスのキャッシュ

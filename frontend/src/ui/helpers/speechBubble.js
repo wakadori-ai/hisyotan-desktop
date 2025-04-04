@@ -29,6 +29,15 @@ export function initSpeechBubbleElements() {
     logDebug('speechText要素を取得しました');
   } else {
     logError('speechText要素が見つかりません');
+    
+    // speechBubbleが存在してspeechTextが存在しない場合、自動的に作成
+    if (speechBubble) {
+      logDebug('speechText要素を自動作成します');
+      speechText = document.createElement('div');
+      speechText.id = 'speechText';
+      speechText.className = 'speech-text';
+      speechBubble.appendChild(speechText);
+    }
   }
   
   logDebug('吹き出し要素初期化が完了しました');
@@ -37,14 +46,20 @@ export function initSpeechBubbleElements() {
 /**
  * 吹き出しを表示する
  * @param {string} eventType - イベントタイプ（オプション）
+ * @param {string} text - 表示するテキスト
  */
-export function showBubble(eventType = 'default') {
+export function showBubble(eventType = 'default', text) {
+  // デフォルトのテキストを設定
+  if (!text) {
+    text = 'こんにちは！何かお手伝いしましょうか？';
+  }
+  
   // ログ出力
   const isZombieWarning = eventType === 'zombie_warning';
   if (isZombieWarning) {
     logZombieWarning(`吹き出しを表示します... (イベント: ${eventType})`);
   } else {
-    logDebug(`吹き出しを表示します... (イベント: ${eventType})`);
+    logDebug(`吹き出しを表示します... (イベント: ${eventType}) - テキスト: ${text.substring(0, 20)}...`);
   }
   
   // DOM要素の取得確認
@@ -54,6 +69,23 @@ export function showBubble(eventType = 'default') {
       logError('speechBubble要素が見つかりません。表示できません。');
       return;
     }
+  }
+  
+  // speechText要素の確認と取得
+  if (!speechText) {
+    speechText = document.getElementById('speechText');
+    if (!speechText && speechBubble) {
+      logDebug('speechText要素が見つからないため作成します');
+      speechText = document.createElement('div');
+      speechText.id = 'speechText';
+      speechText.className = 'speech-text';
+      speechBubble.appendChild(speechText);
+    }
+  }
+  
+  // テキストを設定
+  if (speechText && text) {
+    setText(text);
   }
   
   // スタイル設定前の状態をデバッグ出力
@@ -150,52 +182,55 @@ export function setText(text) {
   }
   
   // speechText要素の取得または作成
-  let speechText = document.getElementById('speechText');
+  let textElement = document.getElementById('speechText');
   
-  if (!speechText) {
+  if (!textElement) {
     logDebug('speechText要素が見つかりません。新規作成します');
     
     // 新しいspeechText要素を作成
-    speechText = document.createElement('span');
-    speechText.id = 'speechText';
-    speechText.className = 'bubble-text';
+    textElement = document.createElement('div');
+    textElement.id = 'speechText';
+    textElement.className = 'speech-text';
     
     // 適切な位置に挿入（アイコンやUIの前に配置）
     // 通常、テキストは最初の要素なので、最初の子要素として挿入
-    bubble.insertBefore(speechText, bubble.firstChild);
+    bubble.insertBefore(textElement, bubble.firstChild);
     logDebug('新しいspeechText要素を作成して吹き出しに挿入しました');
+    
+    // グローバル変数を更新
+    speechText = textElement;
   }
   
-  // テキストを設定
-  speechText.textContent = text;
+  // テキストを複数の方法で設定（確実に表示されるようにするため）
+  textElement.textContent = text;
+  textElement.innerText = text;
+  textElement.innerHTML = text;
+  
+  // データ属性にも保存（バックアップ）
+  textElement.dataset.originalText = text;
   
   // 強制再描画トリガー
-  void speechText.offsetHeight;
-  speechText.style.transform = 'scale(1.00001)';
-  
-  // HTMLエスケープして設定（念のため）
-  const safeText = text.replace(/&/g, '&amp;')
-                      .replace(/</g, '&lt;')
-                      .replace(/>/g, '&gt;')
-                      .replace(/"/g, '&quot;')
-                      .replace(/'/g, '&#039;');
-  speechText.innerHTML = safeText;
+  void textElement.offsetHeight;
+  textElement.style.transform = 'scale(1.00001)';
   
   // 必要に応じて保険設定（Electron特有の問題対策）
   setTimeout(() => {
-    if (speechText && speechText.textContent.trim() === '') {
+    if (textElement && textElement.textContent.trim() === '') {
       logZombieWarning('テキストが空です。強制再設定します');
       
-      // データ属性に保存して復元を確実に
-      speechText.dataset.originalText = text;
-      speechText.innerHTML = safeText;
-      speechText.innerText = text;
+      // データ属性から復元を試みる
+      const originalText = textElement.dataset.originalText || text;
+      
+      // すべての方法で再設定
+      textElement.textContent = originalText;
+      textElement.innerText = originalText;
+      textElement.innerHTML = originalText;
       
       // 強制再描画のためにCSSプロパティを一時的に変更
-      const originalDisplay = speechText.style.display;
-      speechText.style.display = 'inline-block';
-      void speechText.offsetHeight;
-      speechText.style.display = originalDisplay;
+      const originalDisplay = textElement.style.display;
+      textElement.style.display = 'inline-block';
+      void textElement.offsetHeight;
+      textElement.style.display = originalDisplay;
     }
   }, 0);
   
@@ -248,27 +283,24 @@ export function debugBubbleStyles() {
   
   const computedStyle = window.getComputedStyle(speechBubble);
   const classes = speechBubble.className;
-  const inlineStyle = speechBubble.getAttribute('style');
   
-  console.log('--- 吹き出しスタイルデバッグ ---');
-  console.log(`クラス: ${classes}`);
-  console.log(`インラインスタイル: ${inlineStyle || 'なし'}`);
-  console.log(`表示状態: display=${computedStyle.display}, visibility=${computedStyle.visibility}, opacity=${computedStyle.opacity}`);
-  console.log(`位置: top=${computedStyle.top}, left=${computedStyle.left}, z-index=${computedStyle.zIndex}`);
-  console.log('------------------------------');
+  // テキスト要素のチェック
+  const textElement = document.getElementById('speechText');
+  const textContent = textElement ? textElement.textContent : 'テキスト要素なし';
+  const textDisplay = textElement ? window.getComputedStyle(textElement).display : 'N/A';
   
-  return {
+  const styleInfo = {
+    display: computedStyle.display,
+    visibility: computedStyle.visibility,
+    opacity: computedStyle.opacity,
+    zIndex: computedStyle.zIndex,
     classes,
-    inlineStyle,
-    computedStyle: {
-      display: computedStyle.display,
-      visibility: computedStyle.visibility,
-      opacity: computedStyle.opacity,
-      top: computedStyle.top,
-      left: computedStyle.left,
-      zIndex: computedStyle.zIndex
-    }
+    text: textContent.substring(0, 30) + (textContent.length > 30 ? '...' : ''),
+    textDisplay
   };
+  
+  console.log('吹き出しのスタイル情報:', styleInfo);
+  return styleInfo;
 }
 
 /**

@@ -162,16 +162,9 @@
             if (secretaryTan) {
                 secretaryTan.style.opacity = '0';
                 
-                // Electron API が利用可能な場合は画像パスを解決
-                if (isElectron && window.electronAPI.resolveAssetPath) {
-                    try {
-                        const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_normal.png');
-                        secretaryTan.src = resolvedPath || '/assets/images/secretary_normal.png';
-                        console.log('画像パスを解決しました:', resolvedPath);
-                    } catch (error) {
-                        console.error('画像パス解決エラー:', error);
-                    }
-                }
+                // 直接HTTP経由で画像パスを設定
+                secretaryTan.src = '/assets/images/secretary_normal.png';
+                console.log('画像パスを設定しました: /assets/images/secretary_normal.png');
             }
             
             // 設定UIイベントのリスナーを登録
@@ -235,19 +228,7 @@
                 speechBubble.classList.add('active');
                 
                 // 秘書たん画像の表情に応じた画像に変更
-                let imagePath = `/assets/images/secretary_${greeting.emotion}.png`;
-                
-                // Electron API が利用可能な場合は画像パスを解決
-                if (isElectron && window.electronAPI.resolveAssetPath) {
-                    try {
-                        const resolvedPath = await window.electronAPI.resolveAssetPath(`assets/images/secretary_${greeting.emotion}.png`);
-                        if (resolvedPath) {
-                            imagePath = resolvedPath;
-                        }
-                    } catch (error) {
-                        console.error('画像パス解決エラー:', error);
-                    }
-                }
+                const imagePath = `/assets/images/secretary_${greeting.emotion}.png`;
                 
                 secretaryTan.src = imagePath;
                 secretaryTan.style.opacity = '1';
@@ -296,20 +277,8 @@
                     
                     // 秘書たん画像を表示
                     if (secretaryTan) {
-                        // 画像パスを解決
-                        let imagePath = "/assets/images/secretary_sad.png";
-                        
-                        // Electron API が利用可能な場合は画像パスを解決
-                        if (window.electronAPI.resolveAssetPath) {
-                            try {
-                                const resolvedPath = await window.electronAPI.resolveAssetPath('assets/images/secretary_sad.png');
-                                if (resolvedPath) {
-                                    imagePath = resolvedPath;
-                                }
-                            } catch (error) {
-                                console.error('画像パス解決エラー:', error);
-                            }
-                        }
+                        // 画像パスを設定
+                        const imagePath = "/assets/images/secretary_sad.png";
                         
                         secretaryTan.src = imagePath;
                         secretaryTan.style.opacity = '1';
