@@ -13,6 +13,7 @@ console.log('✅ styles.cssの読み込み完了');
 import * as assistantUI from './assistantUI.js';
 import apiClient from '../core/apiClient.js';
 import speechManager from '../emotion/speechManager.js';
+import { initAssistantUI } from './assistantUI.js';
 
 // デバッグ情報
 console.log('🌸 renderer.js が読み込まれました');
@@ -61,78 +62,25 @@ if (!window.speechManager) {
 }
 
 /**
- * アプリケーションの初期化
- * すべてのコンポーネントを適切な順序で初期化する
+ * レンダラープロセスの初期化
  */
-async function initializeApp() {
-  // 既に初期化済みの場合はスキップ
-  if (isAppInitialized) {
-    console.log('🔄 アプリケーションは既に初期化済みです');
-    return;
-  }
-  
-  console.log('🌟 アプリケーションの初期化を開始します');
-  
+async function init() {
   try {
-    // UI要素を作成（まだ存在しない場合）
-    assistantUI.createUI();
+    console.log('🚀 レンダラープロセスを初期化します');
     
-    // UI要素の初期化
-    assistantUI.initUIElements();
+    // アシスタントUIの初期化
+    initAssistantUI();
     
-    // 立ち絵を表示
-    if (typeof assistantUI.showAssistantImage === 'function') {
-      assistantUI.showAssistantImage();
-    } else {
-      console.warn('🔍 showAssistantImage関数が見つかりません');
-      // 代替手段で立ち絵を表示
-      const imgElement = document.getElementById('assistantImage');
-      if (imgElement) {
-        imgElement.style.display = 'block';
-        imgElement.style.opacity = '1';
-        imgElement.classList.add('active');
-      }
-    }
+    // ここにアプリケーションの初期化コードを追加
     
-    // 設定の読み込み
-    try {
-      const config = await apiClient.getSettings();
-      console.log('⚙️ 設定をロードしました', config);
-      
-      // SpeechManagerに設定をセット
-      if (window.speechManager) {
-        speechManager.setConfig(config.settings);
-        console.log('🎤 SpeechManagerに設定をセットしました');
-        
-        // VOICEVOX接続確認
-        const voicevoxConnected = await speechManager.checkVoicevoxConnection()
-          .catch(err => {
-            console.error('🎙️ VOICEVOX接続確認エラー:', err);
-            return false;
-          });
-        
-        console.log(`🎙️ VOICEVOX接続確認結果: ${voicevoxConnected ? '接続成功' : '接続失敗'}`);
-      }
-    } catch (error) {
-      console.error('⚠️ 設定のロードに失敗しました:', error);
-    }
-    
-    // UI要素の存在確認（デバッグ用）
-    checkUIElements();
-    
-    // 歓迎メッセージを表示
-    setTimeout(() => {
-      assistantUI.showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
-    }, 500);
-    
-    // 初期化完了フラグを設定
-    isAppInitialized = true;
-    console.log('✅ アプリケーションの初期化が完了しました');
-    
-  } catch (err) {
-    console.error('💔 アプリケーション初期化中にエラーが発生しました:', err);
+    console.log('✅ レンダラープロセスの初期化が完了しました');
+  } catch (error) {
+    console.error('⚠️ レンダラープロセスの初期化エラー:', error);
   }
 }
+
+// 初期化実行
+init();
 
 // DOM構築後の初期化
 document.addEventListener('DOMContentLoaded', () => {

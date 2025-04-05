@@ -8,6 +8,10 @@ import { hideBubble } from '@ui/handlers/bubbleManager.js';
 let speechBubble;
 let speechText;
 
+// テキスト設定・復元中フラグ（グローバルに公開）
+window.isRecovering = false;
+let isRecovering = window.isRecovering;
+
 /**
  * 吹き出し関連のDOM要素を初期化する
  */
@@ -162,6 +166,10 @@ export function setText(text) {
   const callStackTrace = new Error().stack;
   console.log(`📝 [setText] 呼び出し元スタック: ${callStackTrace}`);
   
+  // 🔒 復元中フラグを設定（他のObserverからの処理を一時的にブロック）
+  isRecovering = true;
+  console.log(`🔒 [setText] テキスト設定保護モード開始: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`);
+  
   if (!text || text.trim() === '') {
     logError('setText: テキストが空です。フォールバックテキストを使用します');
     text = '...'; // フォールバックメッセージを設定
@@ -176,6 +184,7 @@ export function setText(text) {
   const bubble = document.getElementById('speechBubble');
   if (!bubble) {
     logError('speechBubble要素が見つかりません。表示できません');
+    isRecovering = false; // 保護を解除
     return;
   }
 
@@ -263,6 +272,7 @@ export function setText(text) {
   // データ属性に保存
   textElement.dataset.originalText = text;
   textElement.dataset.setTime = Date.now().toString();
+  textElement.dataset.setByFunction = 'setText';
   
   // テキスト要素自体のスタイルも強制的に設定
   textElement.style.cssText += `
@@ -291,6 +301,15 @@ export function setText(text) {
   
   // 連続setText検出のためのMutationObserverを設定
   setupTextMonitor(textElement, text);
+
+  // debug log
+  console.log("💡 textElementの子要素:", textElement.childNodes);
+  
+  // ⏱️ 一定時間後に保護を解除
+  setTimeout(() => {
+    isRecovering = false;
+    console.log(`🔓 [setText] テキスト設定保護モード終了: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`);
+  }, 500);
 }
 
 // テキスト要素の変更を監視するMutationObserver
@@ -309,6 +328,12 @@ function setupTextMonitor(textElement, originalText) {
   
   // 新しいObserverを設定
   textChangeObserver = new MutationObserver((mutations) => {
+    // 🔒 復元処理中ならスキップ
+    if (isRecovering) {
+      console.log(`🔒 [TextMonitor] 保護モード中のため変更を無視します`);
+      return;
+    }
+    
     for (const mutation of mutations) {
       // テキストが変更されたか空になった場合
       if (mutation.type === 'childList' || mutation.type === 'characterData') {
@@ -328,12 +353,26 @@ function setupTextMonitor(textElement, originalText) {
           
           // テキストが空になった場合は再設定
           if (!currentText && originalText) {
+            // 既にObserverが復旧処理を実行済みでないことを確認
+            if (textElement.dataset.recoveredByObserver === 'true') {
+              const recoveryTime = parseInt(textElement.dataset.recoveryTime || '0', 10);
+              const now = Date.now();
+              // 復旧されてから500ms以内の場合は処理をスキップ
+              if (now - recoveryTime < 500) {
+                console.log(`⏱️ [TextMonitor] Observerが既に復旧済み（${now - recoveryTime}ms前）のため処理をスキップします`);
+                return;
+              }
+            }
+            
+            // 🔒 復元中フラグを設定
+            isRecovering = true;
+            
             console.log(`🔄 [TextMonitor] テキストが空になったため再設定します: "${originalText}"`);
             
             // spanを再作成してテキストを復元
             const newSpan = document.createElement('span');
             newSpan.textContent = originalText;
-            newSpan.className = 'speech-text-content recovered';
+            newSpan.className = 'speech-text-content recovered-by-textmonitor';
             newSpan.style.cssText = `
               color: #4e3b2b !important; 
               display: inline-block !important;
@@ -351,6 +390,13 @@ function setupTextMonitor(textElement, originalText) {
             // データ属性を更新して回復したことを記録
             textElement.dataset.recovered = 'true';
             textElement.dataset.recoveryTime = Date.now().toString();
+            textElement.dataset.recoveredByTextMonitor = 'true';
+            
+            // ⏱️ 一定時間後に保護を解除
+            setTimeout(() => {
+              isRecovering = false;
+              console.log(`🔓 [TextMonitor] 復元保護モード終了`);
+            }, 500);
           }
         }
       }

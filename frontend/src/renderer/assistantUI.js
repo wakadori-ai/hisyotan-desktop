@@ -1,7 +1,11 @@
 /**
  * assistantUI.js
- * UI操作関連の機能を集約したヘルパーモジュール
+ * アシスタントUIの初期化と制御
  */
+
+// 必要なモジュールのインポート
+import { showBubble as showBubbleFromHelper, setText as setTextFromHelper, hideSpeechBubble, initSpeechBubbleElements } from '../ui/helpers/speechBubble.js';
+import { observeSpeechTextAutoRecovery } from '../ui/helpers/speechObserver.js';
 
 // スタイルシートをインポート
 import '@ui/styles/main.css';
@@ -315,7 +319,7 @@ function handlePawButtonClickDirect() {
   
   try {
     // 吹き出し表示を優先
-    showBubble('default', message);
+    showBubbleFromHelper('default', message);
     console.log('💬 吹き出しを表示しました:', message);
     
     // まず既存の音声を確実に停止
@@ -389,7 +393,7 @@ function handlePawButtonClick() {
     } catch (error) {
       console.error('🐾 speechManager.speak呼び出しエラー:', error);
       // フォールバック処理
-      showBubble('default', message);
+      showBubbleFromHelper('default', message);
     }
     return;
   }
@@ -402,11 +406,11 @@ function handlePawButtonClick() {
       window.electron.ipcRenderer.send('show-random-message');
     } catch (error) {
       console.error('IPC呼び出しエラー:', error);
-      showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
+      showBubbleFromHelper('default', 'こんにちは！何かお手伝いしましょうか？');
     }
   } else {
     console.log('🐾 フォールバック: 直接吹き出しを表示します');
-    showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
+    showBubbleFromHelper('default', 'こんにちは！何かお手伝いしましょうか？');
   }
 }
 
@@ -419,11 +423,11 @@ function handlePawButtonRightClick() {
     if (window.speechManager && window.speechManager.speak) {
       window.speechManager.speak('設定メニューを開きますね', 'normal', 3000);
     } else {
-      showBubble('default', '設定メニューを開きますね');
+      showBubbleFromHelper('default', '設定メニューを開きますね');
     }
   } catch (error) {
     console.error('設定UI表示エラー:', error);
-    showBubble('warning', '設定を開けませんでした');
+    showBubbleFromHelper('warning', '設定を開けませんでした');
   }
 }
 
@@ -627,10 +631,10 @@ async function showSettingsInBubble() {
           }
           
           // 成功メッセージを表示
-          showBubble('success', '設定を保存しました ✨');
+          showBubbleFromHelper('success', '設定を保存しました ✨');
         } catch (error) {
           console.error('設定の保存に失敗しました:', error);
-          showBubble('error', '設定の保存に失敗しました');
+          showBubbleFromHelper('error', '設定の保存に失敗しました');
         }
       });
     }
@@ -1655,4 +1659,47 @@ function startWelcomeMessageProtection() {
     clearInterval(textRestoreInterval);
     console.log('🛡️ ウェルカムメッセージ保護期間が終了しました');
   }, PROTECTION_DURATION);
+} 
+
+/**
+ * アシスタントUIの初期化処理
+ */
+export function initAssistantUI() {
+  try {
+    console.log('アシスタントUIを初期化します');
+    
+    // UIの準備
+    createUI();
+    
+    // イベントハンドラの設定
+    setupEventListeners();
+    
+    // 吹き出し要素の初期化
+    initSpeechBubbleElements();
+    
+    // スピーチテキスト監視を開始
+    if (typeof observeSpeechTextAutoRecovery === 'function') {
+      observeSpeechTextAutoRecovery();
+      console.log('スピーチテキスト自動復旧の監視を開始しました');
+    } else {
+      console.error('observeSpeechTextAutoRecovery関数が見つかりません');
+    }
+    
+    // ウェルカムメッセージはdelayを設けて安定させる
+    setTimeout(() => {
+      // 初期化時のウェルカムメッセージ表示（すでに表示済みでなければ）
+      if (!window.hasShownWelcomeMessage) {
+        console.log('🌸 ウェルカムメッセージを表示します（初期化）');
+        window.electronAPI.speak('お疲れ様です！休憩も大切ですよ✨', 'smile');
+      } else {
+        console.log('🌸 ウェルカムメッセージはすでに表示済みです（スキップ）');
+      }
+    }, 800); // 800ms待ってから表示（UI初期化が完了するのを待つ）
+    
+    console.log('アシスタントUIの初期化が完了しました');
+    return true;
+  } catch (error) {
+    console.error('アシスタントUI初期化エラー:', error);
+    return false;
+  }
 } 

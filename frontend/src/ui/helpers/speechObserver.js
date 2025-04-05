@@ -38,6 +38,13 @@ export function observeSpeechTextAutoRecovery() {
     const now = new Date();
     const timeStamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`;
     
+    // 🔒 speechBubble.jsの復元中フラグをチェック
+    // window.isRecoveringはspeechBubble.jsで定義されたグローバル変数
+    if (typeof window.isRecovering === 'boolean' && window.isRecovering === true) {
+      logZombieWarning(`[${timeStamp}] [Observer] 🔒 他のモジュールが保護モード中のため変更を無視します`);
+      return;
+    }
+    
     // 監視対象の要素が存在するか再確認
     if (!document.body.contains(speechText) || !document.body.contains(speechBubble)) {
       logError('[Observer] 監視対象の要素がDOMから削除されました。監視を終了します');
@@ -66,13 +73,55 @@ export function observeSpeechTextAutoRecovery() {
       
       // テキストが空でもコンテンツを設定
       if (text === '') {
+        // 既にTextMonitorが復旧処理を実行済みでないことを確認
+        if (speechText.dataset.recoveredByTextMonitor === 'true') {
+          const recoveryTime = parseInt(speechText.dataset.recoveryTime || '0', 10);
+          const now = Date.now();
+          // 復旧されてから500ms以内の場合は処理をスキップ
+          if (now - recoveryTime < 500) {
+            logZombieWarning(`[${timeStamp}] [Observer] TextMonitorが既に復旧済み（${now - recoveryTime}ms前）のため処理をスキップします`);
+            return;
+          }
+        }
+        
+        // 🔒 speechBubble.jsの復元中フラグをセット
+        if (typeof window.isRecovering !== 'undefined') {
+          window.isRecovering = true;
+        }
+        
         // バックアップテキストがあればそれを使用
-        if (backupText) {
-          speechText.textContent = backupText;
-          logZombieWarning(`[${timeStamp}] [Observer] バックアップテキストで復元: "${backupText}"`);
-        } else {
-          speechText.textContent = '「ごめん、もう一度言うねっ」';
-          logZombieWarning(`[${timeStamp}] [Observer] 空テキスト修正済み (デフォルトテキスト使用)`);
+        const recoveryText = backupText || '「ごめん、もう一度言うねっ」';
+        
+        // spanによる復旧に切り替える
+        const newSpan = document.createElement('span');
+        newSpan.className = 'speech-text-content recovered-by-observer';
+        newSpan.textContent = recoveryText;
+        newSpan.style.cssText = `
+          color: #4e3b2b !important;
+          display: inline-block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          width: 100% !important;
+          font-size: 1.05rem !important;
+          line-height: 1.6 !important;
+        `;
+        
+        // 内容をクリアして新しいspanを追加
+        speechText.innerHTML = '';
+        speechText.appendChild(newSpan);
+        
+        // データ属性を更新
+        speechText.dataset.recoveredByObserver = 'true';
+        speechText.dataset.recoveryTime = Date.now().toString();
+        
+        logZombieWarning(`[${timeStamp}] [Observer] spanによるテキスト復元: "${recoveryText.substring(0, 20)}${recoveryText.length > 20 ? '...' : ''}"`);
+        
+        // ⏱️ 一定時間後に保護を解除
+        if (typeof window.isRecovering !== 'undefined') {
+          setTimeout(() => {
+            window.isRecovering = false;
+            logZombieWarning(`[${timeStamp}] [Observer] 🔓 復元保護モード終了`);
+          }, 500);
         }
       }
       

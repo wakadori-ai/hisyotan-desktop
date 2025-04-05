@@ -33,6 +33,7 @@ function displayError(message) {
 // 多重実行防止用の変数
 let lastSpokenEvent = null;
 let lastSpokenMessage = null;
+let lastSpokenTime = 0;
 let lastZombieWarningTime = 0;
 const zombieCooldownMs = 10000; // ゾンビ警告のクールダウン時間（10秒）
 
@@ -42,6 +43,18 @@ let isAudioPlaying = false;
 // 再生状態を管理するフラグ
 let _isPlaying = false;
 let _mouthMovingTimeout = null;
+
+// ウェルカムメッセージの表示状態を管理するフラグ
+window.hasShownWelcomeMessage = false;
+
+// ウェルカムメッセージのテキスト（複数の候補）
+const welcomeMessages = [
+  'こんにちは！何かお手伝いしましょうか？',
+  'お疲れ様です！休憩も大切ですよ✨',
+  '何か質問があればいつでも声をかけてくださいね',
+  'お仕事頑張ってますね！素敵です',
+  'リラックスタイムも必要ですよ〜'
+];
 
 /**
  * 秘書たんにセリフを話させる
@@ -83,10 +96,38 @@ export async function speak(
       displayTime = messageDisplayTime;
     }
     
-    // 多重実行チェック（同一メッセージ・同一イベントタイプの場合はスキップ）
-    const isDuplicate = (lastSpokenEvent === eventType && lastSpokenMessage === message);
+    // =================================================================
+    // ウェルカムメッセージの重複表示防止（特別処理）
+    // =================================================================
+    
+    // ウェルカムメッセージかどうかを判定
+    const isWelcomeMessage = welcomeMessages.includes(message);
+    
+    // 初期化直後のウェルカムメッセージ表示を制御
+    if (isWelcomeMessage) {
+      // すでにウェルカムメッセージが表示されている場合
+      if (window.hasShownWelcomeMessage) {
+        console.log(`🌸 ウェルカムメッセージ「${message}」の重複表示をスキップします`);
+        // すでに表示されているのでスキップ
+        return false;
+      }
+      
+      // ウェルカムメッセージ表示フラグを設定
+      window.hasShownWelcomeMessage = true;
+      console.log(`🌸 ウェルカムメッセージ「${message}」を表示（初回）`);
+    }
+    
+    // =================================================================
+    // 通常の重複検出ロジック
+    // =================================================================
+    
+    // 前回と同じメッセージで時間が近い場合はスキップ
+    const now = Date.now();
+    const timeSinceLastSpeak = now - lastSpokenTime;
+    const isDuplicate = (lastSpokenEvent === eventType && lastSpokenMessage === message && timeSinceLastSpeak < 3000);
+    
     if (isDuplicate) {
-      logDebug(`発話スキップ（重複検出）: "${message}" (イベント: ${eventType})`);
+      logDebug(`発話スキップ（重複検出、${timeSinceLastSpeak}ms前に同じメッセージ）: "${message}" (イベント: ${eventType})`);
       return false;
     }
     
@@ -98,7 +139,6 @@ export async function speak(
     
     // ゾンビ警告のクールダウン制御
     if (eventType === "zombie_warning" || eventType === "zombie_few") {
-      const now = Date.now();
       if (now - lastZombieWarningTime < zombieCooldownMs) {
         logDebug(`ゾンビ警告をスキップ（クールダウン中: ${Math.round((now - lastZombieWarningTime) / 1000)}秒経過）: "${message}"`);
         return false;
@@ -223,6 +263,7 @@ export async function speak(
     // 会話状態を記録（多重実行防止用）
     lastSpokenEvent = eventType;
     lastSpokenMessage = message;
+    lastSpokenTime = now;
     
     // 吹き出しが実際に表示されたか確認するためのデバッグ
     setTimeout(() => {
@@ -234,7 +275,7 @@ export async function speak(
       }
       
       // DOM要素の状態確認
-      console.log('�� 吹き出し表示状態チェック:', {
+      console.log('🔍 吹き出し表示状態チェック:', {
         speechBubbleExists: !!speechBubble,
         speechTextExists: !!speechText,
         speechTextContent: speechText?.textContent || '空',

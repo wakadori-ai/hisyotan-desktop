@@ -38,7 +38,7 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const isDevCSP = process.env.ELECTRON_CSP_DEV === 'true';
 
 // セキュリティポリシーの設定
-const setContentSecurityPolicy = (win) => {
+const setContentSecurityPolicy = () => {
   // 開発モードと本番モードでCSPを分ける
   const csp = isDev ? 
     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:;" :
@@ -397,11 +397,8 @@ function registerGlobalShortcuts() {
 function createWindow() {
   console.log('🪟 メインウィンドウを作成します');
   
-  // CSP設定
-  setContentSecurityPolicy(mainWindow);
-  
   // メインウィンドウの設定
-  mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 300,
     height: 500,
     webPreferences: {
@@ -420,15 +417,18 @@ function createWindow() {
     icon: path.join(__dirname, '../frontend/public/assets/icon.ico')
   });
   
+  // CSP設定を適用（ウィンドウ作成後に呼び出す）
+  setContentSecurityPolicy();
+  
   // 開発モードでの設定
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    window.loadURL('http://localhost:5173');
+    window.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    window.loadFile(path.join(__dirname, '../dist/index.html'));
   }
   
-  return mainWindow;
+  return window;
 }
 
 /**
@@ -438,6 +438,14 @@ app.whenReady().then(async () => {
   console.log('Electronアプリケーションの初期化を開始しています...');
   
   try {
+    // 開発モードの場合、CSP制限を緩和
+    if (isDev) {
+      setupDevCSP();
+    }
+    
+    // CSP設定を先に適用
+    setContentSecurityPolicy();
+    
     // メインウィンドウを作成
     mainWindow = createWindow();
     
