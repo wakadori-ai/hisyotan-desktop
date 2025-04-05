@@ -53,9 +53,6 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
     `;
   }
   
-  // テキストを設定（複数の方法で確実に）
-  setText(text);
-  
   // 吹き出しのスタイルを設定
   bubble.className = 'speech-bubble';
   bubble.classList.add('show');
@@ -88,21 +85,6 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
   
   // 親要素の確認と表示状態の調整
   ensureBubbleVisibility(bubble);
-  
-  // タイマーを使って再度表示をチェック
-  setTimeout(() => {
-    const computedStyle = getComputedStyle(bubble);
-    if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
-      console.log('⚠️ 吹き出しが再び非表示になっています。強制表示を試みます。');
-      ensureBubbleVisibility(bubble);
-    }
-    
-    // テキストが空になっている場合は再設定
-    if (!textElement.textContent || textElement.textContent.trim() === '') {
-      console.log('⚠️ テキストが空になっています。再設定します。');
-      setText(text);
-    }
-  }, 100);
 }
 
 
@@ -135,7 +117,7 @@ function setText(text) {
     spanElement.className = 'speech-text-content';
     // 明示的な色と表示スタイルを設定
     spanElement.style.cssText = `
-      color: #4e3b2b; 
+    color: #4e3b2b; 
       display: inline-block;
       visibility: visible;
       opacity: 1;

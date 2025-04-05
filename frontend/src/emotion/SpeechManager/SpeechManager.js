@@ -12,7 +12,7 @@ import { logDebug, logError } from '@core/logger.js';
 //   renderSettingUI 
 // } from '@ui/uiHelper.js';
 import { initUIElements } from '@ui/helpers/uiBuilder.js';
-import { showBubble } from '@ui/helpers/speechBubble.js';
+import { showBubble } from '@ui/helpers/speechController.js';
 import { setExpression, stopTalking } from '../expressionManager.js';
 // import { 
 //   formatMessage, 

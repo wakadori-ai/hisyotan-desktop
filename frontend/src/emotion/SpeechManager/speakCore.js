@@ -17,7 +17,7 @@ import {
 } from '@emotion/expressionManager.js';
 import { playPresetSound } from '@emotion/audioReactor.js';
 import { requestVoiceSynthesis, stopCurrentPlayback } from './voicevoxClient.js';
-import { showBubble } from '@ui/helpers/speechBubble.js';
+import { showBubble } from '@ui/helpers/speechController.js';
 
 /**
  * エラーメッセージを表示する (showErrorの代替関数)

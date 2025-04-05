@@ -4,7 +4,6 @@
  */
 
 // 必要なモジュールのインポート
-import { showBubble as showBubbleFromHelper, setText as setTextFromHelper, initSpeechBubbleElements } from '../ui/helpers/speechBubble.js';
 import { observeSpeechTextAutoRecovery } from '../ui/helpers/speechObserver.js';
 import { createUI, initUIElements } from '../ui/helpers/uiBuilder.js';
 import { setupEventListeners } from '../ui/handlers/uiEventHandlers.js';
@@ -63,9 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     verifyAndFixUIStructure();
   }, 300);
-  
-  // 既存のUI要素の初期化
-  initUIElements();
   
   // すでにDOMに存在する要素を確認
   if (!document.getElementById('assistantImage')) {
@@ -220,7 +216,7 @@ export function initAssistantUI() {
     setupEventListeners();
     
     // 吹き出し要素の初期化
-    initSpeechBubbleElements();
+    initUIElements();
     
     // スピーチテキスト監視を開始
     if (typeof observeSpeechTextAutoRecovery === 'function') {
