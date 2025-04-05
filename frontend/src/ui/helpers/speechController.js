@@ -105,6 +105,73 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
   }, 100);
 }
 
+
+/**
+ * 吹き出しにテキストを設定
+ * @param {string} text - 表示テキスト
+ */
+function setText(text) {
+  if (!text) {
+    console.error('setText: テキストが空です');
+    return;
+  }
+  
+  // テキスト要素の取得
+  const textElement = document.getElementById('speechText') || speechText;
+  if (!textElement) {
+    console.error('speechText要素が見つかりません');
+    return;
+  }
+  
+  console.log(`📝 テキストを設定: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`);
+  
+  // テキスト要素内を空にする
+  textElement.innerHTML = '';
+  
+  try {
+    // 確実に表示されるよう、明示的なスタイルを持つspanを作成
+    const spanElement = document.createElement('span');
+    spanElement.textContent = text;
+    spanElement.className = 'speech-text-content';
+    // 明示的な色と表示スタイルを設定
+    spanElement.style.cssText = `
+      color: #4e3b2b; 
+      display: inline-block;
+      visibility: visible;
+      opacity: 1;
+      width: 100%;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    `;
+    textElement.appendChild(spanElement);
+    
+    // データ属性にバックアップ
+    textElement.dataset.originalText = text;
+    
+  } catch (error) {
+    console.error('テキスト設定エラー:', error);
+  }
+  
+  // 強制的に再描画を促す
+  void textElement.offsetHeight;
+  
+  // 設定後の確認
+  setTimeout(() => {
+    if (!textElement.textContent || textElement.textContent.trim() === '') {
+      console.warn('⚠️ テキスト設定後も空になっています。再試行します。');
+      // 単純なテキストノードを追加し、親要素にも明示的なスタイルを設定
+      textElement.style.cssText = `
+        color: #4e3b2b !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      `;
+      const textNode = document.createTextNode(text);
+      textElement.appendChild(textNode);
+    }
+  }, 50);
+}
+
 // 吹き出し内に設定UIを表示する関数
 export async function showSettingsInBubble() {
     // 吹き出し要素の取得
