@@ -66,15 +66,6 @@ python backend/debug_start.py --threshold 0.1 --verbose
 3. エラーログ：
    - フルスタックトレースが表示されるので、エラーの具体的な原因を特定できます
 
-### WebSocket接続のデバッグ
-
-WebSocket接続に問題がある場合：
-
-1. 詳細ログを有効にして接続状態を確認：
-   ```bash
-   python backend/debug_start.py --verbose
-   ```
-
 ## 既知の問題
 
 ### 1. timeモジュールの変数衝突
