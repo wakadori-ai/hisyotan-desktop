@@ -1,4 +1,4 @@
-import { showSettingsInBubble } from '../helpers/speechController.js';
+import { showHordeModeSettings } from '../helpers/speechController.js';
 
 // 肉球ボタンのイベント設定を分離
 export function setupPawButtonEvents(pawButton) {
@@ -217,7 +217,7 @@ export function handlePawButtonClick() {
   function handlePawButtonRightClick() {
     try {
       // 独立したUIではなく吹き出し内に設定メニューを表示
-      showSettingsInBubble();
+      showHordeModeSettings();
       
       if (window.speechManager && window.speechManager.speak) {
         window.speechManager.speak('設定メニューを開きますね', 'normal', 3000);

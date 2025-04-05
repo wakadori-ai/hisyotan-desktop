@@ -8,7 +8,7 @@ import { showBubble as showBubbleFromHelper, setText as setTextFromHelper, initS
 import { observeSpeechTextAutoRecovery } from '../ui/helpers/speechObserver.js';
 import { createUI, initUIElements } from '../ui/helpers/uiBuilder.js';
 import { setupEventListeners } from '../ui/handlers/uiEventHandlers.js';
-import { showSettingsInBubble } from '../ui/helpers/speechController.js';
+import { showHordeModeSettings } from '../ui/helpers/speechController.js';
 // スタイルシートをインポート
 import '@ui/styles/main.css';
 // CSS変数のある変数ファイルも直接インポート
@@ -88,7 +88,7 @@ export function showAssistantImage() {
 // エクスポート
 export {
   hideBubble,
-  showSettingsInBubble
+  showHordeModeSettings,
 }; 
 
 // DOMの読み込み完了後にUIを初期化
@@ -512,7 +512,7 @@ export function debugUI() {
       return '吹き出しを修復しました。表示を確認してください。';
     },
     // 設定UIを吹き出しに表示する関数をエクスポート
-    showSettingsInBubble
+    showHordeModeSettings
   };
 }
 
