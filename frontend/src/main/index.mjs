@@ -68,21 +68,6 @@ if (preloadPathFromEnv) {
   console.log(`preloadパスを環境変数から取得: ${preloadPathFromEnv}`);
 }
 
-// 設定読み込み
-let config = {};
-try {
-  // ESMでのパス解決を使用
-  const configPath = fileURLToPath(new URL('../../../config.json', import.meta.url));
-  config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-} catch (error) {
-  console.error('設定ファイルの読み込みに失敗しました:', error);
-  config = {
-    app: { name: 'ふにゃ秘書たん', version: '1.0.0' },
-    window: { width: 400, height: 600, transparent: true, frame: false, alwaysOnTop: true },
-    voicevox: { host: 'http://127.0.0.1:50021', speaker_id: 8 }
-  };
-}
-
 // メインウィンドウ
 let mainWindow = null;
 
