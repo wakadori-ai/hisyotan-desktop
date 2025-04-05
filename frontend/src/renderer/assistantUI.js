@@ -29,37 +29,6 @@ let speechText;
 let assistantImage;
 
 
-
-// 吹き出しの表示状態を監視する関数
-let bubbleObserver = null;
-function startBubbleObserver() {
-  if (bubbleObserver) return; // 既に監視中なら何もしない
-  
-  const checkBubbleVisibility = () => {
-    const bubble = document.getElementById('speechBubble') || speechBubble;
-    if (!bubble) return;
-    
-    const computedStyle = window.getComputedStyle(bubble);
-    if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden' || parseFloat(computedStyle.opacity) < 0.1) {
-      console.log('💬 吹き出しが非表示になっていました。表示状態を復元します。');
-      bubble.style.display = 'flex';
-      bubble.style.visibility = 'visible';
-      bubble.style.opacity = '1';
-    }
-  };
-  
-  // 定期的に表示状態をチェック
-  bubbleObserver = setInterval(checkBubbleVisibility, 500);
-}
-
-// 監視を停止する関数
-function stopBubbleObserver() {
-  if (bubbleObserver) {
-    clearInterval(bubbleObserver);
-    bubbleObserver = null;
-  }
-}
-
 /**
  * 吹き出しにテキストを設定
  * @param {string} text - 表示テキスト
