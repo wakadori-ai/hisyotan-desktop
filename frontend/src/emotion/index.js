@@ -35,7 +35,6 @@ import { hideTimeoutMap } from './speechManager.js';
 // 吹き出し表示
 import {
   formatMessage,
-  forceShowBubble,
   displayTextInBubble
 } from './bubbleDisplay.js';
 
@@ -137,7 +136,6 @@ export {
   
   // 吹き出し表示
   formatMessage,
-  forceShowBubble,
   displayTextInBubble,
   
   // 表情管理

@@ -4,8 +4,6 @@
  */
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
-import { showBubble } from '@ui/uiHelper.js';
-import { hideBubble } from '@ui/handlers/bubbleManager.js';
 import { 
   setExpression, 
   startTalking, 
@@ -18,8 +16,8 @@ import {
   stopNervousShake
 } from '@emotion/expressionManager.js';
 import { playPresetSound } from '@emotion/audioReactor.js';
-import { formatMessage, forceShowBubble } from '@emotion/SpeechManager/bubbleDisplay.js';
 import { requestVoiceSynthesis, stopCurrentPlayback } from './voicevoxClient.js';
+import { showBubble } from '@ui/helpers/speechBubble.js';
 
 /**
  * エラーメッセージを表示する (showErrorの代替関数)
@@ -169,7 +167,7 @@ export async function speak(
     setExpression(emotion);
     
     // メッセージを整形して吹き出しに表示
-    const formattedMessage = formatMessage(message);
+    const formattedMessage = message;
     
     // 吹き出しを表示
     showBubble(eventType);

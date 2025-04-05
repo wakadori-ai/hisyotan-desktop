@@ -4,19 +4,21 @@
  */
 
 import { logDebug, logError } from '@core/logger.js';
-import { 
-  showBubble, 
-  hideBubble, 
-  setText, 
-  initUIElements, 
-  renderSettingUI 
-} from '@ui/uiHelper.js';
+// import { 
+//   showBubble, 
+//   hideBubble, 
+//   setText, 
+//   initUIElements, 
+//   renderSettingUI 
+// } from '@ui/uiHelper.js';
+import { initUIElements } from '@ui/helpers/uiBuilder.js';
+import { showBubble } from '@ui/helpers/speechBubble.js';
 import { setExpression, stopTalking } from '../expressionManager.js';
-import { 
-  formatMessage, 
-  forceShowBubble, 
-  displayTextInBubble 
-} from './bubbleDisplay.js';
+// import { 
+//   formatMessage, 
+//   forceShowBubble, 
+//   displayTextInBubble 
+// } from './bubbleDisplay.js.backup';
 import { 
   speak as speakCore, 
   speakWithPreset as speakWithPresetCore,
@@ -27,11 +29,11 @@ import {
   requestVoiceSynthesis, 
   checkVoicevoxConnection as checkVoicevoxConnectionAPI 
 } from './voicevoxClient.js';
-import {
-  showHordeModeToggle as showHordeModeToggleUI,
-  getHordeModeState,
-  setHordeModeState
-} from './hordeModeToggle.js';
+// import {
+//   showHordeModeToggle as showHordeModeToggleUI,
+//   getHordeModeState,
+//   setHordeModeState
+// } from './hordeModeToggle.js';
 
 /**
  * エラーメッセージを表示する (showErrorの代替関数)

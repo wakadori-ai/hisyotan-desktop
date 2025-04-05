@@ -254,11 +254,11 @@ export function initUIElements() {
       }
       
       // グローバル変数に要素を保存
-      if (key === 'pawButton') pawButton = element;
-      if (key === 'quitButton') quitButton = element;
-      if (key === 'speechBubble') speechBubble = element;
-      if (key === 'speechText') speechText = element;
-      if (key === 'assistantImage') assistantImage = element;
+      if (key === 'pawButton') window.pawButton = element;
+      if (key === 'quitButton') window.quitButton = element;
+      if (key === 'speechBubble') window.speechBubble = element;
+      if (key === 'speechText') window.speechText = element;
+      if (key === 'assistantImage') window.assistantImage = element;
     }
     
     // イベントリスナーの設定

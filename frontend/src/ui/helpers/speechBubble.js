@@ -2,7 +2,7 @@
 // 吹き出し表示・非表示・テキスト処理を担当するモジュール
 
 import { logDebug, logError, logZombieWarning } from '@core/logger.js';
-import { hideBubble } from '@ui/handlers/bubbleManager.js';
+// import { hideBubble } from '@ui/handlers/bubbleManager.js';
 
 // DOM要素
 let speechBubble;
