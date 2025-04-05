@@ -255,3 +255,57 @@ export function stopBubbleObserver() {
     bubbleObserver = null;
   }
 }
+
+
+
+/**
+ * 吹き出しの表示を確実にするためのヘルパー関数
+ * @param {HTMLElement} bubble - 吹き出し要素
+ */
+export function ensureBubbleVisibility(bubble) {
+  if (!bubble) return;
+  
+  console.log('💬 吹き出しの表示状態を確認します');
+  
+  // 親要素の表示状態を確認
+  const parent = bubble.parentElement;
+  if (parent) {
+    // 親要素が表示状態であることを確認
+    if (getComputedStyle(parent).display === 'none') {
+      console.log('⚠️ 親要素が非表示です。表示に設定します。');
+      parent.style.display = 'block';
+    }
+    
+    // 親要素のz-indexを確認
+    const parentZIndex = parseInt(getComputedStyle(parent).zIndex);
+    if (!isNaN(parentZIndex) && parentZIndex >= 9999) {
+      console.log('⚠️ 親要素のz-indexが高すぎます。吹き出しのz-indexを上げます。');
+      bubble.style.zIndex = (parentZIndex + 1);
+    }
+  }
+  
+  // 吹き出しの表示状態を再確認
+  setTimeout(() => {
+    const computedStyle = getComputedStyle(bubble);
+    console.log('💬 吹き出し表示状態:', {
+      display: computedStyle.display,
+      visibility: computedStyle.visibility,
+      opacity: computedStyle.opacity,
+      zIndex: computedStyle.zIndex,
+      position: computedStyle.position
+    });
+    
+    // 表示されていない場合は強制的に表示
+    if (computedStyle.display === 'none' || 
+        computedStyle.visibility === 'hidden' || 
+        parseFloat(computedStyle.opacity) < 0.1) {
+      console.log('⚠️ 吹き出しが表示されていません。強制的に表示します。');
+      
+      // 再度クラスを適用
+      bubble.className = 'speech-bubble show fixed-position';
+      
+      // DOMツリーの最後に移動（他の要素の下に隠れる問題を解決）
+      document.body.appendChild(bubble);
+    }
+  }, 100);
+}
