@@ -144,6 +144,9 @@ export class SpeechManager {
         
         // 通常のテキスト設定（uiPayloadとともに）
         setText(formattedMessage);
+        console.log("[speechText] innerHTML =", speechText.innerHTML);
+        console.log("[speechText] child count =", speechText.childNodes.length);
+
         
         // setText後のDOM状態をチェック
         console.log('🔍 setText()後の吹き出し状態:', {

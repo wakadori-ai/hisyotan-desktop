@@ -97,6 +97,15 @@ function setText(text) {
     console.error('setText: テキストが空です');
     return;
   }
+
+  console.log("[setText] innerText =", speechText.innerText);
+  console.log("[setText] child count =", speechText.childNodes.length);
+  console.log("[setText] boundingRect =", speechText.getBoundingClientRect());
+
+  console.log("[setText] before:", speechText.innerHTML, speechText.childNodes.length);
+  speechText.innerHTML = `<span class="speech-text-content">${text}</span>`;
+  console.log("[setText] after:", speechText.innerHTML, speechText.childNodes.length);
+
   
   // テキスト要素の取得
   const textElement = document.getElementById('speechText') || speechText;

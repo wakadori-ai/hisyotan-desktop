@@ -71,8 +71,12 @@ export function observeSpeechTextAutoRecovery() {
       logZombieWarning(`[${timeStamp}] [Observer] 吹き出しの異常を検出: テキスト空または非表示です。復旧を試みます`);
       logZombieWarning(`[${timeStamp}] [Observer] 状態: テキスト="${text}", display=${displayed}, visibility=${visible}, opacity=${opacity}, classList=${speechBubble.className}`);
       
-      // テキストが空でもコンテンツを設定
-      if (text === '') {
+      // テキストが空だけどinnerHTMLが存在する場合は復旧スキップ
+      if (
+        text === '' &&
+        speechText.innerHTML.includes('<span') &&
+        speechText.innerHTML.includes('speech-text-content')
+      ) {
         // 既にTextMonitorが復旧処理を実行済みでないことを確認
         if (speechText.dataset.recoveredByTextMonitor === 'true') {
           const recoveryTime = parseInt(speechText.dataset.recoveryTime || '0', 10);
@@ -146,7 +150,7 @@ export function observeSpeechTextAutoRecovery() {
   // テキスト要素のみ監視（属性変更とテキスト変更）
   window._speechTextObserver.observe(speechText, {
     characterData: true,
-    subtree: true,
+    subtree: false,
     characterDataOldValue: true
   });
   
