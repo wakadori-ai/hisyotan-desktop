@@ -246,7 +246,6 @@ $keywords = @(
     "hisyotan",
     "uvicorn",
     "frontend/src/main/index.js",
-    "frontend/core/main.js",
     "frontend/src/main/preload/preload.js",
     "frontend/src/main/preload/paw-preload.js",
     "dist/preload.js",
