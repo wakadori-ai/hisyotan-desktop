@@ -18,7 +18,7 @@ import {
   stopNervousShake
 } from '@emotion/expressionManager.js';
 import { playPresetSound } from '@emotion/audioReactor.js';
-import { formatMessage, forceShowBubble } from '@emotion/bubbleDisplay.js';
+import { formatMessage, forceShowBubble } from '@emotion/SpeechManager/bubbleDisplay.js';
 import { requestVoiceSynthesis, stopCurrentPlayback } from './voicevoxClient.js';
 
 /**
