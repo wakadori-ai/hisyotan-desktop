@@ -3,7 +3,7 @@
  * セリフIDに対応する音声ファイルの管理と生成を行います
  */
 
-// 設定の読み込み（将来的にはconfigLoaderから取得するようにも可能）
+// 設定の読み込み
 const VOICEVOX_HOST = 'http://127.0.0.1:50021';
 const CACHE_DIR = 'frontend/public/assets/sounds/generated';
 const INDEX_FILE = `${CACHE_DIR}/index.json`;

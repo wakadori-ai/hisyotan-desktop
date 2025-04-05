@@ -9,10 +9,8 @@ import '@ui/paw.js';
 
 // コア機能のインポート
 import { logDebug, logError, saveErrorLog } from '@core/logger.js';
-import { loadConfig } from '@config/configLoader.js';
 import { initUIElements, showError, shouldShowError } from '@ui/uiHelper.js';
 import { initExpressionElements, setExpression } from '@emotion/expressionManager.js';
-import { setConfig as setWebSocketConfig, initWebSocket } from '@core/websocketHandler.js';
 import { setConfig as setSpeechConfig, checkVoicevoxConnection } from '@emotion/speechManager.js';
 import { initRandomLines } from '@emotion/emotionHandler.js';
 import zombieOverlayManager from '@ui/overlayManager.js';
@@ -42,13 +40,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // 初期表情設定
     setExpression('normal');
-    
-    // 設定読み込み
-    const config = await loadConfig();
-    
-    // 各モジュールに設定を渡す
-    setWebSocketConfig(config);
-    setSpeechConfig(config);
     
     // ゾンビオーバーレイマネージャーを初期化
     zombieOverlayManager.initialize();
