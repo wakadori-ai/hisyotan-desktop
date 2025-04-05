@@ -8,7 +8,7 @@
   width: var(--bubble-min-width);
   max-width: var(--bubble-max-width);
   min-height: var(--bubble-min-height);
-  background: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.9); /* 背景の透明度を上げて文字を見やすく */
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border-radius: 12px;
@@ -25,6 +25,8 @@
   display: flex;
   flex-direction: column;
   -webkit-app-region: drag;
+  overflow: visible !important; /* テキストがはみ出す場合でも表示されるように */
+  height: auto; /* 高さを自動調整 */
 }
 
 /* 吹き出しの表示状態 */
@@ -50,12 +52,13 @@
   right: 30px; /* 矢印の位置を調整して立ち絵に合わせる */
   width: 20px;
   height: 20px;
-  background-color: rgba(255, 255, 255, 0.26);
+  background-color: rgba(255, 255, 255, 0.9); /* 吹き出しと同じ背景色に */
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border-right: 1.5px solid rgba(255, 200, 220, 0.7);
   border-bottom: 1.5px solid rgba(255, 200, 220, 0.7);
   transform: rotate(45deg);
+  z-index: -1; /* 矢印を吹き出しの下に表示し、テキストとの重なりを防ぐ */
 }
 
 /* 吹き出しテキスト */
@@ -67,14 +70,14 @@
   word-break: break-word;
   display: block;
   width: 100%;
-  padding-right: 10px;
+  padding: 5px;
+  box-sizing: border-box;
   visibility: visible;
   opacity: 1;
   margin: 0;
-  padding: 0;
   text-align: left;
   position: relative;
-  z-index: 2147483646;
+  z-index: 2; /* z-indexを低く設定して吹き出し内に収める */
 }
 
 /* 吹き出しテキスト内容 */
@@ -89,7 +92,7 @@
   font-size: 1.05rem;
   line-height: 1.6;
   position: relative;
-  z-index: 2147483646;
+  z-index: 2;
 }
 
 /* 警告吹き出し */
@@ -325,9 +328,11 @@ body.mouse-active .speech-bubble.active {
 
 /* 吹き出しが確実に表示されるための追加スタイル */
 .speech-bubble.fixed-position {
-  position: fixed !important;
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  z-index: 2147483647 !important;
+  position: fixed;
+  top: 15%;
+  right: 50px;
+  left: auto;
+  transform: none;
+  animation: none;
+  transition: none;
 } 

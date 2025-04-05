@@ -1,4 +1,3 @@
-
 /**
  * DOM構造とスタイルを確認し、問題があれば修正する
  */
@@ -70,8 +69,34 @@ export function verifyAndFixUIStructure() {
         newText.textContent = 'こんにちは！何かお手伝いしましょうか？';
         speechBubble.appendChild(newText);
       } else if (!speechText.textContent || speechText.textContent.trim() === '') {
-        console.log('⚠️ テキスト要素が空です。テキストを設定します。');
-        speechText.textContent = 'こんにちは！何かお手伝いしましょうか？';
+        // ロックされている場合は必ずdataset.originalTextから復元を試みる
+        if (speechText.dataset.locked === 'true') {
+          console.log('🔒 テキスト要素はロックされています。dataset.originalTextから復元します。');
+          
+          if (speechText.dataset.originalText) {
+            console.log('🔄 ロックされたテキストを元のテキストから復元します: ', speechText.dataset.originalText);
+            const spanElement = document.createElement('span');
+            spanElement.textContent = speechText.dataset.originalText;
+            spanElement.className = 'speech-text-content recovered-from-original';
+            spanElement.style.cssText = `
+              color: #4e3b2b; 
+              display: inline-block;
+              visibility: visible;
+              opacity: 1;
+              width: 100%;
+              font-size: 1.05rem;
+              line-height: 1.6;
+            `;
+            speechText.innerHTML = '';
+            speechText.appendChild(spanElement);
+          } else {
+            console.warn('⚠️ ロックされていますが、originalTextが設定されていません');
+          }
+        } else {
+          // ロックされていない場合のみデフォルトテキストを設定
+          console.log('⚠️ テキスト要素が空です。テキストを設定します。');
+          speechText.textContent = 'こんにちは！何かお手伝いしましょうか？';
+        }
       }
     }
     

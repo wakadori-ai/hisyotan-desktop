@@ -17,7 +17,7 @@ import {
 } from '@emotion/expressionManager.js';
 import { playPresetSound } from '@emotion/audioReactor.js';
 import { requestVoiceSynthesis, stopCurrentPlayback } from './voicevoxClient.js';
-import { showBubble } from '@ui/helpers/speechController.js';
+import { showBubble, hideBubble, setText } from '@ui/helpers/speechController.js';
 
 /**
  * エラーメッセージを表示する (showErrorの代替関数)
@@ -172,12 +172,8 @@ export async function speak(
     // 吹き出しを表示
     showBubble(eventType);
     
-    // テキストを設定
-    const speechText = document.getElementById('speechText');
-    if (speechText) {
-      speechText.textContent = formattedMessage;
-      speechText.innerText = formattedMessage;
-    }
+    // テキストを設定（setText関数を使用）
+    setText(formattedMessage);
     
     // 音声合成処理
     let success = false;
@@ -279,14 +275,28 @@ export async function speak(
         speechTextContent: speechText?.textContent || '空',
         speechTextInnerHTML: speechText?.innerHTML || '空',
         speechBubbleChildren: speechBubble?.children?.length || 0,
-        speechBubbleHTML: speechBubble?.innerHTML || '空'
+        speechTextIsChildOfBubble: speechBubble?.contains(speechText) || false,
+        speechBubbleHTML: speechBubble?.innerHTML?.substring(0, 100) || '空'
       });
       
       // テキストが空の場合は強制的に再設定
       if (speechText && (!speechText.textContent || speechText.textContent.trim() === '')) {
         console.log('🚨 テキストが空なので強制的に設定します:', formattedMessage);
-        speechText.textContent = formattedMessage;
-        speechText.innerText = formattedMessage;
+        setText(formattedMessage);
+      }
+      
+      // speechTextがspeechBubbleの子要素でない場合は追加
+      if (speechText && speechBubble && !speechBubble.contains(speechText)) {
+        console.log('⚠️ speechTextがspeechBubbleの子要素ではありません。追加します。');
+        
+        // 念のため既存の親から切り離す
+        if (speechText.parentElement) {
+          speechText.parentElement.removeChild(speechText);
+        }
+        
+        // speechBubbleに追加
+        speechBubble.appendChild(speechText);
+        console.log('✅ speechTextをspeechBubbleに追加しました。子要素数:', speechBubble.childElementCount);
       }
     }, 100);
     

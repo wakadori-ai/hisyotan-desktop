@@ -71,6 +71,17 @@ export function observeSpeechTextAutoRecovery() {
       logZombieWarning(`[${timeStamp}] [Observer] 吹き出しの異常を検出: テキスト空または非表示です。復旧を試みます`);
       logZombieWarning(`[${timeStamp}] [Observer] 状態: テキスト="${text}", display=${displayed}, visibility=${visible}, opacity=${opacity}, classList=${speechBubble.className}`);
       
+      // ロックされている場合は処理をスキップ
+      if (speechText.dataset.locked === 'true') {
+        const lockTime = parseInt(speechText.dataset.setTime || '0', 10);
+        const now = Date.now();
+        // 1秒以内にロックされた場合はスキップ
+        if (now - lockTime < 1000) {
+          logZombieWarning(`[${timeStamp}] [Observer] 🔒 テキストがロックされているため復旧をスキップします（${now - lockTime}ms前にセット）`);
+          return;
+        }
+      }
+      
       // テキストが空だけどinnerHTMLが存在する場合は復旧スキップ
       if (
         text === '' &&
@@ -108,17 +119,54 @@ export function observeSpeechTextAutoRecovery() {
           width: 100% !important;
           font-size: 1.05rem !important;
           line-height: 1.6 !important;
+          position: relative !important;
+          z-index: 5 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          text-shadow: 0 0 1px rgba(255,255,255,0.7) !important;
         `;
         
         // 内容をクリアして新しいspanを追加
-        speechText.innerHTML = '';
-        speechText.appendChild(newSpan);
-        
-        // データ属性を更新
-        speechText.dataset.recoveredByObserver = 'true';
-        speechText.dataset.recoveryTime = Date.now().toString();
-        
-        logZombieWarning(`[${timeStamp}] [Observer] spanによるテキスト復元: "${recoveryText.substring(0, 20)}${recoveryText.length > 20 ? '...' : ''}"`);
+        // ロックされている場合は元の内容を保護
+        if (speechText.dataset.locked === 'true') {
+          // ロックされている場合、クリアをスキップしてdataset.originalTextから復元を試みる
+          logZombieWarning(`[${timeStamp}] [Observer] 🛡️ speechTextはロック中、observerによる消去をスキップします`);
+          
+          // すでにspanがあるか確認し、なければdataset.originalTextから復元
+          if (!speechText.querySelector('.speech-text-content') && speechText.dataset.originalText) {
+            const lockedSpan = document.createElement('span');
+            lockedSpan.className = 'speech-text-content locked-content-restored';
+            lockedSpan.textContent = speechText.dataset.originalText;
+            lockedSpan.style.cssText = `
+              color: #4e3b2b !important;
+              display: inline-block !important;
+              visibility: visible !important;
+              opacity: 1 !important;
+              width: 100% !important;
+              font-size: 1.05rem !important;
+              line-height: 1.6 !important;
+              position: relative !important;
+              z-index: 5 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              text-shadow: 0 0 1px rgba(255,255,255,0.7) !important;
+            `;
+            
+            speechText.innerHTML = ''; // 既存の内容を一旦クリア
+            speechText.appendChild(lockedSpan);
+            logZombieWarning(`[${timeStamp}] [Observer] 🔄 ロック中のテキストをoriginalTextから復元: "${speechText.dataset.originalText.substring(0, 20)}${speechText.dataset.originalText.length > 20 ? '...' : ''}"`);
+          }
+        } else {
+          // ロックされていない場合は通常の復旧処理
+          speechText.innerHTML = '';
+          speechText.appendChild(newSpan);
+          
+          // データ属性を更新
+          speechText.dataset.recoveredByObserver = 'true';
+          speechText.dataset.recoveryTime = Date.now().toString();
+          
+          logZombieWarning(`[${timeStamp}] [Observer] spanによるテキスト復元: "${recoveryText.substring(0, 20)}${recoveryText.length > 20 ? '...' : ''}"`);
+        }
         
         // ⏱️ 一定時間後に保護を解除
         if (typeof window.isRecovering !== 'undefined') {
@@ -130,18 +178,51 @@ export function observeSpeechTextAutoRecovery() {
       }
       
       // 吹き出しのスタイルを強制的に修正
-      speechBubble.className = 'speech-bubble show';
+      speechBubble.className = 'speech-bubble show fixed-position';
       speechBubble.style.cssText = `
         display: flex !important;
         visibility: visible !important;
         opacity: 1 !important;
-        position: absolute !important;
-        top: 20% !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
+        position: fixed !important;
+        top: 15% !important;
+        right: 50px !important;
+        left: auto !important;
+        width: auto !important;
+        min-width: 280px !important;
+        max-width: 350px !important;
+        min-height: 80px !important;
         z-index: 2147483647 !important;
         pointer-events: auto !important;
+        overflow: visible !important;
+        height: auto !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+        padding: 14px 18px !important;
       `;
+      
+      // speechTextがspeechBubbleの子要素でない場合は追加
+      if (!speechBubble.contains(speechText)) {
+        logZombieWarning(`[${timeStamp}] [Observer] ⚠️ speechTextがspeechBubbleの子要素ではありません。追加します。`);
+        
+        // 念のため既存の親から切り離す
+        if (speechText.parentElement) {
+          try {
+            speechText.parentElement.removeChild(speechText);
+          } catch (e) {
+            logError(`[Observer] 親要素からspeechTextを切り離す際にエラー: ${e.message}`);
+          }
+        }
+        
+        // speechBubbleに追加
+        try {
+          speechBubble.appendChild(speechText);
+          logZombieWarning(`[${timeStamp}] [Observer] ✅ speechTextをspeechBubbleに追加しました。`);
+        } catch (e) {
+          logError(`[Observer] speechTextをspeechBubbleに追加する際にエラー: ${e.message}`);
+        }
+      }
+      
+      // 構造をログ出力
+      logZombieWarning(`[${timeStamp}] [Observer] 💬 DOM構造確認: speechTextIsChildOfBubble=${speechBubble.contains(speechText)}, speechBubbleChildCount=${speechBubble.childElementCount}`);
       
       logZombieWarning(`[${timeStamp}] [Observer] 吹き出し強制復旧実行完了`);
     }
@@ -150,7 +231,8 @@ export function observeSpeechTextAutoRecovery() {
   // テキスト要素のみ監視（属性変更とテキスト変更）
   window._speechTextObserver.observe(speechText, {
     characterData: true,
-    subtree: false,
+    childList: true, // 子ノードの追加・削除を監視
+    subtree: true,   // 子孫ノードの変更も監視
     characterDataOldValue: true
   });
   

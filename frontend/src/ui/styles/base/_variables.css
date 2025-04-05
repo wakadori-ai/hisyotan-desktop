@@ -37,7 +37,7 @@
   --assistant-height: 75vh;
   --assistant-image-width: 35vw;
   --assistant-image-height: 70vh;
-  --bubble-min-width: 200px;
-  --bubble-max-width: 280px;
-  --bubble-min-height: 60px;
+  --bubble-min-width: 280px;
+  --bubble-max-width: 350px;
+  --bubble-min-height: 80px;
 } 

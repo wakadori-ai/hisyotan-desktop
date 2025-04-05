@@ -7,7 +7,7 @@
 import { observeSpeechTextAutoRecovery } from '../ui/helpers/speechObserver.js';
 import { createUI, initUIElements } from '../ui/helpers/uiBuilder.js';
 import { setupEventListeners } from '../ui/handlers/uiEventHandlers.js';
-import { showHordeModeSettings } from '../ui/helpers/speechController.js';
+import { showHordeModeSettings, showBubble, setText } from '../ui/helpers/speechController.js';
 import { showAssistantImage } from '../ui/helpers/assistantImage.js';
 import { cleanupDuplicateElements, verifyAndFixUIStructure } from '../ui/helpers/uiVerifier.js';
 
@@ -32,6 +32,8 @@ let assistantImage;
 // エクスポート
 export {
   showHordeModeSettings,
+  setText,
+  showBubble
 }; 
 
 // DOMの読み込み完了後にUIを初期化
@@ -95,35 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         bubble.classList.add('speech-bubble', 'show', 'fixed-position');
         
-        // テキスト要素の初期化
-        textElement.innerHTML = '';
-        textElement.style.cssText = `
-          display: block !important;
-          visibility: visible !important;
-          opacity: 1 !important;
-          color: #4e3b2b !important;
-          width: 100% !important;
-        `;
-        
-        // ウェルカムメッセージをセット
-        const spanElement = document.createElement('span');
-        spanElement.textContent = welcomeMessage;
-        spanElement.className = 'speech-text-content welcome-message';
-        spanElement.style.cssText = `
-          color: #4e3b2b !important; 
-          display: inline-block !important;
-          visibility: visible !important;
-          opacity: 1 !important;
-          width: 100% !important;
-          font-size: 1.05rem !important;
-          line-height: 1.6 !important;
-        `;
-        textElement.appendChild(spanElement);
+        // setText関数を使用してウェルカムメッセージを設定
+        setText(welcomeMessage);
         
         // データ属性に初期メッセージであることを記録
-        textElement.dataset.originalText = welcomeMessage;
         textElement.dataset.isWelcomeMessage = 'true';
-        textElement.dataset.setTime = Date.now().toString();
         
         // 吹き出しが非表示にならないように監視
         startWelcomeMessageProtection();
@@ -165,21 +143,8 @@ function startWelcomeMessageProtection() {
         if (originalText) {
           console.log(`🔄 空になったウェルカムメッセージを復元します: "${originalText}"`);
           
-          // スパンを再作成してテキストを復元
-          textElement.innerHTML = '';
-          const newSpan = document.createElement('span');
-          newSpan.textContent = originalText;
-          newSpan.className = 'speech-text-content welcome-message restored';
-          newSpan.style.cssText = `
-            color: #4e3b2b !important; 
-            display: inline-block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            width: 100% !important;
-            font-size: 1.05rem !important;
-            line-height: 1.6 !important;
-          `;
-          textElement.appendChild(newSpan);
+          // setText関数を使用してテキストを復元
+          setText(originalText);
           
           // 吹き出しも表示状態に戻す
           bubble.style.cssText = `
@@ -231,7 +196,25 @@ export function initAssistantUI() {
       // 初期化時のウェルカムメッセージ表示（すでに表示済みでなければ）
       if (!window.hasShownWelcomeMessage) {
         console.log('🌸 ウェルカムメッセージを表示します（初期化）');
-        window.electronAPI.speak('お疲れ様です！休憩も大切ですよ✨', 'smile');
+        
+        // electronAPI.speakの存在チェック
+        if (typeof window.electronAPI?.speak === 'function') {
+          window.electronAPI.speak('お疲れ様です！休憩も大切ですよ✨', 'smile');
+        } else {
+          console.warn('⚠️ window.electronAPI.speak が未定義です。代替手段を使用します。');
+          
+          // speechManager.speakを使用（代替手段）
+          if (window.speechManager?.speak) {
+            window.speechManager.speak('お疲れ様です！休憩も大切ですよ✨', 'smile');
+          } else {
+            // 最終手段：直接テキスト表示
+            console.log('⚠️ 代替手段も使用できません。直接テキスト表示を行います。');
+            setText('お疲れ様です！休憩も大切ですよ✨');
+          }
+        }
+        
+        // ウェルカムメッセージ表示済みフラグを設定
+        window.hasShownWelcomeMessage = true;
       } else {
         console.log('🌸 ウェルカムメッセージはすでに表示済みです（スキップ）');
       }
