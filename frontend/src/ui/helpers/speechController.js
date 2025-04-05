@@ -1,4 +1,110 @@
 
+
+/**
+ * 吹き出しを表示する
+ * @param {string} type - 吹き出しタイプ
+ * @param {string} text - 表示テキスト
+ */
+export function showBubble(type = 'default', text = 'こんにちは！何かお手伝いしましょうか？') {
+  console.log(`🗨️ 吹き出しを表示: ${type} - "${text.substring(0, 15)}..."`);
+  
+  // 既存の吹き出し要素をすべて取得（重複チェック用）
+  const allBubbles = document.querySelectorAll('#speechBubble');
+  if (allBubbles.length > 1) {
+    console.log(`⚠️ 重複する吹き出し要素が ${allBubbles.length} 個見つかりました。クリーンアップします。`);
+    cleanupDuplicateElements();
+  }
+  
+  // 吹き出し要素の取得
+  const bubble = document.getElementById('speechBubble') || speechBubble;
+  if (!bubble) {
+    console.log('💬 speechBubble要素が見つかりません。作成します。');
+    createUI();
+    return setTimeout(() => showBubble(type, text), 10);
+  }
+  
+  // テキスト要素の取得
+  const textElement = document.getElementById('speechText') || speechText;
+  if (!textElement) {
+    console.log('💬 speechText要素が見つかりません。作成します。');
+    const newText = document.createElement('div');
+    newText.id = 'speechText';
+    newText.className = 'speech-text';
+    // 明示的なスタイルを設定
+    newText.style.cssText = `
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      color: #4e3b2b !important;
+      width: 100% !important;
+    `;
+    bubble.appendChild(newText);
+    speechText = newText;
+  } else {
+    // テキスト要素内の余分な要素をクリア
+    textElement.innerHTML = '';
+    // 明示的なスタイルを設定
+    textElement.style.cssText = `
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      color: #4e3b2b !important;
+      width: 100% !important;
+    `;
+  }
+  
+  // テキストを設定（複数の方法で確実に）
+  setText(text);
+  
+  // 吹き出しのスタイルを設定
+  bubble.className = 'speech-bubble';
+  bubble.classList.add('show');
+  bubble.classList.add('fixed-position');
+  
+  // 吹き出しに明示的なスタイルを設定
+  bubble.style.cssText = `
+    display: flex !important; 
+    visibility: visible !important; 
+    opacity: 1 !important;
+    z-index: 9999 !important;
+  `;
+  
+  // タイプに応じたクラスを追加
+  if (type === 'warning') {
+    bubble.classList.add('warning');
+  } else if (type === 'error') {
+    bubble.classList.add('error');
+  } else if (type === 'success') {
+    bubble.classList.add('success');
+  } else if (type === 'zombie_warning') {
+    bubble.classList.add('zombie-warning');
+  }
+  
+  // 吹き出しが非表示にならないように監視
+  startBubbleObserver();
+  
+  // 強制的に再描画を促す
+  void bubble.offsetWidth;
+  
+  // 親要素の確認と表示状態の調整
+  ensureBubbleVisibility(bubble);
+  
+  // タイマーを使って再度表示をチェック
+  setTimeout(() => {
+    const computedStyle = getComputedStyle(bubble);
+    if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
+      console.log('⚠️ 吹き出しが再び非表示になっています。強制表示を試みます。');
+      ensureBubbleVisibility(bubble);
+    }
+    
+    // テキストが空になっている場合は再設定
+    if (!textElement.textContent || textElement.textContent.trim() === '') {
+      console.log('⚠️ テキストが空になっています。再設定します。');
+      setText(text);
+    }
+  }, 100);
+}
+
 // 吹き出し内に設定UIを表示する関数
 export async function showSettingsInBubble() {
     // 吹き出し要素の取得
