@@ -1,4 +1,5 @@
 import { setupPawButtonEvents } from './pawButtonHandler.js';
+import { handleQuitButtonClick } from './quitButtonHandler.js';
 
 // イベントリスナーの設定を分離
 export function setupEventListeners() {
