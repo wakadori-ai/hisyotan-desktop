@@ -1,11 +1,5 @@
 /frontend/ - フロントエンドのメインディレクトリ
 │
-├── core/ - アプリケーションの中核モジュール
-│   ├── main.js - 古いメインプロセスファイル
-│   ├── paw-preload.js - 肉球UIのプリロードスクリプト
-│   ├── preload.js - メインウィンドウのプリロードスクリプト
-│   ├── preload.js.bak - バックアップファイル
-│   └── websocketHandler.js - WebSocket通信の管理
 │
 ├── dist/ - ビルド済みアプリケーション
 │   └── assets/ - ビルド済みアセット
