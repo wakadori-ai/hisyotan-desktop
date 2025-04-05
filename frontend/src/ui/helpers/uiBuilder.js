@@ -128,10 +128,12 @@ export function createUI() {
     pawButtonWrapper.appendChild(pawBackground);
     
     // 肉球ボタンの作成
-    const pawButton = document.createElement('div');
+    const pawButton = document.createElement('button');
     pawButton.id = 'paw-button';
-    pawButton.className = 'paw-button';
     pawButton.textContent = '🐾';
+    pawButton.setAttribute('role', 'button');
+    pawButton.setAttribute('tabindex', '0');
+    pawButton.setAttribute('aria-label', '話しかける');
     pawButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定
     pawButton.style.cursor = 'pointer'; // カーソルをポインタに設定
     
@@ -156,10 +158,12 @@ export function createUI() {
     });
     
     // 終了ボタンの作成
-    const quitButton = document.createElement('div');
+    const quitButton = document.createElement('button');
     quitButton.id = 'quit-button';
-    quitButton.className = 'quit-button';
-    quitButton.textContent = '×';
+    quitButton.textContent = '❌';
+    quitButton.setAttribute('role', 'button');
+    quitButton.setAttribute('tabindex', '0');
+    quitButton.setAttribute('aria-label', '閉じる');
     quitButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定（これだけはインラインで）
     
     // ホバーエフェクト

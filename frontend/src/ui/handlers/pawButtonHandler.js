@@ -122,10 +122,13 @@ export function setupPawButtonEvents(pawButton) {
       pointer-events: auto !important;
     `;
     
+    // 肉球絵文字を明示的に設定
+    pawButton.textContent = '🐾';
+    
     // HTML属性も追加
     pawButton.setAttribute('role', 'button');
     pawButton.setAttribute('tabindex', '0');
-    pawButton.setAttribute('aria-label', '秘書たんを呼ぶ');
+    pawButton.setAttribute('aria-label', '話しかける');
     
     // クリックイベントだけに統一（余分なイベントを登録しない）
     pawButton.addEventListener('click', handlePawClick);
