@@ -234,7 +234,7 @@ async function playAudioData(audioData) {
 /**
  * 現在再生中の音声を停止する
  */
-function stopCurrentPlayback() {
+export function stopCurrentPlayback() {
   try {
     if (audioContext && isPlaying) {
       // すべてのノードを切断

@@ -6,7 +6,7 @@
   width: 250px !important;
   height: 420px !important;
   z-index: var(--z-index-base) !important;
-  pointer-events: none !important;
+  pointer-events: auto !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -15,6 +15,7 @@
   padding: var(--spacing-md) !important;
   background-color: rgba(255, 255, 255, 0.05) !important;
   backdrop-filter: none !important;
+  -webkit-app-region: drag !important;
 }
 
 /* 立ち絵 */
@@ -38,7 +39,7 @@
               transform var(--transition-duration, 0.3s) ease;
   user-select: none;
   pointer-events: auto;
-  -webkit-app-region: drag; /* ドラッグ可能にする */
+  -webkit-app-region: no-drag; /* ドラッグではなくイメージをクリック可能に変更 */
   z-index: calc(var(--z-index-base, 100) + 1) !important;
   overflow: visible;
   display: block !important; /* 必ず表示 */
@@ -97,6 +98,7 @@
   display: flex !important;
   flex-direction: column !important;
   visibility: visible !important;
+  -webkit-app-region: no-drag !important; /* ドラッグ対象外にする */
 }
 
 .speech-bubble.show {
@@ -137,6 +139,7 @@
   z-index: 997;
   pointer-events: auto;
   margin-top: 10px;
+  -webkit-app-region: no-drag; /* ドラッグ対象外にする */
 }
 
 /* ふわふわアニメーション */

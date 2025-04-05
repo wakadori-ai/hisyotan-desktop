@@ -25,8 +25,40 @@ let isAppInitialized = false;
 // グローバルアクセス用に設定
 window.assistantUI = assistantUI;
 window.settingsApi = apiClient;
-window.speechManager = speechManager;
-console.log('🎤 SpeechManager をグローバルに登録しました');
+
+// speechManagerが正しく読み込まれていることを確認
+try {
+  if (!speechManager) {
+    console.error('❌ speechManagerのインポートに失敗しました');
+  } else {
+    window.speechManager = speechManager;
+    console.log('🎤 SpeechManager をグローバルに登録しました:', 
+      Object.keys(speechManager).join(', '));
+      
+    // メソッドの存在確認
+    if (typeof speechManager.speak === 'function') {
+      console.log('✅ speechManager.speakメソッドが存在します');
+    } else {
+      console.error('❌ speechManager.speakメソッドが見つかりません');
+    }
+  }
+} catch (err) {
+  console.error('❌ speechManager初期化エラー:', err);
+}
+
+// フォールバック：speechManagerが存在しない場合の簡易実装
+if (!window.speechManager) {
+  console.log('⚠️ フォールバックspeechManagerを作成します');
+  window.speechManager = {
+    speak: (text, emotion, duration) => {
+      console.log(`フォールバックspeak: ${text} (${emotion}, ${duration}ms)`);
+      assistantUI.showBubble('default', text);
+      return true;
+    },
+    checkVoicevoxConnection: async () => false,
+    setConfig: (config) => console.log('フォールバックsetConfig:', config)
+  };
+}
 
 /**
  * アプリケーションの初期化

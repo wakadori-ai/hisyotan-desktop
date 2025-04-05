@@ -19,7 +19,7 @@ import {
 } from '@emotion/expressionManager.js';
 import { playPresetSound } from '@emotion/audioReactor.js';
 import { formatMessage, forceShowBubble } from '@emotion/bubbleDisplay.js';
-import { requestVoiceSynthesis } from './voicevoxClient.js';
+import { requestVoiceSynthesis, stopCurrentPlayback } from './voicevoxClient.js';
 
 /**
  * エラーメッセージを表示する (showErrorの代替関数)
@@ -38,6 +38,10 @@ const zombieCooldownMs = 10000; // ゾンビ警告のクールダウン時間（
 
 // 音声再生中フラグ
 let isAudioPlaying = false;
+
+// 再生状態を管理するフラグ
+let _isPlaying = false;
+let _mouthMovingTimeout = null;
 
 /**
  * 秘書たんにセリフを話させる
@@ -229,15 +233,23 @@ export async function speak(
         return;
       }
       
-      // 強制的に表示を保証
-      if (speechBubble.style.display !== 'flex' || 
-          speechBubble.style.visibility !== 'visible' || 
-          (speechText && speechText.textContent.trim() === '')) {
-        
-        logDebug('吹き出しまたはテキストに問題があります。強制表示します');
-        forceShowBubble(formattedMessage, eventType);
+      // DOM要素の状態確認
+      console.log('�� 吹き出し表示状態チェック:', {
+        speechBubbleExists: !!speechBubble,
+        speechTextExists: !!speechText,
+        speechTextContent: speechText?.textContent || '空',
+        speechTextInnerHTML: speechText?.innerHTML || '空',
+        speechBubbleChildren: speechBubble?.children?.length || 0,
+        speechBubbleHTML: speechBubble?.innerHTML || '空'
+      });
+      
+      // テキストが空の場合は強制的に再設定
+      if (speechText && (!speechText.textContent || speechText.textContent.trim() === '')) {
+        console.log('🚨 テキストが空なので強制的に設定します:', formattedMessage);
+        speechText.textContent = formattedMessage;
+        speechText.innerText = formattedMessage;
       }
-    }, 50);
+    }, 100);
     
     // 設定UIの場合やautoCloseがfalseの場合は自動非表示しない
     if (eventType.startsWith('setting_') || !autoClose) {
@@ -337,11 +349,43 @@ export async function speakWithPreset(presetSound, message, emotion = 'normal', 
  * @returns {boolean} 発話再生中ならtrue
  */
 export function isPlaying() {
-  return isAudioPlaying;
+  return _isPlaying;
+}
+
+/**
+ * 現在再生中の音声を停止する
+ * @returns {boolean} 停止処理を実行した場合はtrue
+ */
+export function stopPlaying() {
+  try {
+    logDebug('speakCore: 音声再生を停止します');
+    
+    // 口パク動作を停止
+    stopTalking();
+    
+    // 口パクタイマーがあればクリア
+    if (_mouthMovingTimeout) {
+      clearTimeout(_mouthMovingTimeout);
+      _mouthMovingTimeout = null;
+      logDebug('口パクタイマーをクリアしました');
+    }
+    
+    // フラグをリセット
+    _isPlaying = false;
+    
+    // 音声再生を停止
+    stopCurrentPlayback();
+    
+    return true;
+  } catch (error) {
+    logError(`音声停止処理エラー: ${error.message}`);
+    return false;
+  }
 }
 
 export default {
   speak,
   speakWithPreset,
-  isPlaying
+  isPlaying,
+  stopPlaying
 }; 

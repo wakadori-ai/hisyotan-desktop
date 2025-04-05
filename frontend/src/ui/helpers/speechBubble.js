@@ -159,89 +159,214 @@ export function showBubble(eventType = 'default', text) {
  * @param {string} text - 表示するテキスト
  */
 export function setText(text) {
+  const callStackTrace = new Error().stack;
+  console.log(`📝 [setText] 呼び出し元スタック: ${callStackTrace}`);
+  
   if (!text || text.trim() === '') {
     logError('setText: テキストが空です。フォールバックテキストを使用します');
     text = '...'; // フォールバックメッセージを設定
   }
 
-  logDebug(`テキスト設定開始: "${text}"`);
-  
-  // MutationObserverが既に存在する場合はリセット
-  if (window._speechTextObserver) {
-    window._speechTextObserver.disconnect();
-    window._speechTextObserver = null;
-    window._speechTextObserverAttached = false;
-    logDebug('既存のMutationObserverをリセットしました');
+  // 確実にspeechTextを取得
+  if (!speechText) {
+    speechText = document.getElementById('speechText');
   }
-  
+
   // 吹き出し要素の取得
   const bubble = document.getElementById('speechBubble');
   if (!bubble) {
     logError('speechBubble要素が見つかりません。表示できません');
     return;
   }
-  
+
   // speechText要素の取得または作成
   let textElement = document.getElementById('speechText');
   
   if (!textElement) {
-    logDebug('speechText要素が見つかりません。新規作成します');
-    
     // 新しいspeechText要素を作成
     textElement = document.createElement('div');
     textElement.id = 'speechText';
     textElement.className = 'speech-text';
     
-    // 適切な位置に挿入（アイコンやUIの前に配置）
-    // 通常、テキストは最初の要素なので、最初の子要素として挿入
+    // 吹き出しの先頭に挿入
     bubble.insertBefore(textElement, bubble.firstChild);
-    logDebug('新しいspeechText要素を作成して吹き出しに挿入しました');
     
     // グローバル変数を更新
     speechText = textElement;
+    
+    // ログで確認
+    console.log('新しいspeechText要素を作成しました', textElement);
   }
   
-  // テキストを複数の方法で設定（確実に表示されるようにするため）
-  textElement.textContent = text;
-  textElement.innerText = text;
-  textElement.innerHTML = text;
+  // 吹き出しの位置調整（画面内に確実に表示されるように）
+  if (bubble) {
+    // 吹き出しが画面内に収まるよう位置を調整
+    const windowHeight = window.innerHeight;
+    if (windowHeight < 600) {
+      // 小さい画面サイズの場合は上部に表示
+      bubble.style.top = '10px';
+      bubble.style.bottom = 'auto';
+    } else {
+      // 通常サイズの画面では、画面の中央より少し上に表示
+      const assistantImg = document.getElementById('assistantImage');
+      if (assistantImg) {
+        const imgRect = assistantImg.getBoundingClientRect();
+        if (imgRect.top > 0) {
+          // 立ち絵の上に配置
+          bubble.style.bottom = `${windowHeight - imgRect.top + 10}px`;
+        } else {
+          // 立ち絵が見つからない場合はデフォルト位置
+          bubble.style.bottom = '300px';
+        }
+      } else {
+        bubble.style.bottom = '300px';
+      }
+    }
+    bubble.style.right = '5px';
+    
+    // 吹き出しの表示を強制
+    bubble.style.cssText += `
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      position: fixed !important;
+      z-index: 9999 !important;
+    `;
+  }
   
-  // データ属性にも保存（バックアップ）
+  console.log(`📝 [setText] テキスト設定前の状態:`, {
+    textElementExists: !!textElement,
+    currentTextContent: textElement ? textElement.textContent : 'なし',
+    bubbleDisplayStyle: bubble ? bubble.style.display : 'なし',
+    bubbleVisibility: bubble ? bubble.style.visibility : 'なし',
+    bubbleOpacity: bubble ? bubble.style.opacity : 'なし'
+  });
+  
+  // テキストを設定（すべての方法で試す）
+  textElement.innerHTML = ''; // 内容をクリア
+  
+  // 明示的なスタイルを持つspanを作成して追加
+  const spanElement = document.createElement('span');
+  spanElement.textContent = text;
+  spanElement.className = 'speech-text-content';
+  spanElement.style.cssText = `
+    color: #4e3b2b !important; 
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    font-size: 1.05rem !important;
+    line-height: 1.6 !important;
+  `;
+  textElement.appendChild(spanElement);
+  
+  // データ属性に保存
   textElement.dataset.originalText = text;
+  textElement.dataset.setTime = Date.now().toString();
   
-  // 強制再描画トリガー
-  void textElement.offsetHeight;
-  textElement.style.transform = 'scale(1.00001)';
-  
-  // テキスト要素の表示を確保
-  textElement.style.cssText = `
+  // テキスト要素自体のスタイルも強制的に設定
+  textElement.style.cssText += `
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
+    color: #4e3b2b !important;
+    font-size: 1.05rem !important;
+    line-height: 1.6 !important;
+    width: 100% !important;
   `;
   
-  // 必要に応じて保険設定（Electron特有の問題対策）
-  setTimeout(() => {
-    if (textElement && textElement.textContent.trim() === '') {
-      logZombieWarning('テキストが空です。強制再設定します');
-      
-      // データ属性から復元を試みる
-      const originalText = textElement.dataset.originalText || text || '...';
-      
-      // すべての方法で再設定
-      textElement.textContent = originalText;
-      textElement.innerText = originalText;
-      textElement.innerHTML = originalText;
-      
-      // 強制再描画のためにCSSプロパティを一時的に変更
-      const originalDisplay = textElement.style.display;
-      textElement.style.display = 'inline-block';
-      void textElement.offsetHeight;
-      textElement.style.display = originalDisplay || 'block';
-    }
-  }, 0);
+  // テスト用にログ出力
+  console.log('テキスト設定完了:', {
+    element: textElement,
+    text: text,
+    content: textElement.textContent,
+    innerText: textElement.innerText,
+    boundingRect: textElement.getBoundingClientRect(),
+    bubbleRect: bubble ? bubble.getBoundingClientRect() : null
+  });
   
-  logDebug(`テキスト設定完了: "${text}"`);
+  // 吹き出しを表示
+  bubble.classList.add('show');
+  bubble.classList.remove('hide');
+  
+  // 連続setText検出のためのMutationObserverを設定
+  setupTextMonitor(textElement, text);
+}
+
+// テキスト要素の変更を監視するMutationObserver
+let textChangeObserver = null;
+
+/**
+ * テキスト変更の監視を設定
+ * @param {HTMLElement} textElement - 監視対象のテキスト要素
+ * @param {string} originalText - 設定された元のテキスト
+ */
+function setupTextMonitor(textElement, originalText) {
+  // 既存のObserverがあれば切断
+  if (textChangeObserver) {
+    textChangeObserver.disconnect();
+  }
+  
+  // 新しいObserverを設定
+  textChangeObserver = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      // テキストが変更されたか空になった場合
+      if (mutation.type === 'childList' || mutation.type === 'characterData') {
+        const currentText = textElement.textContent || '';
+        
+        // テキストが空になった、または変更された場合
+        if (!currentText || currentText !== originalText) {
+          console.warn(`⚠️ [TextMonitor] テキストが変更されました: "${originalText}" → "${currentText}"`, {
+            mutationType: mutation.type,
+            target: mutation.target,
+            addedNodes: Array.from(mutation.addedNodes).map(n => n.nodeName),
+            removedNodes: Array.from(mutation.removedNodes).map(n => n.nodeName)
+          });
+          
+          // 呼び出し元を特定するためのスタックトレース
+          console.warn(`⚠️ [TextMonitor] 変更検出時のスタック: ${new Error().stack}`);
+          
+          // テキストが空になった場合は再設定
+          if (!currentText && originalText) {
+            console.log(`🔄 [TextMonitor] テキストが空になったため再設定します: "${originalText}"`);
+            
+            // spanを再作成してテキストを復元
+            const newSpan = document.createElement('span');
+            newSpan.textContent = originalText;
+            newSpan.className = 'speech-text-content recovered';
+            newSpan.style.cssText = `
+              color: #4e3b2b !important; 
+              display: inline-block !important;
+              visibility: visible !important;
+              opacity: 1 !important;
+              width: 100% !important;
+              font-size: 1.05rem !important;
+              line-height: 1.6 !important;
+            `;
+            
+            // 子要素をクリアして新しいspanを追加
+            textElement.innerHTML = '';
+            textElement.appendChild(newSpan);
+            
+            // データ属性を更新して回復したことを記録
+            textElement.dataset.recovered = 'true';
+            textElement.dataset.recoveryTime = Date.now().toString();
+          }
+        }
+      }
+    }
+  });
+  
+  // テキスト要素とその子要素の変更を監視
+  textChangeObserver.observe(textElement, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class']
+  });
+  
+  console.log(`🔍 [TextMonitor] テキスト "${originalText.substring(0, 20)}..." の監視を開始しました`);
 }
 
 /**

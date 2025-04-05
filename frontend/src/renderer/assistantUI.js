@@ -9,6 +9,8 @@ import '@ui/styles/main.css';
 import '@ui/styles/base/_variables.css';
 // 立ち絵・吹き出し用コンポーネントスタイルも明示的にインポート
 import '@ui/styles/components/_assistant.css';
+// 肉球ボタン用スタイルを明示的にインポート
+import '@ui/styles/components/_paw-button.css';
 
 // 不要な古い設定UI関数のインポートを削除
 import { hideBubble } from '@ui/handlers/bubbleManager.js';
@@ -149,37 +151,191 @@ function setupEventListeners() {
 
 // 肉球ボタンのイベント設定を分離
 function setupPawButtonEvents(pawButton) {
+  console.log('🐾 setupPawButtonEvents: 肉球ボタンにイベントを設定します', pawButton);
+  
+  if (!pawButton) {
+    console.error('❌ setupPawButtonEvents: pawButtonが見つかりません');
+    return;
+  }
+  
+  // 直接クリックハンドラを設定
+  console.log('🐾 直接的なクリックハンドラを設定します');
+  
+  // デバウンス処理のための変数
+  let isProcessing = false;
   let lastClickTime = 0;
-  const COOLDOWN_TIME = 3000;
+  const DEBOUNCE_TIME = 500; // ミリ秒
   
-  // ボタンは -webkit-app-region: no-drag に設定してクリック可能に
-  pawButton.style.webkitAppRegion = 'no-drag';
+  // 既存のイベントをすべて削除
+  const clone = pawButton.cloneNode(true);
+  pawButton.parentNode.replaceChild(clone, pawButton);
+  pawButton = clone;
   
-  // 左クリックイベント
-  pawButton.addEventListener('click', (event) => {
-    console.log('🐾 肉球ボタンがクリックされました');
-    
-    if (window._wasDragging) {
-      window._wasDragging = false;
-      return;
-    }
-    
-    const currentTime = Date.now();
-    if (currentTime - lastClickTime < COOLDOWN_TIME) {
-      console.log('🕒 クールタイム中です');
-      return;
-    }
-    
-    lastClickTime = currentTime;
-    handlePawButtonClick();
-  });
+  // グローバル参照を更新
+  window.pawButton = pawButton;
+  globalThis.pawButton = pawButton;
   
-  // 右クリックイベント（設定表示）
-  pawButton.addEventListener('contextmenu', (event) => {
+  // 統合されたクリックハンドラ関数
+  const handlePawClick = function(event) {
+    // イベントの詳細をログ
+    console.log(`🐾 肉球ボタンイベント受信: ${event.type} (${new Date().toISOString()})`);
+    
+    // イベントの伝播を防止
     event.preventDefault();
-    console.log('🔧 肉球ボタンが右クリックされました');
-    handlePawButtonRightClick();
+    event.stopPropagation();
+    
+    // デバウンス処理
+    const currentTime = Date.now();
+    if (isProcessing || currentTime - lastClickTime < DEBOUNCE_TIME) {
+      console.log('⏱️ デバウンス中: イベントをスキップします');
+      return false;
+    }
+    
+    // 処理中フラグを設定
+    isProcessing = true;
+    lastClickTime = currentTime;
+    
+    console.log('🎯 クリック処理を実行します');
+    
+    // 少し遅延させて実行（同じフレームでの複数イベント処理を防止）
+    setTimeout(() => {
+      try {
+        handlePawButtonClickDirect();
+      } finally {
+        // 処理完了フラグを解除（タイムアウト付き）
+        setTimeout(() => {
+          isProcessing = false;
+          console.log('🔓 肉球ボタン処理完了、次のイベントを受け付けます');
+        }, 300);
+      }
+    }, 10);
+    
+    return false;
+  };
+  
+  // 右クリックハンドラ関数
+  const rightClickHandler = function(event) {
+    console.log('🔧 肉球ボタンが右クリックされました', new Date().toISOString());
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // デバウンス処理
+    const currentTime = Date.now();
+    if (isProcessing || currentTime - lastClickTime < DEBOUNCE_TIME) {
+      console.log('⏱️ デバウンス中: 右クリックイベントをスキップします');
+      return false;
+    }
+    
+    // 処理中フラグを設定
+    isProcessing = true;
+    lastClickTime = currentTime;
+    
+    // シンプルに直接処理を呼び出し
+    setTimeout(() => {
+      try {
+        handlePawButtonRightClick();
+      } finally {
+        setTimeout(() => {
+          isProcessing = false;
+        }, 300);
+      }
+    }, 10);
+    
+    return false;
+  };
+  
+  // 強制的にスタイルを設定
+  pawButton.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: rgba(255, 192, 203, 0.9);
+    background-image: radial-gradient(circle, #ffb6c1 30%, #ff69b4 100%);
+    cursor: pointer !important;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-origin: center;
+    -webkit-app-region: no-drag !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    user-select: none;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    pointer-events: auto !important;
+  `;
+  
+  // HTML属性も追加
+  pawButton.setAttribute('role', 'button');
+  pawButton.setAttribute('tabindex', '0');
+  pawButton.setAttribute('aria-label', '秘書たんを呼ぶ');
+  
+  // クリックイベントだけに統一（余分なイベントを登録しない）
+  pawButton.addEventListener('click', handlePawClick);
+  pawButton.addEventListener('contextmenu', rightClickHandler);
+  
+  // キーボードイベント
+  pawButton.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      handlePawClick(e);
+    }
   });
+  
+  console.log('✅ 肉球ボタンにイベントリスナーを設定しました');
+  
+  // テスト用（必要な場合のみ、通常はコメントアウト）
+  // setTimeout(() => {
+  //   console.log('🔄 肉球ボタンの自動クリックテストを実行します');
+  //   pawButton.click();
+  // }, 10000);
+}
+
+// 肉球ボタンのクリック処理（直接呼び出し用）
+function handlePawButtonClickDirect() {
+  console.log('🎯 handlePawButtonClickDirect: 処理開始');
+  
+  // シンプルなメッセージ表示
+  const messages = [
+    'こんにちは！何かお手伝いしましょうか？',
+    'お疲れ様です！休憩も大切ですよ✨',
+    '何か質問があればいつでも声をかけてくださいね',
+    'お仕事頑張ってますね！素敵です',
+    'リラックスタイムも必要ですよ〜',
+    'デスクの整理、手伝いましょうか？'
+  ];
+  
+  const randomIndex = Math.floor(Math.random() * messages.length);
+  const message = messages[randomIndex];
+  
+  try {
+    // 吹き出し表示を優先
+    showBubble('default', message);
+    console.log('💬 吹き出しを表示しました:', message);
+    
+    // まず既存の音声を確実に停止
+    if (window.speechManager && typeof window.speechManager.stopAllSpeech === 'function') {
+      window.speechManager.stopAllSpeech();
+    }
+    
+    // 短い遅延後に音声再生を行う（音声エンジンに完全に停止する時間を与える）
+    setTimeout(() => {
+      // speechManagerが利用可能であれば発声も行う
+      if (window.speechManager && typeof window.speechManager.speak === 'function') {
+        window.speechManager.speak(message, 'normal', 5000);
+        console.log('🎤 speechManager.speak呼び出し成功');
+      }
+    }, 100);
+  } catch (error) {
+    console.error('メッセージ表示エラー:', error);
+    // 最終手段
+    alert(message);
+  }
 }
 
 // 終了ボタンのイベント設定を分離
@@ -192,7 +348,29 @@ function setupQuitButtonEvents(quitButton) {
 
 // 肉球ボタンのクリック処理
 function handlePawButtonClick() {
+  console.log('🐾 handlePawButtonClick: 処理開始');
+  console.log('speechManager確認:', window.speechManager ? '存在します' : '存在しません');
+  
+  // デバッグ: インスペクト
+  try {
+    const pawButton = document.getElementById('paw-button');
+    if (pawButton) {
+      console.log('🐾 pawButtonインスペクト:', {
+        id: pawButton.id,
+        className: pawButton.className,
+        style: pawButton.style.cssText,
+        offsetWidth: pawButton.offsetWidth,
+        offsetHeight: pawButton.offsetHeight
+      });
+    } else {
+      console.error('❌ pawButtonが見つかりません');
+    }
+  } catch (e) {
+    console.error('pawButtonインスペクトエラー:', e);
+  }
+  
   if (window.speechManager && window.speechManager.speak) {
+    console.log('🐾 speechManager.speakメソッドが見つかりました、実行します');
     const messages = [
       'こんにちは！何かお手伝いしましょうか？',
       'お疲れ様です！休憩も大切ですよ✨',
@@ -205,18 +383,29 @@ function handlePawButtonClick() {
     const randomIndex = Math.floor(Math.random() * messages.length);
     const message = messages[randomIndex];
     
-    window.speechManager.speak(message, 'normal', 5000);
+    try {
+      window.speechManager.speak(message, 'normal', 5000);
+      console.log('🐾 speechManager.speak呼び出し成功:', message);
+    } catch (error) {
+      console.error('🐾 speechManager.speak呼び出しエラー:', error);
+      // フォールバック処理
+      showBubble('default', message);
+    }
     return;
   }
   
+  console.log('🐾 speechManagerまたはspeakメソッドが見つからないため、代替手段を使用します');
+  
   if (window.electron && window.electron.ipcRenderer) {
     try {
+      console.log('🐾 electron.ipcRendererを使用して処理します');
       window.electron.ipcRenderer.send('show-random-message');
     } catch (error) {
       console.error('IPC呼び出しエラー:', error);
       showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
     }
   } else {
+    console.log('🐾 フォールバック: 直接吹き出しを表示します');
     showBubble('default', 'こんにちは！何かお手伝いしましょうか？');
   }
 }
@@ -526,11 +715,27 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
     const newText = document.createElement('div');
     newText.id = 'speechText';
     newText.className = 'speech-text';
+    // 明示的なスタイルを設定
+    newText.style.cssText = `
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      color: #4e3b2b !important;
+      width: 100% !important;
+    `;
     bubble.appendChild(newText);
     speechText = newText;
   } else {
     // テキスト要素内の余分な要素をクリア
     textElement.innerHTML = '';
+    // 明示的なスタイルを設定
+    textElement.style.cssText = `
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      color: #4e3b2b !important;
+      width: 100% !important;
+    `;
   }
   
   // テキストを設定（複数の方法で確実に）
@@ -540,6 +745,14 @@ export function showBubble(type = 'default', text = 'こんにちは！何かお
   bubble.className = 'speech-bubble';
   bubble.classList.add('show');
   bubble.classList.add('fixed-position');
+  
+  // 吹き出しに明示的なスタイルを設定
+  bubble.style.cssText = `
+    display: flex !important; 
+    visibility: visible !important; 
+    opacity: 1 !important;
+    z-index: 9999 !important;
+  `;
   
   // タイプに応じたクラスを追加
   if (type === 'warning') {
@@ -630,13 +843,20 @@ function setText(text) {
   textElement.innerHTML = '';
   
   try {
-    // テキストを設定
-    textElement.textContent = text;
-    
-    // 確実に表示されるよう、中にspanを作成して設定
+    // 確実に表示されるよう、明示的なスタイルを持つspanを作成
     const spanElement = document.createElement('span');
     spanElement.textContent = text;
     spanElement.className = 'speech-text-content';
+    // 明示的な色と表示スタイルを設定
+    spanElement.style.cssText = `
+      color: #4e3b2b; 
+      display: inline-block;
+      visibility: visible;
+      opacity: 1;
+      width: 100%;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    `;
     textElement.appendChild(spanElement);
     
     // データ属性にバックアップ
@@ -653,7 +873,13 @@ function setText(text) {
   setTimeout(() => {
     if (!textElement.textContent || textElement.textContent.trim() === '') {
       console.warn('⚠️ テキスト設定後も空になっています。再試行します。');
-      // 単純なテキストノードを追加
+      // 単純なテキストノードを追加し、親要素にも明示的なスタイルを設定
+      textElement.style.cssText = `
+        color: #4e3b2b !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      `;
       const textNode = document.createTextNode(text);
       textElement.appendChild(textNode);
     }
@@ -721,21 +947,37 @@ export function createUI() {
   assistantImage.style.display = 'block';
   assistantImage.style.visibility = 'visible';
   assistantImage.style.opacity = '1';
+  assistantImage.style.position = 'fixed';
+  assistantImage.style.bottom = '124px';
+  assistantImage.style.right = '10px';
+  assistantImage.style.zIndex = '1000';
   
   // 吹き出しの作成
   const speechBubble = document.createElement('div');
   speechBubble.id = 'speechBubble';
   speechBubble.className = 'speech-bubble show'; // showクラスを追加
+  
+  // 画面サイズを取得して適切な位置に配置
+  const windowHeight = window.innerHeight;
+  const windowWidth = window.innerWidth;
+  
+  // 小さい画面の場合は上部に、それ以外は立ち絵の上に配置
+  const bubblePosition = windowHeight < 600 ? 
+    `top: 10px; bottom: auto;` : 
+    `bottom: 300px; top: auto;`;
+    
   speechBubble.style.cssText = `
     display: flex !important; 
     visibility: visible !important; 
     opacity: 1 !important;
     position: fixed !important;
-    z-index: 9999 !important;
-    bottom: 300px !important;
+    z-index: 2147483647 !important;
+    ${bubblePosition}
     right: 10px !important;
+    left: auto !important;
     width: 250px !important;
     max-width: 300px !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
   `;
   speechBubble.style.webkitAppRegion = 'drag'; // ドラッグ可能に設定
   
@@ -743,24 +985,78 @@ export function createUI() {
   const speechText = document.createElement('div');
   speechText.id = 'speechText';
   speechText.className = 'speech-text';
-  speechText.textContent = 'こんにちは！何かお手伝いしましょうか？';
+  speechText.style.cssText = `
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #4e3b2b !important;
+    font-size: 1.05rem !important;
+    line-height: 1.6 !important;
+    width: 100% !important;
+    padding: 5px !important;
+    margin: 0 !important;
+    text-align: left !important;
+    position: relative !important;
+    z-index: 2147483646 !important;
+  `;
+  
+  // テキストをスパン要素として追加
+  const spanElement = document.createElement('span');
+  spanElement.textContent = 'こんにちは！何かお手伝いしましょうか？';
+  spanElement.className = 'speech-text-content';
+  spanElement.style.cssText = `
+    color: #4e3b2b !important; 
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    font-size: 1.05rem !important;
+    line-height: 1.6 !important;
+  `;
+  speechText.appendChild(spanElement);
   
   // 吹き出し要素を組み立て
   speechBubble.appendChild(speechText);
+  
+  // 肉球ボタンのラッパーを作成
+  const pawButtonWrapper = document.createElement('div');
+  pawButtonWrapper.className = 'paw-button-wrapper';
+  pawButtonWrapper.style.webkitAppRegion = 'no-drag'; // クリック可能に設定
+  pawButtonWrapper.style.position = 'fixed';
+  pawButtonWrapper.style.bottom = '20px';
+  pawButtonWrapper.style.right = '20px';
+  pawButtonWrapper.style.zIndex = '9999';
+  
+  // 肉球ボタンの背景エフェクト要素を追加
+  const pawBackground = document.createElement('div');
+  pawBackground.className = 'paw-background';
+  pawButtonWrapper.appendChild(pawBackground);
   
   // 肉球ボタンの作成
   const pawButton = document.createElement('div');
   pawButton.id = 'paw-button';
   pawButton.className = 'paw-button';
   pawButton.textContent = '🐾';
-  pawButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定（これだけはインラインで）
+  pawButton.style.webkitAppRegion = 'no-drag'; // クリック可能に設定
+  pawButton.style.cursor = 'pointer'; // カーソルをポインタに設定
+  
+  // 肉球アイコン（テキスト内容は既にpawButtonに設定済み）
+  pawButtonWrapper.appendChild(pawButton);
   
   // ホバーエフェクト
   pawButton.addEventListener('mouseover', () => {
-    pawButton.style.transform = 'scale(1.1)';
+    pawButton.style.transform = 'scale(1.1) translateY(-5px)';
   });
   
   pawButton.addEventListener('mouseout', () => {
+    pawButton.style.transform = 'scale(1)';
+  });
+  
+  pawButton.addEventListener('mousedown', () => {
+    pawButton.style.transform = 'scale(0.95)';
+  });
+  
+  pawButton.addEventListener('mouseup', () => {
     pawButton.style.transform = 'scale(1)';
   });
   
@@ -783,7 +1079,7 @@ export function createUI() {
   // 要素をコンテナに追加
   container.appendChild(assistantImage);
   container.appendChild(speechBubble);
-  container.appendChild(pawButton);
+  container.appendChild(pawButtonWrapper); // ラッパーを追加
   container.appendChild(quitButton);
   
   // コンテナをドキュメントに追加
@@ -917,6 +1213,63 @@ document.addEventListener('DOMContentLoaded', () => {
   // 立ち絵を表示
   setTimeout(() => {
     showAssistantImage();
+    
+    // ウェルカムメッセージを設定し、自動非表示を防止
+    const welcomeMessage = 'こんにちは！何かお手伝いしましょうか？';
+    console.log('🌸 ウェルカムメッセージを表示します:', welcomeMessage);
+    
+    // 安定したウェルカムメッセージ表示（遅延処理）
+    setTimeout(() => {
+      // 吹き出し要素の取得
+      const bubble = document.getElementById('speechBubble');
+      const textElement = document.getElementById('speechText');
+      
+      if (bubble && textElement) {
+        // 吹き出しを表示状態に設定
+        bubble.style.cssText = `
+          display: flex !important; 
+          visibility: visible !important; 
+          opacity: 1 !important;
+          z-index: 9999 !important;
+        `;
+        bubble.classList.add('speech-bubble', 'show', 'fixed-position');
+        
+        // テキスト要素の初期化
+        textElement.innerHTML = '';
+        textElement.style.cssText = `
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          color: #4e3b2b !important;
+          width: 100% !important;
+        `;
+        
+        // ウェルカムメッセージをセット
+        const spanElement = document.createElement('span');
+        spanElement.textContent = welcomeMessage;
+        spanElement.className = 'speech-text-content welcome-message';
+        spanElement.style.cssText = `
+          color: #4e3b2b !important; 
+          display: inline-block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          width: 100% !important;
+          font-size: 1.05rem !important;
+          line-height: 1.6 !important;
+        `;
+        textElement.appendChild(spanElement);
+        
+        // データ属性に初期メッセージであることを記録
+        textElement.dataset.originalText = welcomeMessage;
+        textElement.dataset.isWelcomeMessage = 'true';
+        textElement.dataset.setTime = Date.now().toString();
+        
+        // 吹き出しが非表示にならないように監視
+        startWelcomeMessageProtection();
+      } else {
+        console.error('speechBubbleまたはspeechText要素が見つかりません');
+      }
+    }, 500);
   }, 100);
   
   // 初期化済みフラグを設定
@@ -983,10 +1336,6 @@ function verifyAndFixUIStructure() {
         opacity: 1 !important;
         position: fixed !important;
         z-index: 9999 !important;
-        bottom: 300px !important;
-        right: 10px !important;
-        width: 250px !important;
-        max-width: 300px !important;
       `;
     }
     
@@ -1245,4 +1594,65 @@ export function debugUI() {
     // 設定UIを吹き出しに表示する関数をエクスポート
     showSettingsInBubble
   };
+}
+
+/**
+ * ウェルカムメッセージの保護機能
+ * 初期化後の一定時間、ウェルカムメッセージが消えないようにする
+ */
+function startWelcomeMessageProtection() {
+  console.log('🛡️ ウェルカムメッセージ保護を開始します');
+  
+  // 保護期間（5秒）
+  const PROTECTION_DURATION = 5000;
+  
+  // メッセージが消えていないか定期的にチェック
+  const textRestoreInterval = setInterval(() => {
+    const textElement = document.getElementById('speechText');
+    const bubble = document.getElementById('speechBubble');
+    
+    if (textElement && bubble) {
+      // テキストが空になっていないか確認
+      if (!textElement.textContent || textElement.textContent.trim() === '') {
+        // データ属性から元のテキストを取得
+        const originalText = textElement.dataset.originalText;
+        
+        if (originalText) {
+          console.log(`🔄 空になったウェルカムメッセージを復元します: "${originalText}"`);
+          
+          // スパンを再作成してテキストを復元
+          textElement.innerHTML = '';
+          const newSpan = document.createElement('span');
+          newSpan.textContent = originalText;
+          newSpan.className = 'speech-text-content welcome-message restored';
+          newSpan.style.cssText = `
+            color: #4e3b2b !important; 
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            width: 100% !important;
+            font-size: 1.05rem !important;
+            line-height: 1.6 !important;
+          `;
+          textElement.appendChild(newSpan);
+          
+          // 吹き出しも表示状態に戻す
+          bubble.style.cssText = `
+            display: flex !important; 
+            visibility: visible !important; 
+            opacity: 1 !important;
+            z-index: 9999 !important;
+          `;
+          bubble.classList.add('show');
+          bubble.classList.remove('hide');
+        }
+      }
+    }
+  }, 100);
+  
+  // 保護期間後に監視を終了
+  setTimeout(() => {
+    clearInterval(textRestoreInterval);
+    console.log('🛡️ ウェルカムメッセージ保護期間が終了しました');
+  }, PROTECTION_DURATION);
 } 

@@ -16,8 +16,10 @@ body, html {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  -webkit-app-region: drag; /* ウィンドウ全体をドラッグ可能に */
 }
 
 #assistant-container {
   background-color: rgba(255, 255, 255, 0) !important;
+  -webkit-app-region: drag; /* コンテナもドラッグ可能に */
 } 

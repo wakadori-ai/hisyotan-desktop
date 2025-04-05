@@ -20,7 +20,8 @@ import {
 import { 
   speak as speakCore, 
   speakWithPreset as speakWithPresetCore,
-  isPlaying
+  isPlaying,
+  stopPlaying
 } from './speakCore.js';
 import { 
   requestVoiceSynthesis, 
@@ -364,6 +365,42 @@ export class SpeechManager {
    */
   getFormattedMessage(message) {
     return formatMessage(message);
+  }
+
+  /**
+   * 現在の音声再生をすべて停止する
+   * @returns {boolean} 停止に成功したらtrue
+   */
+  stopAllSpeech() {
+    try {
+      logDebug('SpeechManager: すべての音声再生を停止します');
+      
+      // 1. すべての非表示タイマーをクリア
+      if (this.hideTimeoutMap && this.hideTimeoutMap.size > 0) {
+        logDebug(`${this.hideTimeoutMap.size}個の非表示タイマーを一括クリアします`);
+        for (const [key, timerId] of this.hideTimeoutMap.entries()) {
+          clearTimeout(timerId);
+          logDebug(`タイマー ${key} をクリアしました`);
+        }
+        this.hideTimeoutMap.clear();
+      }
+      
+      // 2. 音声再生を停止
+      stopPlaying();
+      
+      // 3. 口パクや表情を通常に戻す
+      stopTalking();
+      setExpression('normal');
+      
+      // 4. 現在のセリフ状態をリセット
+      this.currentSpeechEvent = null;
+      this.hasAlreadyForced = false;
+      
+      return true;
+    } catch (error) {
+      logError(`音声停止エラー: ${error.message}`);
+      return false;
+    }
   }
 }
 

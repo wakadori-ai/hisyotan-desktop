@@ -2,7 +2,7 @@
 // 吹き出しの管理
 
 import { logDebug } from '@core/logger.js';
-import { fadeIn, fadeOut } from './animationHandler.js';
+import { fadeIn, fadeOut as animationFadeOut } from './animationHandler.js';
 
 // タイムアウトを管理するための変数
 let bubbleTimeout = null;
@@ -63,8 +63,51 @@ export function hideBubble() {
     bubbleTimeout = null;
   }
   
-  // アニメーションで非表示
-  fadeOut(bubble);
+  // テキスト要素のデータを保持
+  const textElement = document.getElementById('speechText');
+  if (textElement) {
+    // 現在のテキストをデータ属性にバックアップ
+    const currentText = textElement.textContent;
+    if (currentText && currentText.trim() !== '') {
+      console.log(`💾 非表示前にテキストをバックアップ: "${currentText.substring(0, 20)}${currentText.length > 20 ? '...' : ''}"`);
+      textElement.dataset.lastText = currentText;
+      textElement.dataset.hiddenAt = Date.now().toString();
+    }
+  }
+  
+  // アニメーションで非表示（テキストは消さない）
+  fadeOutBubble(bubble);
+}
+
+/**
+ * 要素をフェードアウトさせる（バブル専用の拡張バージョン）
+ * @param {HTMLElement} element - フェードアウトさせる要素
+ */
+function fadeOutBubble(element) {
+  if (!element) return;
+  
+  console.log('🔚 吹き出しフェードアウト開始');
+  
+  // クラスでアニメーション
+  element.classList.remove('show');
+  element.classList.add('hide');
+  
+  // テキスト要素を直接消去しないようにする
+  // 吹き出し自体の表示/非表示のみを制御
+  setTimeout(() => {
+    // displayをnoneにすると子要素も表示されなくなるが、
+    // 要素自体とその中身は保持される
+    element.style.display = 'none';
+    
+    // テキスト要素自体は維持
+    const textElement = document.getElementById('speechText');
+    if (textElement) {
+      // テキスト内容をクリアせず、非表示フラグのみ設定
+      textElement.dataset.hidden = 'true';
+    }
+    
+    console.log('🔚 吹き出しフェードアウト完了');
+  }, 500); // CSS トランジションの時間に合わせる
 }
 
 /**

@@ -23,7 +23,8 @@ export const {
   getHordeModeState,
   setHordeModeState,
   isPlaying,
-  getFormattedMessage
+  getFormattedMessage,
+  stopAllSpeech
 } = instance;
 
 // このモジュールのオブジェクトを作成（挙動の一貫性を保つため）
@@ -39,6 +40,7 @@ const speechManager = {
   setHordeModeState,
   isPlaying,
   getFormattedMessage,
+  stopAllSpeech,
   hideTimeoutMap: instance.hideTimeoutMap
 };
 

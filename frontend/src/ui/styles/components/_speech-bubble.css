@@ -1,8 +1,10 @@
 /* 吹き出しの基本スタイル */
 .speech-bubble {
-  position: absolute;
-  top: -120px;
-  left: 0;
+  position: fixed;
+  top: 10%;
+  right: 10px;
+  left: auto;
+  bottom: auto;
   width: var(--bubble-min-width);
   max-width: var(--bubble-max-width);
   min-height: var(--bubble-min-height);
@@ -12,10 +14,10 @@
   border-radius: 12px;
   padding: 14px 18px;
   font-size: 1.05rem;
-  color: var(--color-text);
+  color: #4e3b2b;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   border: 1.5px solid rgba(255, 200, 220, 0.7);
-  z-index: var(--z-index-modal);
+  z-index: 2147483647;
   opacity: 1;
   transition: opacity var(--transition-duration) ease, 
               transform var(--transition-duration) ease;
@@ -59,23 +61,35 @@
 /* 吹き出しテキスト */
 .speech-text {
   font-size: 1.05rem;
-  color: var(--color-text);
+  color: #4e3b2b;
   line-height: 1.6;
   overflow-wrap: break-word;
   word-break: break-word;
   display: block;
   width: 100%;
   padding-right: 10px;
+  visibility: visible;
+  opacity: 1;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  position: relative;
+  z-index: 2147483646;
 }
 
 /* 吹き出しテキスト内容 */
 .speech-text-content {
-  display: block;
+  display: inline-block;
   width: 100%;
   overflow-wrap: break-word;
   word-break: break-word;
   visibility: visible;
   opacity: 1;
+  color: #4e3b2b;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  position: relative;
+  z-index: 2147483646;
 }
 
 /* 警告吹き出し */
@@ -230,7 +244,10 @@ input:checked + .slider:before {
 .bubble-text {
   font-size: 14px;
   line-height: 1.5;
-  color: var(--color-text);
+  color: #4e3b2b;
+  display: block;
+  visibility: visible;
+  opacity: 1;
 }
 
 /* 吹き出しポップアニメーション */
@@ -290,18 +307,27 @@ body.mouse-active .speech-bubble.active {
 .bubble-text {
   font-size: 14px;
   line-height: 1.5;
-  color: var(--color-text);
+  color: #4e3b2b;
+  display: block;
+  visibility: visible;
+  opacity: 1;
 }
 
-/* 吹き出し固定表示位置 */
+/* 画面サイズによる位置調整 */
+@media screen and (max-height: 600px) {
+  .speech-bubble {
+    top: 10px;
+    bottom: auto;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+}
+
+/* 吹き出しが確実に表示されるための追加スタイル */
 .speech-bubble.fixed-position {
   position: fixed !important;
-  z-index: 9999 !important;
-  bottom: 300px !important;
-  right: 10px !important;
-  width: 280px !important;
-  max-width: 320px !important;
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
+  z-index: 2147483647 !important;
 } 

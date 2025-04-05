@@ -402,8 +402,8 @@ function createWindow() {
   
   // メインウィンドウの設定
   mainWindow = new BrowserWindow({
-    width: 400,
-    height: 600,
+    width: 300,
+    height: 500,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -413,9 +413,9 @@ function createWindow() {
     },
     frame: false,
     transparent: true,
-    backgroundColor: '#26ffffff', // 白色の透明度15%（HEX表記）
+    backgroundColor: '#10ffffff', // 白色の透明度15%（HEX表記）
     hasShadow: false,
-    resizable: false,
+    resizable: true,
     alwaysOnTop: true,
     icon: path.join(__dirname, '../frontend/public/assets/icon.ico')
   });
