@@ -4,7 +4,7 @@
  */
 
 // 必要なモジュールのインポート
-import { showBubble as showBubbleFromHelper, setText as setTextFromHelper, hideSpeechBubble, initSpeechBubbleElements } from '../ui/helpers/speechBubble.js';
+import { showBubble as showBubbleFromHelper, setText as setTextFromHelper, initSpeechBubbleElements } from '../ui/helpers/speechBubble.js';
 import { observeSpeechTextAutoRecovery } from '../ui/helpers/speechObserver.js';
 
 // スタイルシートをインポート
@@ -894,30 +894,30 @@ function setText(text) {
  * 吹き出しを非表示にする
  * 設定UIが表示されている場合は非表示にしない
  */
-export function hideSpeechBubble() {
-  const bubble = document.getElementById('speechBubble') || speechBubble;
-  if (!bubble) return;
+// export function hideSpeechBubble() {
+//   const bubble = document.getElementById('speechBubble') || speechBubble;
+//   if (!bubble) return;
   
-  // 設定UIが表示されているかチェック
-  const textElement = document.getElementById('speechText') || speechText;
-  if (textElement && textElement.querySelector('.settings-container')) {
-    console.log('🔧 設定UIが表示中のため、吹き出しを非表示にしません');
-    return; // 設定UI表示中は非表示にしない
-  }
+//   // 設定UIが表示されているかチェック
+//   const textElement = document.getElementById('speechText') || speechText;
+//   if (textElement && textElement.querySelector('.settings-container')) {
+//     console.log('🔧 設定UIが表示中のため、吹き出しを非表示にしません');
+//     return; // 設定UI表示中は非表示にしない
+//   }
   
-  console.log('💬 吹き出しを非表示にします');
+//   console.log('💬 吹き出しを非表示にします');
   
-  // クラスの切り替え
-  bubble.classList.remove('show');
-  bubble.classList.add('hide');
+//   // クラスの切り替え
+//   bubble.classList.remove('show');
+//   bubble.classList.add('hide');
   
-  // 一定時間後に状態リセット
-  setTimeout(() => {
-    bubble.style.display = 'none';
-    // 次回表示時のためにクラスをリセット
-    bubble.classList.remove('hide', 'warning', 'error', 'success', 'zombie-warning');
-  }, 500);
-}
+//   // 一定時間後に状態リセット
+//   setTimeout(() => {
+//     bubble.style.display = 'none';
+//     // 次回表示時のためにクラスをリセット
+//     bubble.classList.remove('hide', 'warning', 'error', 'success', 'zombie-warning');
+//   }, 500);
+// }
 
 /**
  * UI要素を作成
